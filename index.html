@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>CUPCODE — 원두 조회</title>
+<title>BEAN-HOARDER — 원두 조회</title>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
   :root {
@@ -80,7 +80,7 @@
 const SHEET_CSV_URL = "";
 // ─────────────────────────────────────────────────────────────────
 
-const KEY_RE = /^[A-Z0-9]{5}\d{2}-\d{3}$/;
+const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 const SPEC_FIELDS = [
   ["REGION",       "REGION"],
   ["VARIETY",      "VARIETY"],
@@ -148,7 +148,7 @@ function escapeHtml(s) {
 async function main() {
   const code = getCode();
   if (!code) {
-    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/VEHUH26-001</span>");
+    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/BXNQ26-001</span>");
     return;
   }
   if (!KEY_RE.test(code)) {
@@ -171,7 +171,7 @@ async function main() {
     show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span>`);
     return;
   }
-  document.title = `${(row.ORIGIN || "").trim()} — CUPCODE`;
+  document.title = `${(row.ORIGIN || "").trim()} — BEAN-HOARDER`;
   render(row);
 }
 main();
