@@ -55,6 +55,10 @@
   .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px; }
   .status .code { font-family: var(--mono); color: var(--ink); }
   .hidden { display: none; }
+  .preview-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--sub); border-bottom: 1px dashed var(--line); padding-bottom: 10px; margin-bottom: 14px;
+  }
 </style>
 </head>
 <body>
@@ -107,10 +111,25 @@ function show(msg) {
   document.getElementById("bean").classList.add("hidden");
 }
 
-function render(row) {
+function render(row, isPreview) {
   const g = k => (row[k] || "").trim();
   document.getElementById("status").classList.add("hidden");
-  document.getElementById("bean").classList.remove("hidden");
+  const bean = document.getElementById("bean");
+  bean.classList.remove("hidden");
+
+  let badge = document.getElementById("f-preview-badge");
+  if (isPreview) {
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "f-preview-badge";
+      badge.className = "preview-badge";
+      bean.prepend(badge);
+    }
+    badge.textContent = "초안 미리보기 · 아직 게시되지 않음";
+    badge.classList.remove("hidden");
+  } else if (badge) {
+    badge.classList.add("hidden");
+  }
 
   document.getElementById("f-roastery").textContent = g("ROASTERY");
   document.getElementById("f-origin").textContent = g("ORIGIN");
@@ -145,7 +164,22 @@ function escapeHtml(s) {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(atob(str).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
+}
+
 async function main() {
+  const previewParam = new URLSearchParams(location.search).get("preview");
+  if (previewParam) {
+    try {
+      const row = JSON.parse(b64DecodeUnicode(previewParam));
+      document.title = `${(row.ORIGIN || "").trim()} — BEAN-HOARDER (미리보기)`;
+      render(row, true);
+    } catch (e) {
+      show("미리보기 데이터를 해석하지 못했습니다.");
+    }
+    return;
+  }
   const code = getCode();
   if (!code) {
     show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/BXNQ26-001</span>");

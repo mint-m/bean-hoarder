@@ -6,6 +6,7 @@ $stage = Join-Path $env:TEMP "bnhd-deploy"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory $stage | Out-Null
 Copy-Item (Join-Path $root "index.html") $stage
+Copy-Item (Join-Path $root "admin.html") $stage
 Copy-Item (Join-Path $root "bean_sheet_template.csv") $stage
 Set-Location $root
 npx --yes wrangler pages deploy $stage --project-name bnhd --branch main --commit-dirty=true
