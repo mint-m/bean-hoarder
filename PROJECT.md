@@ -91,19 +91,23 @@ py tools/make_label.py --all               # CSV 전체 배치 생성
 
 | 요소 | 값 |
 |---|---|
-| GitHub 리포 | `Bean-Hoarder` |
-| Cloudflare Pages 프로젝트 | `bnhd` → `https://bnhd.pages.dev` |
+| GitHub 리포 | https://github.com/mint-m/Bean-Hoarder (private) |
+| Cloudflare Pages 프로젝트 | `bnhd` → **https://bnhd.pages.dev (배포 완료)** |
 | 원두 DB | Google Sheets (웹에 게시 → CSV) |
 
-남은 단계는 §9 체크리스트 참고. **도메인 변경 시**: `tools/make_label.py`의 `BASE_URL` 한 줄 수정 후 `--all` 재생성 (알파뉴메릭 모드 이탈 시 스크립트가 에러로 알려줌).
+- 배포 방식: **wrangler 직접 업로드** (`index.html` + `bean_sheet_template.csv`만 스테이징 — 라벨/도구 파일은 비공개 유지)
+- 재배포: `powershell -File tools\deploy.ps1` 또는 인라인으로
+  `npx wrangler pages deploy {스테이징폴더} --project-name bnhd --branch main`
+- GitHub push 자동 배포(git 연동)로 바꾸려면 Cloudflare 대시보드에서 프로젝트를 다시 만들어야 함 — 데모 단계에선 직접 업로드로 충분
+- **도메인 변경 시**: `tools/make_label.py`의 `BASE_URL` 한 줄 수정 후 `--all` 재생성 (알파뉴메릭 모드 이탈 시 스크립트가 에러로 알려줌)
 
 ## 9. 운영 체크리스트
 
 - [x] 라벨 생성기 + QR 전수 검증 (203/320dpi)
 - [x] 조회 웹앱 상태 처리 및 로컬 검증
-- [x] git 저장소 초기화
-- [ ] GitHub push → Cloudflare Pages `bnhd` 연결
-- [ ] 구글시트 생성·발행 → `index.html`의 `SHEET_CSV_URL` 입력
+- [x] GitHub 리포 생성·push (mint-m/Bean-Hoarder)
+- [x] Cloudflare Pages `bnhd` 생성·배포 → https://bnhd.pages.dev 라이브 (경로형/쿼리형 URL 200 확인)
+- [ ] 구글시트 생성·발행 → `index.html`의 `SHEET_CSV_URL` 입력 → 재배포
 - [ ] 님봇 실인쇄 → 폰 카메라 스캔 테스트
 - [ ] 로스터리 실제 로고 파일 교체 (`logos/DANCHE.svg`)
 
