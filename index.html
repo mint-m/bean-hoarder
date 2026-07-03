@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CUPCODE — 원두 조회</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --ink: #111;
+    --sub: #666;
+    --line: #ddd;
+    --bg: #fafafa;
+    --mono: Consolas, "SF Mono", Menlo, monospace;
+    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: var(--sans); color: var(--ink); background: var(--bg);
+    display: flex; justify-content: center; padding: 28px 16px 60px;
+  }
+  main { width: 100%; max-width: 420px; }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 4px;
+    padding: 24px 22px;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub); margin-bottom: 6px;
+  }
+  h1.origin {
+    font-size: 30px; font-weight: 800; letter-spacing: .01em;
+    text-transform: uppercase; line-height: 1.1;
+  }
+  .subline { font-size: 14px; color: var(--ink); margin-top: 6px; }
+  .subline .sep { color: var(--sub); padding: 0 4px; }
+  hr { border: 0; border-top: 1px solid var(--ink); margin: 16px 0 14px; }
+  dl.specs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  dl.specs > div { display: flex; flex-direction: column; }
+  dt { font-size: 10px; letter-spacing: .12em; color: var(--sub); }
+  dd { margin-top: 2px; }
+  .note {
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line);
+    font-style: italic; font-size: 14px; color: #333;
+  }
+  .keyline {
+    margin-top: 18px; display: flex; justify-content: space-between;
+    align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--sub);
+  }
+  .keyline a { color: var(--sub); }
+  .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px; }
+  .status .code { font-family: var(--mono); color: var(--ink); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div id="status" class="card status">불러오는 중…</div>
+  <div id="bean" class="card hidden">
+    <div class="eyebrow" id="f-roastery"></div>
+    <h1 class="origin" id="f-origin"></h1>
+    <div class="subline" id="f-subline"></div>
+    <hr>
+    <dl class="specs" id="f-specs"></dl>
+    <div class="note hidden" id="f-note"></div>
+    <div class="keyline">
+      <span id="f-key"></span>
+      <a id="f-source" class="hidden" target="_blank" rel="noopener">원본 페이지 ↗</a>
+    </div>
+  </div>
+</main>
+<script>
+// ── 설정 ─────────────────────────────────────────────────────────
+// 구글시트: 파일 → 공유 → 웹에 게시 → CSV 발행 후 그 URL을 여기에.
+// 비워 두면 리포에 포함된 템플릿 CSV(데모 데이터)를 읽는다.
+const SHEET_CSV_URL = "";
+// ─────────────────────────────────────────────────────────────────
+
+const KEY_RE = /^[A-Z0-9]{5}\d{2}-\d{3}$/;
+const SPEC_FIELDS = [
+  ["REGION",       "REGION"],
+  ["VARIETY",      "VARIETY"],
+  ["PROCESS",      "PROCESS"],
+  ["ALTITUDE",     "ALT"],
+  ["HARVEST",      "HARVEST"],
+  ["ROAST_DATE",   "ROASTED"],
+  ["PACKAGE_DATE", "PACKAGED"],
+  ["NET_WEIGHT",   "NET"],
+  ["AGTRON",       "AGTRON"],
+];
+
+function getCode() {
+  const q = new URLSearchParams(location.search).get("c");
+  if (q) return q.trim().toUpperCase();
+  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, "");
+  return path ? path.toUpperCase() : null;
+}
+
+function show(msg) {
+  const el = document.getElementById("status");
+  el.innerHTML = msg;
+  el.classList.remove("hidden");
+  document.getElementById("bean").classList.add("hidden");
+}
+
+function render(row) {
+  const g = k => (row[k] || "").trim();
+  document.getElementById("status").classList.add("hidden");
+  document.getElementById("bean").classList.remove("hidden");
+
+  document.getElementById("f-roastery").textContent = g("ROASTERY");
+  document.getElementById("f-origin").textContent = g("ORIGIN");
+  document.getElementById("f-subline").innerHTML =
+    [g("VARIETY"), g("PROCESS")].filter(Boolean)
+      .map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
+
+  const dl = document.getElementById("f-specs");
+  dl.innerHTML = "";
+  for (const [col, label] of SPEC_FIELDS) {
+    const v = g(col);
+    if (!v) continue;                       // 빈 필드 자동 숨김
+    const div = document.createElement("div");
+    div.innerHTML = `<dt>${label}</dt><dd>${escapeHtml(v)}</dd>`;
+    dl.appendChild(div);
+  }
+
+  const note = document.getElementById("f-note");
+  if (g("TASTING_NOTE")) {
+    note.textContent = g("TASTING_NOTE");
+    note.classList.remove("hidden");
+  }
+  document.getElementById("f-key").textContent = g("KEY");
+  const src = document.getElementById("f-source");
+  if (g("SOURCE_URL")) {
+    src.href = g("SOURCE_URL");
+    src.classList.remove("hidden");
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function main() {
+  const code = getCode();
+  if (!code) {
+    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/VEHUH26-001</span>");
+    return;
+  }
+  if (!KEY_RE.test(code)) {
+    show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    return;
+  }
+  const url = SHEET_CSV_URL || "bean_sheet_template.csv";
+  let text;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    text = await res.text();
+  } catch (e) {
+    show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
+    return;
+  }
+  const { data } = Papa.parse(text, { header: true, skipEmptyLines: true });
+  const row = data.find(r => (r.KEY || "").trim().toUpperCase() === code);
+  if (!row) {
+    show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    return;
+  }
+  document.title = `${(row.ORIGIN || "").trim()} — CUPCODE`;
+  render(row);
+}
+main();
+</script>
+</body>
+</html>
