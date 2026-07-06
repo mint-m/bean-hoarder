@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bean-Hoarder v2 — 작동 방식</title>
+<style>
+  :root {
+    --ink: #111; --sub: #666; --line: #ddd; --bg: #fafafa; --accent: #0a6b52;
+    --mono: Consolas, "SF Mono", Menlo, monospace;
+    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg);
+    display: flex; justify-content: center; padding: 40px 16px 80px;
+  }
+  main { width: 100%; max-width: 760px; }
+  header { margin-bottom: 40px; }
+  header .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--sub); }
+  h1 { font-size: 28px; margin: 6px 0 10px; }
+  header p { font-size: 15px; color: var(--sub); line-height: 1.6; max-width: 560px; }
+  .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .badge { font-family: var(--mono); font-size: 11px; background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; color: var(--sub); }
+  section { margin-bottom: 48px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--sub); margin: 0 0 6px; }
+  h3 { font-size: 20px; margin: 0 0 12px; }
+  section > p.lede { font-size: 14px; color: #333; line-height: 1.7; margin: 0 0 20px; max-width: 620px; }
+
+  /* 아키텍처 다이어그램 */
+  .arch { display: flex; flex-direction: column; align-items: center; }
+  .arch-node { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; font-size: 13px; text-align: center; }
+  .arch-arrow { color: var(--sub); font-size: 18px; line-height: 1; margin: 4px 0; }
+  .arch-platform { width: 100%; border: 1.5px dashed var(--line); border-radius: 16px; padding: 28px 20px 22px; margin-top: 4px; }
+  .arch-platform-label { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--sub); margin-bottom: 18px; }
+  .arch-platform-label b { color: var(--ink); }
+  .arch-inner { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
+  .arch-box { background: #f3f3f0; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; flex: 1; min-width: 160px; }
+  .arch-box strong { display: block; font-size: 14px; margin-bottom: 4px; }
+  .arch-box span { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--sub); }
+  .arch-col { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: 1; min-width: 180px; }
+  .arch-hstep { display: flex; align-items: center; }
+  .arch-hstep .arch-arrow { margin: 0 10px; }
+
+  /* 흐름 스텝 */
+  .flow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 2px; }
+  .step { width: 132px; text-align: center; }
+  .step .circle {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+    font-weight: 700; font-size: 13px;
+  }
+  .step strong { display: block; font-size: 13px; margin-bottom: 4px; }
+  .step span { display: block; font-size: 11.5px; color: var(--sub); line-height: 1.4; }
+  .step code { font-family: var(--mono); font-size: 11px; }
+  .flow-arrow { width: 24px; padding-top: 6px; text-align: center; color: var(--line); font-size: 18px; flex-shrink: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--sub); font-weight: 600; }
+  td.old { color: var(--sub); }
+  td.new { color: var(--accent); font-weight: 500; }
+  ul.plain { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.8; }
+  .filelist { font-family: var(--mono); font-size: 12px; color: var(--sub); line-height: 2; }
+  .filelist b { color: var(--ink); }
+
+  @media (max-width: 560px) {
+    .arch-inner { flex-direction: column; }
+    .flow { flex-direction: column; align-items: center; }
+    .flow-arrow { transform: rotate(90deg); padding: 2px 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <div class="eyebrow">Bean-Hoarder v2</div>
+  <h1>작동 방식</h1>
+  <p>구글시트 대신 Cloudflare D1(데이터베이스)과 Pages Functions(서버 코드)로 처음부터 다시 설계한 버전.
+  "웹에 게시" 같은 수동 단계 없이, 가입하면 바로 등록하고 조회할 수 있다.</p>
+  <div class="badges">
+    <span class="badge">비용 0원</span>
+    <span class="badge">Cloudflare Pages 프로젝트 1개</span>
+    <span class="badge">D1 (SQLite)</span>
+    <span class="badge">Pages Functions</span>
+    <span class="badge">백엔드 서버 없음</span>
+  </div>
+</header>
+
+<section>
+  <h2>01 · 전체 구조</h2>
+  <h3>한 프로젝트 안에 정적 페이지, API, DB가 모두 있다</h3>
+  <p class="lede">
+    v1은 조회 웹앱(Cloudflare Pages) · 원두 DB(구글시트) · 라벨 도구(로컬 파이썬)가 서로 다른 세 곳에 흩어져 있었다.
+    v2는 이 세 가지를 <b>하나의 Cloudflare Pages 프로젝트</b> 안으로 합쳤다 — 정적 파일과 서버 코드(Functions)와
+    데이터베이스(D1)가 같은 배포 단위에 있어서, 저장소를 <code style="font-family:var(--mono)">git push</code> 하나로
+    셋 다 함께 배포된다.
+  </p>
+
+  <div class="arch">
+    <div class="arch-node">브라우저 · 폰 카메라</div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-platform">
+      <div class="arch-platform-label"><b>bhv2.pages.dev</b> — Cloudflare Pages 프로젝트 (무료)</div>
+      <div class="arch-inner">
+        <div class="arch-box">
+          <strong>정적 페이지</strong>
+          <span>index.html<br>admin.html<br>label.js (렌더러)</span>
+        </div>
+        <div class="arch-col">
+          <div class="arch-hstep">
+            <span class="arch-arrow">→</span>
+            <div class="arch-box" style="flex:1">
+              <strong>Functions API</strong>
+              <span>/api/signup<br>/api/beans<br>/api/bean/{KEY}<br>/api/export.csv</span>
+            </div>
+          </div>
+          <div class="arch-arrow" style="margin-left:34px">↓</div>
+          <div class="arch-box" style="margin-left:34px">
+            <strong>D1 데이터베이스</strong>
+            <span>users (usercode, token_hash)<br>beans (key, roastery, …)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>02 · 흐름 1</h2>
+  <h3>가입 — 초대코드 하나로 유저코드와 토큰을 받는다</h3>
+  <p class="lede">
+    운영자가 초대코드를 공유하면, 사용자는 admin.html에서 로스터리명과 초대코드만 입력해 가입한다.
+    시트를 만들거나 게시할 필요가 없다 — 서버가 계정을 즉시 만든다.
+  </p>
+  <div class="flow">
+    <div class="step"><div class="circle">1</div><strong>초대코드 입력</strong><span>운영자가 공유한 코드 + 로스터리명</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">2</div><strong><code>POST /api/signup</code></strong><span>Functions가 초대코드 검증</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">3</div><strong>계정 생성</strong><span>유저코드 4자리 + 토큰 64자 발급</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">4</div><strong>토큰 저장</strong><span>브라우저 localStorage에 보관, 재방문 시 자동 사용</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>03 · 흐름 2</h2>
+  <h3>원두 등록 — 서버가 KEY를 채번하고 QR을 자동 검증한다</h3>
+  <p class="lede">
+    폼을 채우는 동안 라벨은 "예상 KEY"로 실시간 미리보기된다. 실제 저장은 등록 버튼을 눌렀을 때 한 번,
+    서버 쪽에서 일어난다 — 같은 연도·같은 유저코드 안에서 원자적으로 다음 번호를 배정하므로 두 사람이
+    동시에 등록해도 번호가 겹치지 않는다.
+  </p>
+  <div class="flow">
+    <div class="step"><div class="circle">1</div><strong>폼 입력</strong><span>입력할 때마다 라벨 미리보기 갱신</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>Bearer 토큰으로 인증된 요청</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">3</div><strong>서버가 KEY 채번</strong><span>같은 유저코드·연도 내 최대값+1</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">4</div><strong>QR 자동 검증</strong><span>203dpi로 래스터화 후 jsQR로 실제 디코드</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">5</div><strong>PNG 다운로드</strong><span>님봇 프린터로 인쇄</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>04 · 흐름 3</h2>
+  <h3>QR 스캔 → 조회 — 데이터베이스를 직접 읽어 렌더링</h3>
+  <p class="lede">
+    라벨의 QR은 <code style="font-family:var(--mono)">https://bhv2.pages.dev/{KEY}</code> 를 가리킨다.
+    v1처럼 CSV를 통째로 내려받아 클라이언트에서 찾는 대신, 서버가 그 KEY 한 건만 조회해서 돌려준다.
+  </p>
+  <div class="flow">
+    <div class="step"><div class="circle">1</div><strong>QR 스캔</strong><span>폰 카메라가 라벨의 QR을 인식</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">2</div><strong>페이지 접속</strong><span>/{KEY} 경로로 이동</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">3</div><strong><code>GET /api/bean/{KEY}</code></strong><span>D1에서 해당 행 한 건만 조회</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="step"><div class="circle">4</div><strong>카드 렌더링</strong><span>원산지·가공·로스팅일 표시, 빈 필드는 자동 숨김</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>05 · 설계 근거</h2>
+  <h3>v1에서 막혔던 지점과 v2의 해법</h3>
+  <table>
+    <tr><th>v1의 마찰</th><th>원인</th><th>v2의 해법</th></tr>
+    <tr><td class="old">"웹에 게시" 단계에서 진행이 멈춤</td><td class="old">구글시트를 DB로 사용</td><td class="new">D1 — 게시라는 개념 자체가 없음</td></tr>
+    <tr><td class="old">사용자마다 Apps Script를 직접 배포</td><td class="old">시트에 쓰려면 인증 필요</td><td class="new">가입 즉시 토큰 발급, 서버가 대신 씀</td></tr>
+    <tr><td class="old">레지스트리 시트를 운영자가 수동 관리</td><td class="old">유저코드 ↔ 시트 매핑 필요</td><td class="new">users 테이블 — 가입이 곧 등록</td></tr>
+    <tr><td class="old">라벨 렌더러가 Python·JS로 이원화</td><td class="old">미리보기와 인쇄 파이프라인 분리</td><td class="new">label.js 단일 모듈을 두 곳에서 공유</td></tr>
+    <tr><td class="old">QR 검증이 데스크톱 파이썬 전용</td><td class="old">zxing-cpp 의존</td><td class="new">jsQR로 브라우저 안에서 자동 검증</td></tr>
+    <tr><td class="old">KEY 채번을 클라이언트가 추측</td><td class="old">CSV를 읽어 max+1 계산</td><td class="new">서버가 등록 시점에 원자적으로 배정</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>06 · 보안 모델</h2>
+  <h3>무료 범위 안에서 최소한으로 충분하게</h3>
+  <ul class="plain">
+    <li><b>가입</b>: 초대코드(운영자가 공유) + 로스터리명만으로 계정 생성. 초대코드는 환경변수라 언제든 교체 가능.</li>
+    <li><b>토큰</b>: 64자 무작위 값. 서버는 SHA-256 해시만 저장 — 유출돼도 원본 토큰을 복원할 수 없음.</li>
+    <li><b>쓰기</b>: <code style="font-family:var(--mono)">Authorization: Bearer &lt;토큰&gt;</code> 필요. 토큰은 가입 시 한 번만 표시된다.</li>
+    <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
+    <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>07 · 비용 구조 (100명 기준)</h2>
+  <table>
+    <tr><th>리소스</th><th>무료 한도</th><th>예상 사용량</th></tr>
+    <tr><td>Pages 정적 요청</td><td>무제한</td><td>—</td></tr>
+    <tr><td>Pages Functions</td><td>100,000 요청/일</td><td>스캔·등록 수백 건/일</td></tr>
+    <tr><td>D1 읽기</td><td>5,000,000/일</td><td>스캔당 1회</td></tr>
+    <tr><td>D1 쓰기</td><td>100,000/일</td><td>등록당 1~2회</td></tr>
+    <tr><td>D1 저장 용량</td><td>5 GB</td><td>원두 1만 건 ≈ 5 MB</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>08 · 관련 파일</h2>
+  <div class="filelist">
+    <div><b>public/index.html</b> — 조회 페이지, /api/bean/{KEY} 호출</div>
+    <div><b>public/admin.html</b> — 스튜디오: 가입, 입력, 미리보기, 등록, 백업</div>
+    <div><b>public/label.js</b> — 라벨 SVG 렌더러 + QR 검증 (미리보기·다운로드 공용)</div>
+    <div><b>functions/api/[[path]].js</b> — signup · beans · bean/{KEY} · export.csv</div>
+    <div><b>schema.sql / seed.sql</b> — D1 테이블 정의, 데모 데이터</div>
+    <div><b>DESIGN.md</b> — 설계 근거 전문</div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>
