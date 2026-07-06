@@ -1,7 +1,16 @@
 // Bean-Hoarder v2 API — Cloudflare Pages Functions + D1
-// 라우트: POST /api/signup, POST|GET /api/beans, GET /api/bean/{KEY}, GET /api/export.csv
+// 인증: Authorization: Bearer {유저코드}:{4자리 암호}  (편의용 암호 — 쓰기에만 필요, 조회는 공개)
+// 라우트:
+//   POST   /api/signup        초대코드 + 암호 → 유저코드 자동 발급
+//   POST   /api/beans         원두 등록 (KEY 서버 채번)
+//   GET    /api/beans         내 원두 목록
+//   GET    /api/bean/{KEY}    공개 조회
+//   PUT    /api/bean/{KEY}    수정 (소유자만)
+//   DELETE /api/bean/{KEY}    삭제 (소유자만)
+//   GET    /api/export.csv    내 데이터 CSV 백업
 
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
+const PIN_RE = /^\d{4}$/;
 const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const FIELDS = ["origin","region","variety","process","altitude","harvest",
   "roast_date","package_date","net_weight","agtron","tasting_note","source_url"];
@@ -18,12 +27,6 @@ async function sha256hex(s) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function randomToken() {
-  const a = new Uint8Array(32);
-  crypto.getRandomValues(a);
-  return [...a].map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 function randomUsercode() {
   const a = new Uint32Array(4);
   crypto.getRandomValues(a);
@@ -34,11 +37,13 @@ function randomUsercode() {
 
 async function auth(env, request) {
   const h = request.headers.get("Authorization") || "";
-  const m = /^Bearer\s+([0-9a-f]{64})$/i.exec(h);
+  const m = /^Bearer\s+([A-Z0-9]{4}):(\d{4})$/i.exec(h);
   if (!m) return null;
-  const hash = await sha256hex(m[1]);
-  return env.DB.prepare("SELECT usercode, roastery FROM users WHERE token_hash = ?")
-    .bind(hash).first();
+  const usercode = m[1].toUpperCase();
+  const hash = await sha256hex(`${usercode}:${m[2]}`);
+  const row = await env.DB.prepare("SELECT usercode FROM users WHERE usercode = ? AND pass_hash = ?")
+    .bind(usercode, hash).first();
+  return row ? { usercode } : null;
 }
 
 function beanToPublic(row) {
@@ -51,22 +56,27 @@ function beanToPublic(row) {
   };
 }
 
+function pickFields(body) {
+  const vals = {};
+  FIELDS.forEach(f => vals[f] = String(body[f.toUpperCase()] || "").trim());
+  return vals;
+}
+
 async function signup(env, request) {
   const body = await request.json().catch(() => ({}));
   if (!env.INVITE_CODE || body.invite !== env.INVITE_CODE) {
     return json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403);
   }
-  const roastery = String(body.roastery || "").trim();
-  if (!roastery) return json({ ok: false, error: "로스터리명은 필수입니다." }, 400);
+  const pin = String(body.password || "").trim();
+  if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
 
-  const token = randomToken();
-  const hash = await sha256hex(token);
   for (let attempt = 0; attempt < 5; attempt++) {
     const usercode = randomUsercode();
+    const hash = await sha256hex(`${usercode}:${pin}`);
     try {
-      await env.DB.prepare("INSERT INTO users (usercode, roastery, token_hash) VALUES (?, ?, ?)")
-        .bind(usercode, roastery, hash).run();
-      return json({ ok: true, usercode, token, roastery });
+      await env.DB.prepare("INSERT INTO users (usercode, pass_hash) VALUES (?, ?)")
+        .bind(usercode, hash).run();
+      return json({ ok: true, usercode });
     } catch (e) { /* usercode 충돌 시 재시도 */ }
   }
   return json({ ok: false, error: "유저코드 발급 실패 (재시도 요망)" }, 500);
@@ -74,14 +84,12 @@ async function signup(env, request) {
 
 async function addBean(env, request, user) {
   const body = await request.json().catch(() => ({}));
-  const roastery = String(body.ROASTERY || user.roastery || "").trim();
-  if (!roastery) return json({ ok: false, error: "ROASTERY는 필수" }, 400);
+  const roastery = String(body.ROASTERY || "").trim();
+  if (!roastery) return json({ ok: false, error: "ROASTERY(원두의 로스터리)는 필수" }, 400);
 
   let year = String(body.YEAR || "").trim();
   if (!/^\d{2}$/.test(year)) year = String(new Date().getUTCFullYear() % 100).padStart(2, "0");
-
-  const vals = {};
-  FIELDS.forEach(f => vals[f] = String(body[f.toUpperCase()] || "").trim());
+  const vals = pickFields(body);
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const { next } = await env.DB.prepare(
@@ -99,6 +107,34 @@ async function addBean(env, request, user) {
     } catch (e) { /* 동시 등록 충돌 시 재채번 */ }
   }
   return json({ ok: false, error: "채번 충돌 반복 (재시도 요망)" }, 500);
+}
+
+async function ownedBean(env, user, key) {
+  if (!KEY_RE.test(key) || !key.startsWith(user.usercode)) return null;
+  return env.DB.prepare("SELECT * FROM beans WHERE key = ? AND usercode = ?")
+    .bind(key, user.usercode).first();
+}
+
+async function updateBean(env, request, user, key) {
+  const existing = await ownedBean(env, user, key);
+  if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
+  const body = await request.json().catch(() => ({}));
+  const roastery = String(body.ROASTERY || "").trim();
+  if (!roastery) return json({ ok: false, error: "ROASTERY는 필수" }, 400);
+  const vals = pickFields(body);
+  await env.DB.prepare(
+    "UPDATE beans SET roastery = ?, " + FIELDS.map(f => `${f} = ?`).join(", ") +
+    " WHERE key = ? AND usercode = ?"
+  ).bind(roastery, ...FIELDS.map(f => vals[f]), key, user.usercode).run();
+  return json({ ok: true, key });
+}
+
+async function deleteBean(env, user, key) {
+  const existing = await ownedBean(env, user, key);
+  if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
+  await env.DB.prepare("DELETE FROM beans WHERE key = ? AND usercode = ?")
+    .bind(key, user.usercode).run();
+  return json({ ok: true, key });
 }
 
 async function listBeans(env, user) {
@@ -136,17 +172,24 @@ export async function onRequest({ request, env, params }) {
   const seg = params.path || [];
   const method = request.method;
   try {
-    if (method === "GET" && seg[0] === "bean" && seg[1]) {
+    if (seg[0] === "bean" && seg[1]) {
       const key = decodeURIComponent(seg[1]).trim().toUpperCase();
-      if (!KEY_RE.test(key)) return json({ ok: false, error: "KEY 형식 오류" }, 400);
-      const row = await env.DB.prepare("SELECT * FROM beans WHERE key = ?").bind(key).first();
-      if (!row) return json({ ok: false, error: "미등록 KEY" }, 404);
-      return json({ ok: true, bean: beanToPublic(row) });
+      if (method === "GET") {
+        if (!KEY_RE.test(key)) return json({ ok: false, error: "KEY 형식 오류" }, 400);
+        const row = await env.DB.prepare("SELECT * FROM beans WHERE key = ?").bind(key).first();
+        if (!row) return json({ ok: false, error: "미등록 KEY" }, 404);
+        return json({ ok: true, bean: beanToPublic(row) });
+      }
+      if (method === "PUT" || method === "DELETE") {
+        const user = await auth(env, request);
+        if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
+        return method === "PUT" ? updateBean(env, request, user, key) : deleteBean(env, user, key);
+      }
     }
     if (method === "POST" && seg[0] === "signup") return signup(env, request);
     if (seg[0] === "beans" || seg[0] === "export.csv") {
       const user = await auth(env, request);
-      if (!user) return json({ ok: false, error: "인증 실패 — 토큰을 확인하세요." }, 401);
+      if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
       if (seg[0] === "beans" && method === "POST") return addBean(env, request, user);
       if (seg[0] === "beans" && method === "GET") return listBeans(env, user);
       if (seg[0] === "export.csv" && method === "GET") return exportCsv(env, user);

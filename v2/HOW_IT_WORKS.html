@@ -102,7 +102,7 @@
     <div class="arch-node">브라우저 · 폰 카메라</div>
     <div class="arch-arrow">↓</div>
     <div class="arch-platform">
-      <div class="arch-platform-label"><b>bhv2.pages.dev</b> — Cloudflare Pages 프로젝트 (무료)</div>
+      <div class="arch-platform-label"><b>bnhd.pages.dev</b> — Cloudflare Pages 프로젝트 (무료)</div>
       <div class="arch-inner">
         <div class="arch-box">
           <strong>정적 페이지</strong>
@@ -113,13 +113,13 @@
             <span class="arch-arrow">→</span>
             <div class="arch-box" style="flex:1">
               <strong>Functions API</strong>
-              <span>/api/signup<br>/api/beans<br>/api/bean/{KEY}<br>/api/export.csv</span>
+              <span>/api/signup<br>/api/beans<br>/api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv</span>
             </div>
           </div>
           <div class="arch-arrow" style="margin-left:34px">↓</div>
           <div class="arch-box" style="margin-left:34px">
             <strong>D1 데이터베이스</strong>
-            <span>users (usercode, token_hash)<br>beans (key, roastery, …)</span>
+            <span>users (usercode, pass_hash)<br>beans (key, roastery, …)</span>
           </div>
         </div>
       </div>
@@ -129,19 +129,20 @@
 
 <section>
   <h2>02 · 흐름 1</h2>
-  <h3>가입 — 초대코드 하나로 유저코드와 토큰을 받는다</h3>
+  <h3>가입 — 초대코드와 4자리 암호만으로 계정이 생긴다</h3>
   <p class="lede">
-    운영자가 초대코드를 공유하면, 사용자는 admin.html에서 로스터리명과 초대코드만 입력해 가입한다.
-    시트를 만들거나 게시할 필요가 없다 — 서버가 계정을 즉시 만든다.
+    이 서비스는 여러 로스터리에서 원두를 사 모으는 "원두 호더" 개인용이다. 그래서 가입에 로스터리명이
+    필요 없다 — 초대코드와 내가 쓸 숫자 4자리 암호만 정하면 서버가 유저코드를 발급한다.
+    암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준)이고, 유저코드+암호만 기억하면 어느 기기에서든 로그인된다.
   </p>
   <div class="flow">
-    <div class="step"><div class="circle">1</div><strong>초대코드 입력</strong><span>운영자가 공유한 코드 + 로스터리명</span></div>
+    <div class="step"><div class="circle">1</div><strong>초대코드 + 암호</strong><span>운영자가 공유한 코드, 내가 정한 숫자 4자리</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong><code>POST /api/signup</code></strong><span>Functions가 초대코드 검증</span></div>
+    <div class="step"><div class="circle">2</div><strong><code>POST /api/signup</code></strong><span>Functions가 초대코드·암호 형식 검증</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">3</div><strong>계정 생성</strong><span>유저코드 4자리 + 토큰 64자 발급</span></div>
+    <div class="step"><div class="circle">3</div><strong>유저코드 발급</strong><span>무작위 4자리, 암호는 해시로만 저장</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong>토큰 저장</strong><span>브라우저 localStorage에 보관, 재방문 시 자동 사용</span></div>
+    <div class="step"><div class="circle">4</div><strong>브라우저 저장</strong><span>localStorage에 보관, 재방문 시 자동 로그인</span></div>
   </div>
 </section>
 
@@ -156,21 +157,25 @@
   <div class="flow">
     <div class="step"><div class="circle">1</div><strong>폼 입력</strong><span>입력할 때마다 라벨 미리보기 갱신</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>Bearer 토큰으로 인증된 요청</span></div>
+    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>유저코드:암호로 인증된 요청</span></div>
     <div class="flow-arrow">→</div>
     <div class="step"><div class="circle">3</div><strong>서버가 KEY 채번</strong><span>같은 유저코드·연도 내 최대값+1</span></div>
     <div class="flow-arrow">→</div>
     <div class="step"><div class="circle">4</div><strong>QR 자동 검증</strong><span>203dpi로 래스터화 후 jsQR로 실제 디코드</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">5</div><strong>PNG 다운로드</strong><span>님봇 프린터로 인쇄</span></div>
+    <div class="step"><div class="circle">5</div><strong>URL·QR 복사</strong><span>상세 URL 또는 QR 이미지를 클립보드로. 라벨 PNG 다운로드는 선택</span></div>
   </div>
+  <p class="lede" style="margin-top:16px">
+    등록 후에는 "내 원두 목록"에서 언제든 수정(<code style="font-family:var(--mono)">PUT</code>)·삭제(<code style="font-family:var(--mono)">DELETE</code>)할 수 있다 —
+    KEY 앞 4자리가 내 유저코드인 원두만 건드릴 수 있다.
+  </p>
 </section>
 
 <section>
   <h2>04 · 흐름 3</h2>
   <h3>QR 스캔 → 조회 — 데이터베이스를 직접 읽어 렌더링</h3>
   <p class="lede">
-    라벨의 QR은 <code style="font-family:var(--mono)">https://bhv2.pages.dev/{KEY}</code> 를 가리킨다.
+    라벨의 QR은 <code style="font-family:var(--mono)">https://bnhd.pages.dev/{KEY}</code> 를 가리킨다.
     v1처럼 CSV를 통째로 내려받아 클라이언트에서 찾는 대신, 서버가 그 KEY 한 건만 조회해서 돌려준다.
   </p>
   <div class="flow">
@@ -202,10 +207,11 @@
   <h2>06 · 보안 모델</h2>
   <h3>무료 범위 안에서 최소한으로 충분하게</h3>
   <ul class="plain">
-    <li><b>가입</b>: 초대코드(운영자가 공유) + 로스터리명만으로 계정 생성. 초대코드는 환경변수라 언제든 교체 가능.</li>
-    <li><b>토큰</b>: 64자 무작위 값. 서버는 SHA-256 해시만 저장 — 유출돼도 원본 토큰을 복원할 수 없음.</li>
-    <li><b>쓰기</b>: <code style="font-family:var(--mono)">Authorization: Bearer &lt;토큰&gt;</code> 필요. 토큰은 가입 시 한 번만 표시된다.</li>
+    <li><b>가입</b>: 초대코드(운영자가 공유) + 숫자 4자리 암호만으로 계정 생성. 초대코드는 환경변수라 언제든 교체 가능.</li>
+    <li><b>암호</b>: 탈취돼도 무방한 편의용 — 무단 등록·수정을 막는 수준. 서버는 SHA-256(유저코드:암호) 해시만 저장.</li>
+    <li><b>쓰기</b>: 등록·수정·삭제·백업에 <code style="font-family:var(--mono)">Authorization: Bearer 유저코드:암호</code> 필요. 브라우저에 저장돼 재방문 시 자동 로그인.</li>
     <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
+    <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
     <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
   </ul>
 </section>

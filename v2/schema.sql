@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
   usercode   TEXT PRIMARY KEY,
-  roastery   TEXT NOT NULL,
-  token_hash TEXT NOT NULL,
+  pass_hash  TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

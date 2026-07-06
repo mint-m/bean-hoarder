@@ -1,74 +1,56 @@
 # Bean-Hoarder
 
-QR 코드 기반 트레이서빌리티를 갖춘 개인용 커피 원두 소분 라벨링 & 조회 시스템.
-40×20mm 라벨을 님봇(NIIMBOT) 프린터로 인쇄하고, QR을 스캔하면 원두 상세 정보가 뜬다.
-백엔드 없음, **총 운영 비용 0원** (Cloudflare Pages + Google Sheets 무료 티어).
+여러 로스터리에서 원두를 사 모아 소분·보관하는 **원두 호더**를 위한 라벨링 & 조회 서비스.
+40×20mm 라벨을 님봇(NIIMBOT) 프린터로 인쇄하고, QR을 스캔하면 그 원두의 상세 정보가 뜬다.
+Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0원**.
 
 | | |
 |---|---|
-| 조회 웹앱 | **[bnhd.pages.dev](https://bnhd.pages.dev)** |
-| 관리자 페이지 | **[bnhd.pages.dev/admin.html](https://bnhd.pages.dev/admin.html)** (비공개 링크, 메인 페이지에서 연결 안 됨) |
-| 원두 DB | Google Sheets (발행 URL 연동 대기 중 — 현재는 데모 CSV로 동작) |
-| 상세 기술 스펙 | [PROJECT.md](PROJECT.md) |
+| 조회 (QR 스캔 대상) | **[bnhd.pages.dev](https://bnhd.pages.dev)** — 인증 없음 |
+| 스튜디오 (등록·관리) | **[bnhd.pages.dev/admin](https://bnhd.pages.dev/admin)** — 가입/로그인 필요 |
+| 데모 | [bnhd.pages.dev/DEMO26-001](https://bnhd.pages.dev/DEMO26-001) |
+| 작동 방식 (그래픽 문서) | [v2/HOW_IT_WORKS.html](v2/HOW_IT_WORKS.html) |
+| 설계 근거 | [v2/DESIGN.md](v2/DESIGN.md) |
 
-> **v2 (제로베이스 재설계)**: 구글시트 대신 Cloudflare D1 + Pages Functions로 다시 설계한 버전이 [v2/](v2/)에 있다.
-> "웹에 게시"·레지스트리·Apps Script·파이썬 검증이 전부 사라지고 가입 즉시 등록·조회가 된다. 설계 근거와 비교표는 [v2/DESIGN.md](v2/DESIGN.md).
+## 사용 흐름
 
-## 이게 뭔가요
+1. **가입** — 운영자에게 받은 초대코드 + 내가 정한 숫자 4자리 암호 → 유저코드(4자리) 자동 발급. 브라우저에 저장되며, 유저코드+암호만 기억하면 어느 기기에서든 로그인.
+2. **등록** — 원두 정보를 입력하면 라벨이 실시간 미리보기되고(QR은 렌더링 때마다 203dpi 실디코드 자동 검증), 등록 버튼을 누르면 서버가 KEY(`{유저코드}{연도}-{순번}`)를 채번.
+3. **공유·인쇄** — 상세 URL 복사 / QR 이미지 클립보드 복사가 기본 동선, 라벨 PNG(203dpi 님봇·320dpi)·SVG 다운로드는 선택.
+4. **관리** — "내 원두 목록"에서 수정·삭제·URL 복사, CSV 백업 다운로드.
+5. **조회** — 라벨 QR 스캔 → `bnhd.pages.dev/{KEY}` → 원두 카드. 누구나 볼 수 있고 빈 필드는 자동 숨김.
 
-원두를 소분할 때마다 라벨을 인쇄하고, 그 QR을 스캔하면 원산지·가공방식·로스팅일·테이스팅 노트 같은 정보가 바로 뜨는 시스템이다. 별도 앱이나 데이터베이스 없이 구글시트 한 장이 원두 DB이고, 정적 웹페이지 한 장이 조회 화면이다. 시트 행, 라벨의 QR, 웹앱의 조회 대상은 모두 `KEY` 하나(예: `BXNQ26-001`)로 연결된다.
-
-```
-[구글시트]  ──발행(CSV)──▶  [조회 웹앱]  ◀──스캔──  [라벨 QR]
-  원두 DB                    index.html              40×20mm
-  (KEY 기준)               (bnhd.pages.dev)        (QR + 코드 병기)
-```
-
-## 빠르게 훑어보기
-
-- **키 체계**: `BXNQ` (유저코드 4자리, 고정) + 연도 2자리 + 순번 3자리 → `BXNQ26-001`
-- **QR**: 대문자 경로형 URL(`HTTPS://BNHD.PAGES.DEV/BXNQ26-001`)로 인코딩해 알파뉴메릭 모드 유지 → 25×25 모듈, 스캔 안정적
-- **라벨 생성**: `py tools/make_label.py --all` — 님봇 인쇄용 203dpi + 미리보기용 320dpi를 함께 렌더링하고, 매 라벨마다 QR을 실제로 디코드해 검증
-- **원두 등록**: [admin.html](https://bnhd.pages.dev/admin.html)에서 폼 입력 → KEY 자동 채번 → 라벨/QR 실시간 미리보기 → CSV 행 복사해서 시트에 붙여넣기
-- **조회**: `index.html`이 발행된 시트 CSV를 클라이언트에서 직접 파싱해 렌더링 (백엔드 없음)
-
-## 구성 파일
-
-| 파일 | 역할 |
-|---|---|
-| `index.html` | 조회 웹앱 — QR을 스캔하면 뜨는 화면. `?preview=` 파라미터로 초안 데이터도 렌더링 가능 |
-| `admin.html` | 관리자 페이지 — 원두 입력, KEY 채번, QR/라벨 실시간 미리보기, 시각적 디자인 편집기 |
-| `tools/make_label.py` | 라벨 SVG/PNG 생성기 (203/320dpi) + QR 디코드 전수 검증 |
-| `tools/apps_script.gs` | 시트 업로드 수신기 — 구글시트에 붙여넣어 배포하면 admin.html의 "시트로 업로드"가 동작 |
-| `tools/deploy.ps1` | Cloudflare Pages 재배포 스크립트 |
-| `bean_sheet_template.csv` | 구글시트 임포트용 템플릿 겸 로컬 데모 데이터 |
-| `registry_template.csv` | 멀티유저 레지스트리 템플릿 (유저코드 → 시트 CSV URL 매핑) |
-| `logos/` | 로스터리 로고 (파일명이 `ROASTERY` 값과 일치하면 라벨에 자동 표기) |
-| `labels/` | 생성된 라벨 산출물 |
-
-## 로컬에서 열어보기
+## 구조
 
 ```
-py -m http.server 8788
+bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
+├── v2/public/            정적 페이지 (index=조회, admin=스튜디오, label.js=라벨 렌더러)
+├── v2/functions/api/     서버 코드 — signup / beans(CRUD) / bean/{KEY} / export.csv
+└── D1 (bnhd-v2)          users(usercode, pass_hash) · beans(key, roastery, …)
 ```
-- 조회 화면: `http://localhost:8788/?c=BXNQ26-001`
-- 관리자 페이지: `http://localhost:8788/admin.html`
+
+- 쓰기(등록·수정·삭제·백업)는 `유저코드:암호` 인증, 읽기(QR 조회)는 공개
+- 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — SHA-256 해시만 저장
+- 수정·삭제는 KEY 앞 4자리가 내 유저코드인 원두만 가능
+
+## 운영
+
+- **배포**: `cd v2 && npx wrangler pages deploy` (wrangler.toml이 D1 바인딩·초대코드 포함)
+- **초대코드 교체**: `v2/wrangler.toml`의 `INVITE_CODE` 수정 후 재배포
+- **DB 백업**: `npx wrangler d1 export bnhd-v2 --remote` / 사용자는 각자 CSV 내보내기
+- **스키마 변경**: `v2/schema.sql` 수정 → `npx wrangler d1 execute bnhd-v2 --remote --file=schema.sql`
+- **라벨 배치 인쇄** (선택): `py tools/make_label.py --all` — KEY 형식·도메인이 동일해 v2에도 그대로 사용 가능 (CSV 백업 파일을 입력으로)
 
 ## 진행 기록
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-07-03 | 초기 설계: 키 체계, 라벨 SVG 생성기, 조회 웹앱, 시트 스키마 확정. QR을 대문자 경로형 URL로 바꿔 25×25 모듈(알파뉴메릭 모드) 유지하도록 원안 개선 |
-| 2026-07-03 | Bean-Hoarder로 리브랜딩 — 유저코드 5→4자리(`BXNQ`), URL을 `bnhd.pages.dev`로 확정. 라벨 가독성 개선(스펙 그리드 라벨/값 폰트 위계 분리), 정보 우선순위 조정(HARVEST는 웹앱 상세만, 로스터리 필수 표기 + 로고 자동 삽입), 님봇 프린터 대응(203dpi 인쇄용 렌더 추가) |
-| 2026-07-03 | GitHub 리포 생성(`mint-m/Bean-Hoarder`, private) 및 Cloudflare Pages 배포(`bnhd.pages.dev`) — wrangler 직접 업로드 방식으로 정식 라이브. 구글시트 생성(발행은 사용자 권한 필요 단계로 대기 중) |
-| 2026-07-04 | 관리자 페이지(`admin.html`) 추가 — 데이터 입력 폼, CSV 기반 KEY 자동 채번, 클라이언트 QR 미리보기, 시각적 라벨 디자인 편집기(필드 토글·폰트/QR 크기 조절·로고 업로드), CSV 행/QR 콘텐츠 복사, SVG/PNG 다운로드. `index.html`에 `?preview=` 모드를 추가해 시트에 게시하기 전에 QR이 연결될 상세 페이지를 미리 확인할 수 있게 함 |
-| 2026-07-06 | 멀티유저 구조(100명 규모, 비용 0원 유지) — 레지스트리 시트로 유저코드→시트 매핑, `index.html`이 KEY 앞 4자리로 사용자별 시트를 찾아 조회. admin.html에 "내 설정"(유저코드 발급·시트 URL 고정 저장, localStorage), Apps Script 기반 "시트로 업로드", 병합 "CSV 다운로드" 추가. 라벨 디자인 기본값 조정(서브라인: 지역·가공 / 스펙: RSTD·PKGD·NET, HARV 옵션 제거, 사이즈 조정은 접기) |
-| 2026-07-06 | **v2 제로베이스 재설계** (`v2/`) — 컨셉만 유지하고 Cloudflare D1 + Pages Functions로 재구축. 초대코드 가입 → 유저코드·토큰 자동 발급, KEY 서버 채번, 공개 조회 API, CSV 백업 API, 라벨 렌더러 단일 모듈화(label.js), jsQR로 브라우저 내 203dpi QR 자동 검증. 로컬 에뮬레이터에서 가입→등록→조회→백업 전 구간 검증 완료, 원격 D1 생성·시드 완료 (배포는 확인 대기) |
+| 2026-07-03 | v1: 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지. `bnhd.pages.dev` 첫 배포 |
+| 2026-07-04 | v1 관리자 페이지(KEY 채번·QR 미리보기·디자인 편집기) 추가 |
+| 2026-07-06 | 멀티유저 시도(레지스트리 시트 + Apps Script) 후, **v2 제로베이스 재설계** — Cloudflare D1 + Pages Functions로 재구축, 라벨 렌더러 단일화, jsQR 브라우저 검증 |
+| 2026-07-07 | **v2 정식 완성·배포** — 서비스 정의를 "원두 호더 개인용"으로 확정(가입에서 로스터리 제거), 인증을 유저코드+4자리 암호로 교체, 목록·수정·삭제, 상세 URL/QR 이미지 클립보드 복사 추가. `bnhd.pages.dev`에서 v1 교체, 라이브 전 구간 검증. v1 웹 파일은 `legacy/`로 이동 |
 
 ## 남은 일
 
-- [ ] 구글시트 "웹에 게시" (사용자가 직접 — 공유/권한 변경은 자동화 대상 아님) → 발행 CSV URL을 `index.html`의 `SHEET_CSV_URL`에 입력 → 재배포
 - [ ] 님봇 실제 인쇄 → 폰 카메라 스캔 테스트
-- [ ] 로스터리 실제 로고 파일로 교체 (`logos/DANCHE.svg`는 플레이스홀더)
-
-세부 스펙(키 체계 근거, QR 인코딩 계산, 라벨 지오메트리, 배포 절차 전체)은 [PROJECT.md](PROJECT.md)에 정리되어 있다.
+- [ ] 첫 실사용자 초대 (초대코드 전달)

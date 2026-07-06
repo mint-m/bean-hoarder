@@ -2,7 +2,7 @@
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
 // 전역 의존: qrcode-generator(qrcode), jsQR — admin.html에서 <script>로 선로드.
 
-export const BASE_URL = "HTTPS://BHV2.PAGES.DEV";
+export const BASE_URL = "HTTPS://BNHD.PAGES.DEV";
 
 export const W = 40, H = 20;
 const MARGIN = 1.8, QUIET = 1.3;

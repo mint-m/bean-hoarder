@@ -1,6 +1,8 @@
-# BEAN-HOARDER — 커피 원두 소분 라벨링 & 조회 시스템
+# BEAN-HOARDER v1 — 커피 원두 소분 라벨링 & 조회 시스템 (구버전 기록)
 
-> 프로젝트 개요와 진행 기록은 [README.md](README.md) 참고. 이 문서는 상세 기술 스펙.
+> **이 문서는 v1(구글시트 기반) 기록용입니다.** 현재 라이브 서비스는 v2(Cloudflare D1 + Functions)이며
+> [README.md](README.md)와 [v2/DESIGN.md](v2/DESIGN.md)를 참고하세요. v1 웹 파일은 `legacy/`에 보존.
+> 라벨 사양(§4)과 `tools/make_label.py`(§5)는 v2에서도 그대로 유효합니다.
 
 QR 코드 기반 트레이서빌리티를 갖춘 개인/테스트용 원두 소분 라벨 시스템.
 40×20mm 라벨을 님봇(NIIMBOT) 라벨 프린터로 인쇄하고, QR을 스캔하면 구글시트에 등록된 원두 상세 정보를 조회한다.

@@ -19,19 +19,26 @@ v1을 운영하며 드러난 마찰을 근거로 삼았다.
 
 유지한 것: 키 체계(`{유저코드4}{연도2}-{순번3}`), 대문자 경로형 QR(25×25 유지), 40×20mm 라벨 사양(님봇 203dpi), 라벨 정보 계층, 빈 필드 자동 숨김.
 
+## 서비스 정의 (확정)
+
+**여러 로스터리에서 원두를 사서 소분·보관하는 "원두 호더" 개인용.** 계정 = 호더 한 사람이고,
+로스터리는 원두 행마다 기록하는 속성이다 (가입과 무관). 도메인은 v1의 **bnhd.pages.dev**를 이어받는다.
+
 ## 아키텍처
 
 ```
-bhv2.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
-├── /                핵심 조회: /{KEY} → GET /api/bean/{KEY} → 카드 렌더
-├── /admin.html      스튜디오: 가입, 입력, 라벨 미리보기+검증, 등록, 내보내기
+bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
+├── /                핵심 조회: /{KEY} → GET /api/bean/{KEY} → 카드 렌더 (인증 없음)
+├── /admin.html      스튜디오: 가입/로그인, 입력, 라벨 미리보기+검증, 등록·수정·삭제, 목록, 백업
 ├── functions/api/   Pages Functions (서버 코드, 같은 배포에 포함)
-│     POST /api/signup        초대코드 → 유저코드+토큰 발급
-│     POST /api/beans         원두 등록 (Bearer 토큰, KEY 서버 채번)
-│     GET  /api/beans         내 원두 목록 (Bearer)
-│     GET  /api/bean/{KEY}    공개 조회
-│     GET  /api/export.csv    내 데이터 CSV 백업 (Bearer)
-└── D1: users(usercode, roastery, token_hash) / beans(key, usercode, …)
+│     POST   /api/signup        초대코드+암호 → 유저코드 자동 발급
+│     POST   /api/beans         원두 등록 (KEY 서버 채번)
+│     GET    /api/beans         내 원두 목록
+│     GET    /api/bean/{KEY}    공개 조회
+│     PUT    /api/bean/{KEY}    수정 (소유자만)
+│     DELETE /api/bean/{KEY}    삭제 (소유자만)
+│     GET    /api/export.csv    내 데이터 CSV 백업
+└── D1: users(usercode, pass_hash) / beans(key, usercode, roastery, …)
 ```
 
 ## 비용 (100명 기준, 전액 무료)
@@ -48,22 +55,27 @@ bhv2.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
 
 ## 인증 모델 (무료 범위에서 최소·충분)
 
-- **가입**: 초대코드(운영자가 공유) + 로스터리명 → 서버가 유저코드 4자리와 토큰(64자 hex, 1회만 표시)을 발급. 토큰은 SHA-256 해시로만 저장.
-- **쓰기**: `Authorization: Bearer {토큰}`. 토큰은 브라우저 localStorage에 저장되어 재방문 시 자동 사용.
-- **읽기**: 공개 (QR 스캔이 목적이므로).
+- **가입**: 초대코드(운영자가 공유) + 원하는 **숫자 4자리 암호** → 서버가 유저코드 4자리 자동 발급.
+- **암호**: 탈취돼도 무방하다는 전제의 편의용(무단 등록·수정 방지 수준). 서버는 `SHA-256(유저코드:암호)` 해시만 저장, 브라우저 localStorage에 저장 권장. 유저코드+암호만 기억하면 어느 기기에서든 로그인.
+- **쓰기(등록·수정·삭제·백업)**: `Authorization: Bearer {유저코드}:{암호}`.
+- **읽기(QR 조회)**: 공개 — 스캔에 인증 없음.
 - 오남용 시: 운영자가 D1에서 해당 사용자 행 삭제 → 즉시 차단. 초대코드 교체는 환경변수 수정.
+
+## 원두 관리와 등록 후 동선
+
+- 스튜디오 "내 원두 목록": 행별 **수정 로드 / 상세 URL 복사 / 삭제**. 등록 성공 시 그 KEY의 편집 모드로 자동 전환.
+- 등록 후 기본 동선은 **상세 URL 복사**와 **QR 이미지 복사**(콰이엇존 포함 PNG, 클립보드 미지원 시 다운로드 폴백). 라벨 PNG(203dpi 님봇·320dpi)·SVG 다운로드는 접힌 "선택" 메뉴.
+- 채번은 연도 내 MAX+1 — 가장 최근 원두를 삭제 후 재등록하면 그 번호가 재사용됨(잘못 등록→삭제→재등록 흐름에 자연스러움).
 
 ## v1 대비 잃는 것 (수용한 트레이드오프)
 
 - 사용자가 데이터를 "자기 구글시트"로 소유하지 않음 → `GET /api/export.csv`로 언제든 전체 백업 가능하게 보완.
-- 시트 UI로 대량 편집하는 편의 → 수정·삭제 API는 v2.1 과제 (현재는 등록·조회·백업).
 - 운영자 계정(Cloudflare)에 인프라가 종속 → 어차피 v1도 Pages는 동일했고, D1 데이터는 `wrangler d1 export`로 덤프 가능.
 
-## 마이그레이션 / 공존
+## 마이그레이션
 
-- v1(`bnhd.pages.dev`)은 그대로 두고 v2는 `bhv2.pages.dev`에 독립 배포.
-- QR URL이 다르므로 (`HTTPS://BHV2.PAGES.DEV/{KEY}`, 33자 — 여전히 25×25 알파뉴메릭) 라벨은 버전별로 자기 도메인을 가리킴.
-- v2가 검증되면: v1 CSV를 `/api/beans`로 일괄 등록하는 스크립트 한 번 → `bnhd` 프로젝트를 v2 코드로 재배포하면 기존 QR도 v2로 연결됨 (경로 형식이 동일하므로).
+- `bnhd.pages.dev` Pages 프로젝트에 v2를 배포해 v1(구글시트 방식)을 교체. 인쇄된 실라벨이 없던 시점이라 손실 없음.
+- v1 웹 파일은 리포의 `legacy/`로 이동, 라벨 배치 생성기(`tools/make_label.py`)는 KEY 형식·도메인이 동일해 그대로 사용 가능.
 
 ## 운영 절차
 
