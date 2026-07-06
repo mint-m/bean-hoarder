@@ -1,0 +1,11 @@
+name = "bhv2"
+compatibility_date = "2026-05-03"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bnhd-v2"
+database_id = "f6b539d0-3394-4011-9f00-f3961d549409"
+
+[vars]
+INVITE_CODE = "BH-56JQKGQT"

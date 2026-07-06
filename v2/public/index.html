@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>BEAN-HOARDER — 원두 조회</title>
+<style>
+  :root {
+    --ink: #111; --sub: #666; --line: #ddd; --bg: #fafafa;
+    --mono: Consolas, "SF Mono", Menlo, monospace;
+    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: var(--sans); color: var(--ink); background: var(--bg);
+    display: flex; justify-content: center; padding: 28px 16px 60px;
+  }
+  main { width: 100%; max-width: 420px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 24px 22px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--sub); margin-bottom: 6px;
+  }
+  h1.origin { font-size: 30px; font-weight: 800; letter-spacing: .01em; text-transform: uppercase; line-height: 1.1; }
+  .subline { font-size: 14px; margin-top: 6px; }
+  .subline .sep { color: var(--sub); padding: 0 4px; }
+  hr { border: 0; border-top: 1px solid var(--ink); margin: 16px 0 14px; }
+  dl.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; font-family: var(--mono); font-size: 13px; }
+  dl.specs > div { display: flex; flex-direction: column; }
+  dt { font-size: 10px; letter-spacing: .12em; color: var(--sub); }
+  dd { margin-top: 2px; }
+  .note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); font-style: italic; font-size: 14px; color: #333; }
+  .keyline { margin-top: 18px; display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--sub); }
+  .keyline a { color: var(--sub); }
+  .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px; }
+  .status .code { font-family: var(--mono); color: var(--ink); }
+  .hidden { display: none; }
+  .preview-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--sub); border-bottom: 1px dashed var(--line); padding-bottom: 10px; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div id="status" class="card status">불러오는 중…</div>
+  <div id="bean" class="card hidden">
+    <div class="eyebrow" id="f-roastery"></div>
+    <h1 class="origin" id="f-origin"></h1>
+    <div class="subline" id="f-subline"></div>
+    <hr>
+    <dl class="specs" id="f-specs"></dl>
+    <div class="note hidden" id="f-note"></div>
+    <div class="keyline">
+      <span id="f-key"></span>
+      <a id="f-source" class="hidden" target="_blank" rel="noopener">원본 페이지 ↗</a>
+    </div>
+  </div>
+</main>
+<script>
+const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
+const SPEC_FIELDS = [
+  ["REGION", "REGION"], ["VARIETY", "VARIETY"], ["PROCESS", "PROCESS"],
+  ["ALTITUDE", "ALT"], ["HARVEST", "HARVEST"], ["ROAST_DATE", "ROASTED"],
+  ["PACKAGE_DATE", "PACKAGED"], ["NET_WEIGHT", "NET"], ["AGTRON", "AGTRON"],
+];
+
+function getCode() {
+  const q = new URLSearchParams(location.search).get("c");
+  if (q) return q.trim().toUpperCase();
+  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, "");
+  return path && path !== "index.html" ? path.toUpperCase() : null;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function show(msg) {
+  const el = document.getElementById("status");
+  el.innerHTML = msg;
+  el.classList.remove("hidden");
+  document.getElementById("bean").classList.add("hidden");
+}
+
+function render(row, isPreview) {
+  const g = k => (row[k] || "").trim();
+  document.getElementById("status").classList.add("hidden");
+  const bean = document.getElementById("bean");
+  bean.classList.remove("hidden");
+
+  let badge = document.getElementById("f-preview-badge");
+  if (isPreview) {
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "f-preview-badge";
+      badge.className = "preview-badge";
+      bean.prepend(badge);
+    }
+    badge.textContent = "초안 미리보기 · 아직 등록되지 않음";
+    badge.classList.remove("hidden");
+  } else if (badge) {
+    badge.classList.add("hidden");
+  }
+
+  document.getElementById("f-roastery").textContent = g("ROASTERY");
+  document.getElementById("f-origin").textContent = g("ORIGIN");
+  document.getElementById("f-subline").innerHTML =
+    [g("VARIETY"), g("PROCESS")].filter(Boolean)
+      .map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
+
+  const dl = document.getElementById("f-specs");
+  dl.innerHTML = "";
+  for (const [col, label] of SPEC_FIELDS) {
+    const v = g(col);
+    if (!v) continue;
+    const div = document.createElement("div");
+    div.innerHTML = `<dt>${label}</dt><dd>${escapeHtml(v)}</dd>`;
+    dl.appendChild(div);
+  }
+
+  const note = document.getElementById("f-note");
+  if (g("TASTING_NOTE")) {
+    note.textContent = g("TASTING_NOTE");
+    note.classList.remove("hidden");
+  }
+  document.getElementById("f-key").textContent = g("KEY");
+  const src = document.getElementById("f-source");
+  if (g("SOURCE_URL")) {
+    src.href = g("SOURCE_URL");
+    src.classList.remove("hidden");
+  }
+  document.title = `${g("ORIGIN")} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
+}
+
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(atob(str).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
+}
+
+async function main() {
+  const previewParam = new URLSearchParams(location.search).get("preview");
+  if (previewParam) {
+    try {
+      render(JSON.parse(b64DecodeUnicode(previewParam)), true);
+    } catch (e) {
+      show("미리보기 데이터를 해석하지 못했습니다.");
+    }
+    return;
+  }
+  const code = getCode();
+  if (!code) {
+    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/DEMO26-001</span>");
+    return;
+  }
+  if (!KEY_RE.test(code)) {
+    show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    return;
+  }
+  let res;
+  try {
+    res = await fetch(`/api/bean/${encodeURIComponent(code)}`, { cache: "no-store" });
+  } catch (e) {
+    show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
+    return;
+  }
+  if (res.status === 404) {
+    show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    return;
+  }
+  if (!res.ok) {
+    show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
+    return;
+  }
+  const { bean } = await res.json();
+  render(bean, false);
+}
+main();
+</script>
+</body>
+</html>
