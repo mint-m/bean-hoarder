@@ -79,9 +79,12 @@
 </main>
 <script>
 // ── 설정 ─────────────────────────────────────────────────────────
-// 구글시트: 파일 → 공유 → 웹에 게시 → CSV 발행 후 그 URL을 여기에.
-// 비워 두면 리포에 포함된 템플릿 CSV(데모 데이터)를 읽는다.
+// 단일 사용자 모드: 발행된 시트 CSV URL을 SHEET_CSV_URL에 입력.
+// 멀티유저 모드: REGISTRY_CSV_URL에 레지스트리 시트(USERCODE,CSV_URL 컬럼)의
+//   발행 CSV URL을 입력하면, KEY 앞 4자리(유저코드)로 각 사용자의 시트를 찾는다.
+// 둘 다 비어 있으면 리포에 포함된 템플릿 CSV(데모 데이터)를 읽는다.
 const SHEET_CSV_URL = "";
+const REGISTRY_CSV_URL = "";
 // ─────────────────────────────────────────────────────────────────
 
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
@@ -189,7 +192,21 @@ async function main() {
     show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span>`);
     return;
   }
-  const url = SHEET_CSV_URL || "bean_sheet_template.csv";
+  let url = SHEET_CSV_URL || "bean_sheet_template.csv";
+  if (REGISTRY_CSV_URL) {
+    try {
+      const regRes = await fetch(REGISTRY_CSV_URL, { cache: "no-store" });
+      if (regRes.ok) {
+        const reg = Papa.parse(await regRes.text(), { header: true, skipEmptyLines: true }).data;
+        const uc = code.slice(0, 4);
+        const hit = reg.find(r =>
+          (r.USERCODE || "").trim().toUpperCase() === uc &&
+          (r.CSV_URL || "").trim() &&
+          (r.STATUS || "active").trim().toLowerCase() !== "disabled");
+        if (hit) url = hit.CSV_URL.trim();
+      }
+    } catch (e) { /* 레지스트리 실패 시 기본 URL로 폴백 */ }
+  }
   let text;
   try {
     const res = await fetch(url, { cache: "no-store" });

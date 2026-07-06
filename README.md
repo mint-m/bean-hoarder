@@ -36,8 +36,10 @@ QR 코드 기반 트레이서빌리티를 갖춘 개인용 커피 원두 소분 
 | `index.html` | 조회 웹앱 — QR을 스캔하면 뜨는 화면. `?preview=` 파라미터로 초안 데이터도 렌더링 가능 |
 | `admin.html` | 관리자 페이지 — 원두 입력, KEY 채번, QR/라벨 실시간 미리보기, 시각적 디자인 편집기 |
 | `tools/make_label.py` | 라벨 SVG/PNG 생성기 (203/320dpi) + QR 디코드 전수 검증 |
+| `tools/apps_script.gs` | 시트 업로드 수신기 — 구글시트에 붙여넣어 배포하면 admin.html의 "시트로 업로드"가 동작 |
 | `tools/deploy.ps1` | Cloudflare Pages 재배포 스크립트 |
 | `bean_sheet_template.csv` | 구글시트 임포트용 템플릿 겸 로컬 데모 데이터 |
+| `registry_template.csv` | 멀티유저 레지스트리 템플릿 (유저코드 → 시트 CSV URL 매핑) |
 | `logos/` | 로스터리 로고 (파일명이 `ROASTERY` 값과 일치하면 라벨에 자동 표기) |
 | `labels/` | 생성된 라벨 산출물 |
 
@@ -57,6 +59,7 @@ py -m http.server 8788
 | 2026-07-03 | Bean-Hoarder로 리브랜딩 — 유저코드 5→4자리(`BXNQ`), URL을 `bnhd.pages.dev`로 확정. 라벨 가독성 개선(스펙 그리드 라벨/값 폰트 위계 분리), 정보 우선순위 조정(HARVEST는 웹앱 상세만, 로스터리 필수 표기 + 로고 자동 삽입), 님봇 프린터 대응(203dpi 인쇄용 렌더 추가) |
 | 2026-07-03 | GitHub 리포 생성(`mint-m/Bean-Hoarder`, private) 및 Cloudflare Pages 배포(`bnhd.pages.dev`) — wrangler 직접 업로드 방식으로 정식 라이브. 구글시트 생성(발행은 사용자 권한 필요 단계로 대기 중) |
 | 2026-07-04 | 관리자 페이지(`admin.html`) 추가 — 데이터 입력 폼, CSV 기반 KEY 자동 채번, 클라이언트 QR 미리보기, 시각적 라벨 디자인 편집기(필드 토글·폰트/QR 크기 조절·로고 업로드), CSV 행/QR 콘텐츠 복사, SVG/PNG 다운로드. `index.html`에 `?preview=` 모드를 추가해 시트에 게시하기 전에 QR이 연결될 상세 페이지를 미리 확인할 수 있게 함 |
+| 2026-07-06 | 멀티유저 구조(100명 규모, 비용 0원 유지) — 레지스트리 시트로 유저코드→시트 매핑, `index.html`이 KEY 앞 4자리로 사용자별 시트를 찾아 조회. admin.html에 "내 설정"(유저코드 발급·시트 URL 고정 저장, localStorage), Apps Script 기반 "시트로 업로드", 병합 "CSV 다운로드" 추가. 라벨 디자인 기본값 조정(서브라인: 지역·가공 / 스펙: RSTD·PKGD·NET, HARV 옵션 제거, 사이즈 조정은 접기) |
 
 ## 남은 일
 
