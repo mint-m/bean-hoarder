@@ -15,9 +15,10 @@ const VARIETY_HINTS = ["Bourbon", "Typica", "Caturra", "Catuai", "Gesha", "Geish
 const LABEL_SYNONYMS = {
   ROASTERY: ["roastery", "roaster", "로스터리", "로스터"],
   ORIGIN: ["origin", "country", "산지", "원산지", "국가"],
-  REGION: ["region", "area", "zone", "woreda", "지역", "세부지역"],
+  REGION: ["region", "area", "zone", "woreda", "village", "지역", "세부지역", "마을"],
   PRODUCER: ["producer", "farmer", "grower", "생산자", "농장"],
-  LOT: ["lot", "washing station", "wet mill", "랏", "워싱스테이션"],
+  LOT: ["lot name", "lot", "로트명", "랏"],
+  WASHING_STATION: ["washing station", "wet mill", "워싱스테이션", "수세소"],
   VARIETY: ["variety", "varietal", "cultivar", "품종"],
   PROCESS: ["process", "processing", "가공방식", "가공"],
   ALTITUDE: ["altitude", "elevation", "고도"],
@@ -26,6 +27,31 @@ const LABEL_SYNONYMS = {
   TASTING_NOTE: ["tasting notes", "tasting note", "notes", "flavor", "cup", "테이스팅 노트", "노트"],
   MEMO: ["memo", "비고", "메모"],
 };
+
+const MONTHS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
+  jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+function monthDot(name, year) {
+  const m = MONTHS[name.toLowerCase().replace(/\.$/, "")];
+  return m ? `${String(year).slice(2)}.${String(m).padStart(2, "0")}` : null;
+}
+// "Month YYYY – Month YYYY" 또는 "Month YYYY" 형태를 로스팅/패키징일과 같은 점(dot) 표기(yy.mm)로 정규화.
+// 매칭 실패 시 원문 그대로 반환.
+function normalizeHarvestMonths(s) {
+  let m = /([A-Za-z]{3,9})\.?\s+(20\d{2})\s*(?:[-–~]|to|and)\s*([A-Za-z]{3,9})\.?\s+(20\d{2})/i.exec(s);
+  if (m) {
+    const d1 = monthDot(m[1], m[2]), d2 = monthDot(m[3], m[4]);
+    if (d1 && d2) return `${d1}-${d2}`;
+  }
+  m = /([A-Za-z]{3,9})\.?\s+(20\d{2})/.exec(s);
+  if (m) {
+    const d = monthDot(m[1], m[2]);
+    if (d) return d;
+  }
+  return s;
+}
 
 function normLabel(s) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -44,11 +70,19 @@ export function parseBeanText(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   // 1) "라벨: 값" / "라벨 - 값" 형태의 줄을 우선 인식 (스펙시트 스타일 상품 페이지에 흔함)
+  //    REGION만 예외: Region/Area/Village처럼 여러 줄이 같은 필드로 매핑될 수 있어 콤마로 이어붙인다
+  //    (지역 계층을 별도 필드로 쪼개지 않고 한 줄 자유 텍스트로 유지하기로 한 결정에 따름).
   for (const line of lines) {
     const m = /^([\w \/·]{2,24})\s*[:：\-–]\s*(.+)$/.exec(line);
     if (!m) continue;
     const field = findFieldForLabel(m[1]);
-    if (field && !out[field]) out[field] = m[2].trim();
+    if (!field) continue;
+    const value = m[2].trim();
+    if (field === "REGION") {
+      out.REGION = out.REGION ? `${out.REGION}, ${value}` : value;
+    } else if (!out[field]) {
+      out[field] = value;
+    }
   }
 
   // 라벨 인식으로 채운 산지는 원문 대소문자가 제각각이므로, 알려진 국가명이면 표준 표기(대문자)로 맞춘다.
@@ -57,18 +91,20 @@ export function parseBeanText(text) {
     out.ORIGIN = canon || out.ORIGIN.trim();
   }
 
-  // 라벨 인식으로 채운 수확시기("2024/2025", "2024-25" 등)를 폼의 관례인 "yy/yy" 표기로 정규화.
+  // 라벨 인식으로 채운 수확시기를 정규화: "2024/2025"→"24/25", 단일 "2024"→"24",
+  // "December 2025 – January 2026"→"25.12-26.01"(로스팅/패키징일과 같은 점 표기).
   if (out.HARVEST) {
     let m = /(20\d{2})\s*[\/\-]\s*(?:20)?(\d{2})/.exec(out.HARVEST);
     if (m) out.HARVEST = `${m[1].slice(2)}/${m[2]}`;
     else if ((m = /^(20\d{2})$/.exec(out.HARVEST.trim()))) out.HARVEST = m[1].slice(2);
+    else out.HARVEST = normalizeHarvestMonths(out.HARVEST);
   }
 
   // 라벨 인식으로 이미 채운 고도·용량은 표기가 제각각이므로("1900-2250m", "150g" 등)
   // 폼의 단위 자동 부착(withUnit)과 겹치지 않도록 숫자만 남긴다.
   if (out.ALTITUDE) {
     const m = /(\d{3,4}\s*[-~–]\s*\d{3,4}|\d{3,4})/.exec(out.ALTITUDE);
-    out.ALTITUDE = m ? m[1].replace(/\s+/g, "") : "";
+    out.ALTITUDE = m ? m[1].replace(/\s+/g, "").replace(/[~–]/g, "-") : "";
     if (!out.ALTITUDE) delete out.ALTITUDE;
   }
   if (out.NET_WEIGHT) {
@@ -117,7 +153,7 @@ export function parseBeanText(text) {
   // 5) 고도: "1900-2100m" / "2100 masl" 등 — 단위는 떼고 숫자만 반환(폼의 자동 단위 부착과 동일하게)
   if (!out.ALTITUDE) {
     const m = /\b(\d{3,4}\s*[-~–]\s*\d{3,4}|\d{3,4})\s*(m\b|masl\b|미터)/i.exec(whole);
-    if (m) out.ALTITUDE = m[1].replace(/\s+/g, "");
+    if (m) out.ALTITUDE = m[1].replace(/\s+/g, "").replace(/[~–]/g, "-");
   }
 
   // 6) 용량: "150g" / "1kg" 등 — 숫자만 반환(그램 환산), 5kg 초과는 오탐으로 보고 무시
@@ -129,10 +165,13 @@ export function parseBeanText(text) {
     }
   }
 
-  // 7) 수확시기: "2025/2026", "2025-26", "25-26", "25/26", 단일 "2025" 순으로 시도
+  // 7) 수확시기: "December 2025 – January 2026"(월 단위) → "2025/2026" → "25-26"/"25/26" → 단일 "2025" 순으로 시도
   if (!out.HARVEST) {
     let m = /\b(20\d{2})\s*[\/\-]\s*(?:20)?(\d{2})\b/.exec(whole);
-    if (m) {
+    const monthRange = normalizeHarvestMonths(whole);
+    if (monthRange !== whole && /^\d{2}\.\d{2}(-\d{2}\.\d{2})?$/.test(monthRange)) {
+      out.HARVEST = monthRange;
+    } else if (m) {
       out.HARVEST = `${m[1].slice(2)}/${m[2]}`;
     } else {
       m = /\b(\d{2})[\/\-](\d{2})\b/.exec(whole);
@@ -162,6 +201,6 @@ export function parseBeanText(text) {
 
 export const FIELD_LABELS_KO = {
   ROASTERY: "로스터리", ORIGIN: "국가(산지)", REGION: "세부 지역", PRODUCER: "생산자",
-  LOT: "랏", VARIETY: "품종", PROCESS: "가공방식", ALTITUDE: "고도", HARVEST: "수확시기",
+  LOT: "랏", WASHING_STATION: "워싱스테이션", VARIETY: "품종", PROCESS: "가공방식", ALTITUDE: "고도", HARVEST: "수확시기",
   NET_WEIGHT: "용량", TASTING_NOTE: "테이스팅 노트", SOURCE_URL: "원본 URL", MEMO: "메모",
 };

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS beans (
   region       TEXT DEFAULT '',
   producer     TEXT DEFAULT '',
   lot          TEXT DEFAULT '',
+  washing_station TEXT DEFAULT '',
   variety      TEXT DEFAULT '',
   process      TEXT DEFAULT '',
   altitude     TEXT DEFAULT '',

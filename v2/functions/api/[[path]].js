@@ -13,7 +13,7 @@
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 const PIN_RE = /^\d{4}$/;
 const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-const FIELDS = ["origin","region","producer","lot","variety","process","altitude","harvest",
+const FIELDS = ["origin","region","producer","lot","washing_station","variety","process","altitude","harvest",
   "roast_date","package_date","net_weight","agtron","tasting_note","memo","source_url"];
 const REQUIRED_LABELS = {
   origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일",
@@ -64,7 +64,7 @@ async function auth(env, request) {
 function beanToPublic(row) {
   return {
     KEY: row.key, ROASTERY: row.roastery, ORIGIN: row.origin, REGION: row.region,
-    PRODUCER: row.producer, LOT: row.lot,
+    PRODUCER: row.producer, LOT: row.lot, WASHING_STATION: row.washing_station,
     VARIETY: row.variety, PROCESS: row.process, ALTITUDE: row.altitude,
     HARVEST: row.harvest, ROAST_DATE: row.roast_date, PACKAGE_DATE: row.package_date,
     NET_WEIGHT: row.net_weight, AGTRON: row.agtron, TASTING_NOTE: row.tasting_note,
@@ -203,7 +203,7 @@ async function exportCsv(env, user) {
   const { results } = await env.DB.prepare(
     "SELECT * FROM beans WHERE usercode = ? ORDER BY key"
   ).bind(user.usercode).all();
-  const HEADERS = ["KEY","ROASTERY","ORIGIN","REGION","PRODUCER","LOT","VARIETY","PROCESS","ALTITUDE",
+  const HEADERS = ["KEY","ROASTERY","ORIGIN","REGION","PRODUCER","LOT","WASHING_STATION","VARIETY","PROCESS","ALTITUDE",
     "HARVEST","ROAST_DATE","PACKAGE_DATE","NET_WEIGHT","AGTRON","TASTING_NOTE","MEMO","SOURCE_URL"];
   const lines = [HEADERS.join(",")];
   results.forEach(r => {

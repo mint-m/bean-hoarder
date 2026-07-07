@@ -214,7 +214,7 @@
       </div>
 
       <details class="adv">
-        <summary>추가 정보 펼치기 (고도 · 수확시기 · 생산자 · 랏)</summary>
+        <summary>추가 정보 펼치기 (고도 · 수확시기 · 생산자 · 랏 · 워싱스테이션)</summary>
         <div class="row2">
           <div class="field"><label>고도</label>
             <div class="unit-wrap"><input type="text" id="f-altitude" inputmode="numeric" placeholder="1900-2100"><span class="unit">m</span></div>
@@ -223,7 +223,10 @@
         </div>
         <div class="row2">
           <div class="field"><label>생산자 / 농장</label><input type="text" id="f-producer" placeholder="Daniel Caro Lopez"></div>
-          <div class="field"><label>랏 · 워싱스테이션</label><input type="text" id="f-lot" placeholder="Sewda Premium"></div>
+          <div class="field"><label>랏 (로트명)</label><input type="text" id="f-lot" placeholder="Sewda Premium"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>워싱스테이션</label><input type="text" id="f-washingstation" placeholder="Sewda"></div>
         </div>
       </details>
 
@@ -361,12 +364,12 @@ const subToggleInputs = {};  // key -> checkbox element (서브라인 자동 체
 
 const $ = id => document.getElementById(id);
 const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
-const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-variety","f-process",
+const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-washingstation","f-variety","f-process",
   "f-altitude","f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
 const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
 const AUTOFILL_INPUT_IDS = {
   ROASTERY: "f-roastery", ORIGIN: "f-origin", REGION: "f-region", PRODUCER: "f-producer",
-  LOT: "f-lot", VARIETY: "f-variety", PROCESS: "f-process", ALTITUDE: "f-altitude",
+  LOT: "f-lot", WASHING_STATION: "f-washingstation", VARIETY: "f-variety", PROCESS: "f-process", ALTITUDE: "f-altitude",
   HARVEST: "f-harvest", NET_WEIGHT: "f-netweight", TASTING_NOTE: "f-note",
   SOURCE_URL: "f-source", MEMO: "f-memo",
 };
@@ -455,6 +458,7 @@ function getRow() {
     REGION: $("f-region").value.trim(),
     PRODUCER: $("f-producer").value.trim(),
     LOT: $("f-lot").value.trim(),
+    WASHING_STATION: $("f-washingstation").value.trim(),
     VARIETY: $("f-variety").value.trim(),
     PROCESS: $("f-process").value.trim(),
     ALTITUDE: withUnit($("f-altitude").value, "m"),
@@ -570,6 +574,7 @@ function loadBeanForEdit(key, beans) {
   $("f-region").value = b.REGION || "";
   $("f-producer").value = b.PRODUCER || "";
   $("f-lot").value = b.LOT || "";
+  $("f-washingstation").value = b.WASHING_STATION || "";
   $("f-variety").value = b.VARIETY || "";
   $("f-process").value = b.PROCESS || "";
   $("f-altitude").value = (b.ALTITUDE || "").replace(/m$/, "");
