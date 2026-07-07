@@ -59,12 +59,16 @@
   .acct { font-size: 13px; }
   .acct code { font-family: var(--mono); font-size: 14px; }
   .divider { border: 0; border-top: 1px dashed var(--line); margin: 14px 0; }
+  .req { color: #a33; margin-left: 2px; }
   table.beans { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.beans th { text-align: left; font-size: 10px; letter-spacing: .08em; color: var(--sub); padding: 4px 6px; border-bottom: 1px solid var(--line); }
   table.beans td { padding: 6px; border-bottom: 1px solid #f0f0ec; vertical-align: middle; }
   table.beans td.key { font-family: var(--mono); white-space: nowrap; }
   table.beans .rowbtns { display: flex; gap: 4px; }
   table.beans button { padding: 3px 7px; font-size: 11px; }
+  .recovery-card { margin-top: 12px; padding: 12px; background: #fff8e6; border: 1px solid #e8d38a; border-radius: 6px; }
+  .recovery-card p { margin: 0 0 8px; font-size: 12px; }
+  .recovery-key { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .04em; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -92,6 +96,15 @@
         <div class="btnrow">
           <button id="btn-login">이 브라우저에 로그인</button>
         </div>
+        <hr class="divider">
+        <p class="hint">유저코드나 암호를 잊으셨나요? 가입 시 저장해둔 복구키로 새 암호를 설정하세요.</p>
+        <div class="row2">
+          <div class="field"><label>복구키</label><input type="text" id="a-recovery" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"></div>
+          <div class="field"><label>새 암호 (숫자 4자리)</label><input type="password" id="a-pin3" maxlength="4" inputmode="numeric" placeholder="0000"></div>
+        </div>
+        <div class="btnrow">
+          <button id="btn-recover">복구키로 재설정</button>
+        </div>
       </div>
       <div id="acct-signed-in" class="acct hidden">
         <div>유저코드 <code id="acct-usercode"></code> — 이 브라우저에 저장됨</div>
@@ -99,42 +112,68 @@
           <button id="btn-signout">로그아웃</button>
         </div>
       </div>
+      <div id="recovery-box" class="hidden"></div>
       <div class="status-line" id="acct-status"></div>
-      <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). 유저코드와 암호만 기억하면 어느 기기에서든 로그인됩니다.</p>
+      <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). <b>복구키는 계정을 되찾을 수 있는 유일한 수단</b>이니 오프라인(메모장, 인쇄물 등)에 꼭 보관하세요 — 서버는 다시 보여줄 수 없습니다.</p>
     </div>
 
     <div class="card" style="margin-top:16px">
-      <h2 id="form-title">1. 원두 정보 <span style="text-transform:none;letter-spacing:0">— KEY는 등록 시 서버가 채번</span></h2>
-      <div class="field"><label>로스터리 (이 원두를 만든 곳, 필수)</label><input type="text" id="f-roastery" placeholder="DANCHE"></div>
+      <h2 id="form-title">1. 원두 정보</h2>
+      <p class="hint" id="form-hint">붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.</p>
+      <div class="field"><label>로스터리 (이 원두를 만든 곳)<span class="req">*</span></label><input type="text" id="f-roastery" placeholder="SEY"></div>
       <div class="row2">
-        <div class="field"><label>원산지 (국가)</label><input type="text" id="f-origin" placeholder="ETHIOPIA"></div>
+        <div class="field"><label>국가(산지)<span class="req">*</span></label><input type="text" id="f-origin" list="dl-origin" placeholder="ETHIOPIA"></div>
         <div class="field"><label>세부 지역</label><input type="text" id="f-region" placeholder="Yirgacheffe, Gedeb"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>품종</label><input type="text" id="f-variety"></div>
-        <div class="field"><label>가공방식</label><input type="text" id="f-process" placeholder="Washed"></div>
+        <div class="field"><label>품종</label><input type="text" id="f-variety" placeholder="SL9"></div>
+        <div class="field"><label>가공방식</label><input type="text" id="f-process" list="dl-process" placeholder="Washed"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>고도</label><input type="text" id="f-altitude" placeholder="2100m"></div>
-        <div class="field"><label>수확시기 (상세에만 표시)</label><input type="text" id="f-harvest" placeholder="25/26"></div>
+        <div class="field"><label>로스팅일<span class="req">*</span></label><input type="text" id="f-roastdate"></div>
+        <div class="field"><label>패키징일<span class="req">*</span></label><input type="text" id="f-packagedate"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>로스팅일</label><input type="text" id="f-roastdate" placeholder="26.06.28"></div>
-        <div class="field"><label>패키징일</label><input type="text" id="f-packagedate" placeholder="26.07.03"></div>
-      </div>
-      <div class="row2">
-        <div class="field"><label>용량</label><input type="text" id="f-netweight" placeholder="60g"></div>
-        <div class="field"><label>애그트론</label><input type="text" id="f-agtron" placeholder="~65"></div>
+        <div class="field"><label>용량<span class="req">*</span></label><input type="text" id="f-netweight" placeholder="20g"></div>
+        <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="라이트 / 미디움 / 다크 또는 애그트론 수치"></div>
       </div>
       <div class="field"><label>테이스팅 노트</label><textarea id="f-note"></textarea></div>
+      <div class="field"><label>메모</label><textarea id="f-memo" placeholder="재구매 의사, 추출 레시피 등 자유롭게"></textarea></div>
       <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
+
+      <details class="adv">
+        <summary>추가 정보 펼치기 (고도 · 수확시기)</summary>
+        <div class="row2">
+          <div class="field"><label>고도</label><input type="text" id="f-altitude" placeholder="2100m"></div>
+          <div class="field"><label>수확시기</label><input type="text" id="f-harvest" placeholder="25/26"></div>
+        </div>
+      </details>
+
+      <datalist id="dl-origin">
+        <option value="ETHIOPIA"><option value="COLOMBIA"><option value="BRAZIL">
+        <option value="KENYA"><option value="GUATEMALA"><option value="HONDURAS">
+        <option value="COSTA RICA"><option value="PANAMA"><option value="PERU">
+        <option value="INDONESIA"><option value="YEMEN"><option value="RWANDA">
+        <option value="BURUNDI"><option value="TANZANIA"><option value="EL SALVADOR">
+        <option value="NICARAGUA"><option value="MEXICO"><option value="INDIA">
+        <option value="VIETNAM"><option value="블렌드 (여러 원산지 혼합)">
+      </datalist>
+      <datalist id="dl-process">
+        <option value="Washed"><option value="Natural"><option value="Honey">
+        <option value="Anaerobic"><option value="Wet-Hulled"><option value="Carbonic Maceration">
+        <option value="Semi-Washed"><option value="블렌드 (여러 가공방식 혼합)">
+      </datalist>
+      <datalist id="dl-roastpoint">
+        <option value="라이트"><option value="미디움라이트"><option value="미디움">
+        <option value="미디움다크"><option value="다크">
+      </datalist>
     </div>
 
     <div class="card" style="margin-top:16px">
       <h2>2. 라벨 디자인</h2>
-      <p class="hint">서브라인 표시 항목</p>
+      <p class="hint">라벨 부제목에 함께 표시할 정보 (원산지 아래 한 줄) — 값을 입력하면 자동으로 체크됩니다</p>
       <div class="toggles" id="toggle-sub"></div>
-      <p class="hint" style="margin-top:12px">스펙 그리드 (최대 4개)</p>
+      <p class="hint" style="margin-top:12px">라벨 하단 칸에 표시할 정보 (최대 4개, 직접 선택)</p>
       <div class="toggles" id="toggle-spec"></div>
       <details class="adv">
         <summary>사이즈 조정 펼치기</summary>
@@ -201,6 +240,8 @@
 
 </div>
 
+<canvas id="raster-canvas" style="display:none"></canvas>
+
 <script type="module">
 import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SPEC_POOL, SUB_POOL, BASE_URL }
   from "./label.js";
@@ -215,11 +256,27 @@ let logoDataUrl = null;
 let mode = "new";            // "new" | "edit"
 let confirmedKey = null;     // 서버에 존재하는 KEY (등록 완료 or 수정 대상)
 let previewSeq = 1;
+const subToggleInputs = {};  // key -> checkbox element (서브라인 자동 체크용)
 
 const $ = id => document.getElementById(id);
 const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
 const FORM_IDS = ["f-roastery","f-origin","f-region","f-variety","f-process","f-altitude",
-  "f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-source"];
+  "f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
+const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
+
+function fmtDate(d) {
+  const y2 = String(d.getFullYear() % 100).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y2}.${mm}.${dd}`;
+}
+(function setDatePlaceholders() {
+  const today = new Date();
+  const roastDay = new Date(today);
+  roastDay.setDate(today.getDate() - 10);
+  $("f-roastdate").placeholder = fmtDate(roastDay);
+  $("f-packagedate").placeholder = fmtDate(today);
+})();
 
 function setStatus(msg, ok) {
   const el = $("action-status");
@@ -269,6 +326,7 @@ function getRow() {
     NET_WEIGHT: $("f-netweight").value.trim(),
     AGTRON: $("f-agtron").value.trim(),
     TASTING_NOTE: $("f-note").value.trim(),
+    MEMO: $("f-memo").value.trim(),
     SOURCE_URL: $("f-source").value.trim(),
   };
 }
@@ -280,9 +338,9 @@ function setMode(newMode, key) {
   $("btn-new").classList.toggle("hidden", mode !== "edit");
   const enabled = !!confirmedKey;
   ["btn-copy-url", "btn-copy-qr", "btn-open-live"].forEach(id => $(id).disabled = !enabled);
-  $("form-title").innerHTML = mode === "edit"
-    ? `1. 원두 정보 <span style="text-transform:none;letter-spacing:0">— ${confirmedKey} 수정 중</span>`
-    : `1. 원두 정보 <span style="text-transform:none;letter-spacing:0">— KEY는 등록 시 서버가 채번</span>`;
+  $("form-hint").innerHTML = mode === "edit"
+    ? `<b>${confirmedKey}</b> 수정 중 — 붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다.`
+    : `붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.`;
 }
 
 let verifySeq = 0;
@@ -312,6 +370,20 @@ async function renderAll() {
   if (mySeq !== verifySeq) return;
   badge.textContent = v.ok ? "QR 검증 OK — 203dpi 실디코드 통과" : "QR 검증 실패 — QR 크기를 키워보세요";
   badge.className = "verify " + (v.ok ? "ok" : "bad");
+}
+
+// 서브라인 필드(지역/가공/품종/고도)에 값이 있으면 해당 표시 체크박스를 자동으로 켠다.
+// 사용자가 직접 끈 체크는 건드리지 않음(값이 있어도 강제로 다시 켜지 않음) — 단, 값이 막 채워진 시점엔 켠다.
+function autoCheckSubline() {
+  Object.entries(SUB_FIELD_INPUT_IDS).forEach(([key, inputId]) => {
+    const inputEl = $(inputId);
+    const checkbox = subToggleInputs[key];
+    if (!inputEl || !checkbox) return;
+    if (inputEl.value.trim() && !checkbox.checked) {
+      checkbox.checked = true;
+      if (!design.subFields.includes(key)) design.subFields.push(key);
+    }
+  });
 }
 
 async function api(path, opts = {}) {
@@ -347,7 +419,7 @@ async function refreshList() {
       </div></td>
     </tr>`).join("");
   holder.innerHTML = `<table class="beans">
-    <tr><th>KEY</th><th>원산지</th><th>로스터리</th><th></th></tr>${rows}</table>`;
+    <tr><th>KEY</th><th>산지</th><th>로스터리</th><th></th></tr>${rows}</table>`;
   holder.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.closest("tr").dataset.key;
@@ -374,9 +446,11 @@ function loadBeanForEdit(key, beans) {
   $("f-netweight").value = b.NET_WEIGHT || "";
   $("f-agtron").value = b.AGTRON || "";
   $("f-note").value = b.TASTING_NOTE || "";
+  $("f-memo").value = b.MEMO || "";
   $("f-source").value = b.SOURCE_URL || "";
   setMode("edit", key);
   setStatus(`${key} 를 수정 중입니다.`, true);
+  autoCheckSubline();
   renderAll();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -393,10 +467,21 @@ async function deleteBean(key) {
   }
 }
 
+function missingRequiredFields(row) {
+  const missing = [];
+  if (!row.ROASTERY) missing.push("로스터리");
+  if (!row.ORIGIN) missing.push("국가(산지)");
+  if (!row.ROAST_DATE) missing.push("로스팅일");
+  if (!row.PACKAGE_DATE) missing.push("패키징일");
+  if (!row.NET_WEIGHT) missing.push("용량");
+  return missing;
+}
+
 async function save() {
   if (!signedIn()) { setStatus("가입 또는 로그인이 필요합니다.", false); return; }
   const row = getRow();
-  if (!row.ROASTERY) { setStatus("로스터리는 필수 항목입니다.", false); return; }
+  const missing = missingRequiredFields(row);
+  if (missing.length) { setStatus(`필수 항목을 입력하세요: ${missing.join(", ")}`, false); return; }
   const payload = Object.assign({}, row, { YEAR: yy });
   delete payload.KEY;
   const wasEdit = mode === "edit";
@@ -418,6 +503,31 @@ async function save() {
   }
 }
 
+function showRecoveryBox(usercode, recoveryKey) {
+  const box = $("recovery-box");
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="recovery-card">
+      <p><b>오프라인 복구키</b> — 지금 이 순간만 표시됩니다. 유저코드나 암호를 잊어도 이 키만 있으면 계정을 되찾을 수 있습니다.</p>
+      <div class="recovery-key">${recoveryKey}</div>
+      <div class="btnrow">
+        <button id="btn-copy-recovery">복사</button>
+        <button id="btn-dl-recovery">텍스트 파일로 저장</button>
+        <button id="btn-dismiss-recovery">저장했습니다</button>
+      </div>
+    </div>`;
+  $("btn-copy-recovery").addEventListener("click", async () => {
+    const ok = await copyText(recoveryKey);
+    setAcctStatus(ok ? "복구키가 복사되었습니다." : "복사 실패 — 직접 선택해 복사하세요.", ok);
+  });
+  $("btn-dl-recovery").addEventListener("click", () => {
+    const text = `Bean-Hoarder 복구 정보\n유저코드: ${usercode}\n복구키: ${recoveryKey}\n\n`
+      + `이 파일은 안전한 곳에 오프라인으로(인쇄물, USB 등) 보관하세요.\n분실 시 계정을 복구할 수 없습니다.\n`;
+    download(`beanhoarder_recovery_${usercode}.txt`, new Blob([text], { type: "text/plain;charset=utf-8" }));
+  });
+  $("btn-dismiss-recovery").addEventListener("click", () => box.classList.add("hidden"));
+}
+
 async function signup() {
   const invite = $("a-invite").value.trim();
   const pin = $("a-pin").value.trim();
@@ -433,7 +543,8 @@ async function signup() {
     account.pin = pin;
     saveAccount();
     renderAccount();
-    setAcctStatus(`가입 완료 — 유저코드 ${body.usercode}. 유저코드와 암호만 기억하면 어디서든 로그인됩니다.`, true);
+    setAcctStatus(`가입 완료 — 유저코드 ${body.usercode}. 아래 복구키를 꼭 저장하세요.`, true);
+    showRecoveryBox(body.usercode, body.recovery_key);
     refreshList();
     renderAll();
   } else {
@@ -455,6 +566,27 @@ async function login() {
     refreshList(); renderAll();
   } else {
     setAcctStatus("유저코드 또는 암호가 올바르지 않습니다.", false);
+  }
+}
+
+async function recover() {
+  const key = $("a-recovery").value.trim();
+  const pin = $("a-pin3").value.trim();
+  if (!key) { setAcctStatus("복구키를 입력하세요.", false); return; }
+  if (!/^\d{4}$/.test(pin)) { setAcctStatus("새 암호는 숫자 4자리여야 합니다.", false); return; }
+  const res = await fetch("/api/recover", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recovery_key: key, password: pin }),
+  });
+  const body = await res.json().catch(() => null);
+  if (body && body.ok) {
+    account.usercode = body.usercode; account.pin = pin;
+    saveAccount(); renderAccount();
+    setAcctStatus(`복구 완료 — 유저코드 ${body.usercode}. 복구키가 새로 발급되었으니 다시 저장하세요.`, true);
+    showRecoveryBox(body.usercode, body.recovery_key);
+    refreshList(); renderAll();
+  } else {
+    setAcctStatus((body && body.error) || "복구 실패", false);
   }
 }
 
@@ -511,16 +643,20 @@ function download(filename, blob) {
   URL.revokeObjectURL(a.href);
 }
 
-function buildToggles(containerId, pool, selected, max) {
+function buildToggles(containerId, pool, selected, max, refStore) {
   const el = $(containerId);
-  pool.forEach(([key, label]) => {
+  pool.forEach(entry => {
+    const key = entry[0];
+    const label = entry[entry.length - 1];
     const wrap = document.createElement("label");
     wrap.innerHTML = `<input type="checkbox" ${selected.includes(key) ? "checked" : ""}> ${label}`;
     el.appendChild(wrap);
-    wrap.querySelector("input").addEventListener("change", (e) => {
+    const input = wrap.querySelector("input");
+    if (refStore) refStore[key] = input;
+    input.addEventListener("change", (e) => {
       if (e.target.checked) {
         if (max && selected.length >= max) { e.target.checked = false; return; }
-        selected.push(key);
+        if (!selected.includes(key)) selected.push(key);
       } else {
         const i = selected.indexOf(key);
         if (i >= 0) selected.splice(i, 1);
@@ -529,18 +665,19 @@ function buildToggles(containerId, pool, selected, max) {
     });
   });
 }
-buildToggles("toggle-sub", SUB_POOL, design.subFields, null);
+buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
 buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4);
 
 $("btn-signup").addEventListener("click", signup);
 $("btn-login").addEventListener("click", login);
+$("btn-recover").addEventListener("click", recover);
 $("btn-signout").addEventListener("click", () => {
   localStorage.removeItem("bh_usercode");
   localStorage.removeItem("bh_pin");
   location.reload();
 });
 
-FORM_IDS.forEach(id => $(id).addEventListener("input", renderAll));
+FORM_IDS.forEach(id => $(id).addEventListener("input", () => { autoCheckSubline(); renderAll(); }));
 $("f-headline-size").addEventListener("input", e => { design.headlineSize = parseFloat(e.target.value); renderAll(); });
 $("f-specval-size").addEventListener("input", e => { design.specValueSize = parseFloat(e.target.value); renderAll(); });
 $("f-qr-size").addEventListener("input", e => { design.qrSize = parseFloat(e.target.value); renderAll(); });

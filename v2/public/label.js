@@ -10,9 +10,13 @@ const LOGO_BOX = [32.7, 1.3, 6.0, 5.0];
 const SANS = "Arial, Helvetica, sans-serif";
 const MONO = "Consolas, 'Courier New', monospace";
 
+// [필드키, 라벨 인쇄 약어, 관리자 화면 표시명]
 export const SPEC_POOL = [
-  ["ROAST_DATE", "RSTD"], ["PACKAGE_DATE", "PKGD"], ["NET_WEIGHT", "NET"],
-  ["AGTRON", "AGT"], ["ALTITUDE", "ALT"],
+  ["ROAST_DATE", "RSTD", "로스팅일"],
+  ["PACKAGE_DATE", "PKGD", "패키징일"],
+  ["NET_WEIGHT", "NET", "용량"],
+  ["AGTRON", "RSTP", "로스팅 포인트"],
+  ["ALTITUDE", "ALT", "고도"],
 ];
 export const SUB_POOL = [["REGION", "지역"], ["PROCESS", "가공"], ["VARIETY", "품종"], ["ALTITUDE", "고도"]];
 

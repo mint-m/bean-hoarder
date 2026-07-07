@@ -35,6 +35,10 @@
   .keyline a { color: var(--sub); }
   .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px; }
   .status .code { font-family: var(--mono); color: var(--ink); }
+  .status a { color: var(--ink); }
+  .memo { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .memo .memo-label { font-size: 10px; letter-spacing: .12em; color: var(--sub); margin-bottom: 2px; }
+  .memo .memo-body { font-size: 14px; color: #333; }
   .hidden { display: none; }
   .preview-badge {
     font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
@@ -52,6 +56,10 @@
     <hr>
     <dl class="specs" id="f-specs"></dl>
     <div class="note hidden" id="f-note"></div>
+    <div class="memo hidden" id="f-memo">
+      <div class="memo-label">MEMO</div>
+      <div class="memo-body" id="f-memo-body"></div>
+    </div>
     <div class="keyline">
       <span id="f-key"></span>
       <a id="f-source" class="hidden" target="_blank" rel="noopener">원본 페이지 ↗</a>
@@ -63,7 +71,7 @@ const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 const SPEC_FIELDS = [
   ["REGION", "REGION"], ["VARIETY", "VARIETY"], ["PROCESS", "PROCESS"],
   ["ALTITUDE", "ALT"], ["HARVEST", "HARVEST"], ["ROAST_DATE", "ROASTED"],
-  ["PACKAGE_DATE", "PACKAGED"], ["NET_WEIGHT", "NET"], ["AGTRON", "AGTRON"],
+  ["PACKAGE_DATE", "PACKAGED"], ["NET_WEIGHT", "NET"], ["AGTRON", "ROAST POINT"],
 ];
 
 function getCode() {
@@ -125,6 +133,11 @@ function render(row, isPreview) {
     note.textContent = g("TASTING_NOTE");
     note.classList.remove("hidden");
   }
+  const memo = document.getElementById("f-memo");
+  if (g("MEMO")) {
+    document.getElementById("f-memo-body").textContent = g("MEMO");
+    memo.classList.remove("hidden");
+  }
   document.getElementById("f-key").textContent = g("KEY");
   const src = document.getElementById("f-source");
   if (g("SOURCE_URL")) {
@@ -150,7 +163,8 @@ async function main() {
   }
   const code = getCode();
   if (!code) {
-    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/DEMO26-001</span>");
+    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/DEMO26-001</span>" +
+      "<br><br>원두를 등록하려면 <a href='/admin'>스튜디오로 이동 →</a>");
     return;
   }
   if (!KEY_RE.test(code)) {

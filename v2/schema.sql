@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
-  usercode   TEXT PRIMARY KEY,
-  pass_hash  TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  usercode      TEXT PRIMARY KEY,
+  pass_hash     TEXT NOT NULL,
+  recovery_hash TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS beans (
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS beans (
   net_weight   TEXT DEFAULT '',
   agtron       TEXT DEFAULT '',
   tasting_note TEXT DEFAULT '',
+  memo         TEXT DEFAULT '',
   source_url   TEXT DEFAULT '',
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );

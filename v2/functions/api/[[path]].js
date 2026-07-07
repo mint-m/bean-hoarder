@@ -1,7 +1,8 @@
 // Bean-Hoarder v2 API — Cloudflare Pages Functions + D1
 // 인증: Authorization: Bearer {유저코드}:{4자리 암호}  (편의용 암호 — 쓰기에만 필요, 조회는 공개)
 // 라우트:
-//   POST   /api/signup        초대코드 + 암호 → 유저코드 자동 발급
+//   POST   /api/signup        초대코드 + 암호 → 유저코드 자동 발급 + 복구키(1회 표시)
+//   POST   /api/recover       복구키 + 새 암호 → 유저코드 재확인, 복구키 회전
 //   POST   /api/beans         원두 등록 (KEY 서버 채번)
 //   GET    /api/beans         내 원두 목록
 //   GET    /api/bean/{KEY}    공개 조회
@@ -13,7 +14,10 @@ const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 const PIN_RE = /^\d{4}$/;
 const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const FIELDS = ["origin","region","variety","process","altitude","harvest",
-  "roast_date","package_date","net_weight","agtron","tasting_note","source_url"];
+  "roast_date","package_date","net_weight","agtron","tasting_note","memo","source_url"];
+const REQUIRED_LABELS = {
+  origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일", net_weight: "용량",
+};
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -35,6 +39,17 @@ function randomUsercode() {
   return s;
 }
 
+// 오프라인 백업용 고엔트로피 복구키: 20자 hex, 4자리씩 하이픈으로 묶어 표시 (예: F89E-5079-5A48-3F33-62B0)
+function randomRecoveryKey() {
+  const a = new Uint8Array(10);
+  crypto.getRandomValues(a);
+  const hex = [...a].map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return hex.match(/.{1,4}/g).join("-");
+}
+function normalizeRecoveryKey(k) {
+  return String(k || "").replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+}
+
 async function auth(env, request) {
   const h = request.headers.get("Authorization") || "";
   const m = /^Bearer\s+([A-Z0-9]{4}):(\d{4})$/i.exec(h);
@@ -52,7 +67,7 @@ function beanToPublic(row) {
     VARIETY: row.variety, PROCESS: row.process, ALTITUDE: row.altitude,
     HARVEST: row.harvest, ROAST_DATE: row.roast_date, PACKAGE_DATE: row.package_date,
     NET_WEIGHT: row.net_weight, AGTRON: row.agtron, TASTING_NOTE: row.tasting_note,
-    SOURCE_URL: row.source_url,
+    MEMO: row.memo, SOURCE_URL: row.source_url,
   };
 }
 
@@ -60,6 +75,15 @@ function pickFields(body) {
   const vals = {};
   FIELDS.forEach(f => vals[f] = String(body[f.toUpperCase()] || "").trim());
   return vals;
+}
+
+function missingRequired(roastery, vals) {
+  const missing = [];
+  if (!roastery) missing.push("로스터리");
+  for (const [field, label] of Object.entries(REQUIRED_LABELS)) {
+    if (!vals[field]) missing.push(label);
+  }
+  return missing;
 }
 
 async function signup(env, request) {
@@ -70,26 +94,50 @@ async function signup(env, request) {
   const pin = String(body.password || "").trim();
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
 
+  const recoveryKey = randomRecoveryKey();
+  const recoveryHash = await sha256hex(normalizeRecoveryKey(recoveryKey));
   for (let attempt = 0; attempt < 5; attempt++) {
     const usercode = randomUsercode();
     const hash = await sha256hex(`${usercode}:${pin}`);
     try {
-      await env.DB.prepare("INSERT INTO users (usercode, pass_hash) VALUES (?, ?)")
-        .bind(usercode, hash).run();
-      return json({ ok: true, usercode });
+      await env.DB.prepare("INSERT INTO users (usercode, pass_hash, recovery_hash) VALUES (?, ?, ?)")
+        .bind(usercode, hash, recoveryHash).run();
+      return json({ ok: true, usercode, recovery_key: recoveryKey });
     } catch (e) { /* usercode 충돌 시 재시도 */ }
   }
   return json({ ok: false, error: "유저코드 발급 실패 (재시도 요망)" }, 500);
 }
 
+async function recoverAccount(env, request) {
+  const body = await request.json().catch(() => ({}));
+  const normalized = normalizeRecoveryKey(body.recovery_key);
+  if (normalized.length !== 20) return json({ ok: false, error: "복구키 형식이 올바르지 않습니다." }, 400);
+  const pin = String(body.password || "").trim();
+  if (!PIN_RE.test(pin)) return json({ ok: false, error: "새 암호는 숫자 4자리여야 합니다." }, 400);
+
+  const recoveryHash = await sha256hex(normalized);
+  const row = await env.DB.prepare("SELECT usercode FROM users WHERE recovery_hash = ?")
+    .bind(recoveryHash).first();
+  if (!row) return json({ ok: false, error: "복구키가 일치하지 않습니다." }, 404);
+
+  const usercode = row.usercode;
+  const newHash = await sha256hex(`${usercode}:${pin}`);
+  const newRecoveryKey = randomRecoveryKey();
+  const newRecoveryHash = await sha256hex(normalizeRecoveryKey(newRecoveryKey));
+  await env.DB.prepare("UPDATE users SET pass_hash = ?, recovery_hash = ? WHERE usercode = ?")
+    .bind(newHash, newRecoveryHash, usercode).run();
+  return json({ ok: true, usercode, recovery_key: newRecoveryKey });
+}
+
 async function addBean(env, request, user) {
   const body = await request.json().catch(() => ({}));
   const roastery = String(body.ROASTERY || "").trim();
-  if (!roastery) return json({ ok: false, error: "ROASTERY(원두의 로스터리)는 필수" }, 400);
+  const vals = pickFields(body);
+  const missing = missingRequired(roastery, vals);
+  if (missing.length) return json({ ok: false, error: `필수 항목 누락: ${missing.join(", ")}` }, 400);
 
   let year = String(body.YEAR || "").trim();
   if (!/^\d{2}$/.test(year)) year = String(new Date().getUTCFullYear() % 100).padStart(2, "0");
-  const vals = pickFields(body);
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const { next } = await env.DB.prepare(
@@ -120,8 +168,9 @@ async function updateBean(env, request, user, key) {
   if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
   const body = await request.json().catch(() => ({}));
   const roastery = String(body.ROASTERY || "").trim();
-  if (!roastery) return json({ ok: false, error: "ROASTERY는 필수" }, 400);
   const vals = pickFields(body);
+  const missing = missingRequired(roastery, vals);
+  if (missing.length) return json({ ok: false, error: `필수 항목 누락: ${missing.join(", ")}` }, 400);
   await env.DB.prepare(
     "UPDATE beans SET roastery = ?, " + FIELDS.map(f => `${f} = ?`).join(", ") +
     " WHERE key = ? AND usercode = ?"
@@ -154,7 +203,7 @@ async function exportCsv(env, user) {
     "SELECT * FROM beans WHERE usercode = ? ORDER BY key"
   ).bind(user.usercode).all();
   const HEADERS = ["KEY","ROASTERY","ORIGIN","REGION","VARIETY","PROCESS","ALTITUDE",
-    "HARVEST","ROAST_DATE","PACKAGE_DATE","NET_WEIGHT","AGTRON","TASTING_NOTE","SOURCE_URL"];
+    "HARVEST","ROAST_DATE","PACKAGE_DATE","NET_WEIGHT","AGTRON","TASTING_NOTE","MEMO","SOURCE_URL"];
   const lines = [HEADERS.join(",")];
   results.forEach(r => {
     const p = beanToPublic(r);
@@ -187,6 +236,7 @@ export async function onRequest({ request, env, params }) {
       }
     }
     if (method === "POST" && seg[0] === "signup") return signup(env, request);
+    if (method === "POST" && seg[0] === "recover") return recoverAccount(env, request);
     if (seg[0] === "beans" || seg[0] === "export.csv") {
       const user = await auth(env, request);
       if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
