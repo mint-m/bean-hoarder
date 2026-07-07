@@ -192,7 +192,18 @@
     <div class="card">
       <h2 id="form-title">원두 정보</h2>
       <p class="hint" id="form-hint" style="margin: -6px 0 14px">붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.</p>
-      <div class="field"><label>로스터리 (이 원두를 만든 곳)<span class="req">*</span></label><input type="text" id="f-roastery" placeholder="SEY"></div>
+      <details class="adv" id="autofill-box" open>
+        <summary>붙여넣기로 자동 채우기 — 상품 페이지 텍스트를 복사해 넣으면 빈 칸을 채워줍니다</summary>
+        <textarea id="f-autofill-text" style="min-height:76px" placeholder="예) 25-26 New Season Ethiopia Sidama Bura Keramo Gara Agena G1 Premium Washed 150g&#10;Process: Washed (36 hours wet fermentation + 21 days drying on raised beds)&#10;Altitude: 1900-2250m&#10;https://roastery.example.com/products/..."></textarea>
+        <div class="btnrow">
+          <button type="button" id="btn-autofill">인식해서 빈 칸 채우기</button>
+          <span class="status-line" id="autofill-status" style="margin:0"></span>
+        </div>
+        <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다. 인식 결과는 반드시 검토 후 저장하세요 — 완벽한 인식을 보장하지 않습니다.</p>
+      </details>
+      <hr class="divider">
+
+      <div class="field"><label>로스터리<span class="req">*</span></label><input type="text" id="f-roastery" placeholder="SEY"></div>
       <div class="row2">
         <div class="field"><label>국가(산지)<span class="req">*</span></label><input type="text" id="f-origin" list="dl-origin" placeholder="ETHIOPIA"></div>
         <div class="field"><label>세부 지역</label><input type="text" id="f-region" placeholder="Yirgacheffe, Gedeb"></div>
@@ -201,19 +212,6 @@
         <div class="field"><label>품종</label><input type="text" id="f-variety" placeholder="SL9"></div>
         <div class="field"><label>가공방식</label><input type="text" id="f-process" list="dl-process" placeholder="Washed"></div>
       </div>
-      <div class="row2">
-        <div class="field"><label>로스팅일<span class="req">*</span></label><input type="date" id="f-roastdate"></div>
-        <div class="field"><label>패키징일<span class="req">*</span></label><input type="date" id="f-packagedate"></div>
-      </div>
-      <div class="row2">
-        <div class="field"><label>용량</label>
-          <div class="unit-wrap"><input type="text" id="f-netweight" inputmode="decimal" placeholder="20"><span class="unit">g</span></div>
-        </div>
-        <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"></div>
-      </div>
-      <div class="field"><label>테이스팅 노트</label><textarea id="f-note" placeholder="Magnolia, Honey Peach, Bergamot"></textarea></div>
-      <div class="field"><label>메모</label><textarea id="f-memo" placeholder="재구매 의사, 추출 레시피 등 자유롭게"></textarea></div>
-      <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
 
       <details class="adv">
         <summary>추가 정보 펼치기 (고도 · 수확시기 · 생산자 · 랏)</summary>
@@ -228,6 +226,20 @@
           <div class="field"><label>랏 · 워싱스테이션</label><input type="text" id="f-lot" placeholder="Sewda Premium"></div>
         </div>
       </details>
+
+      <div class="row2" style="margin-top:12px">
+        <div class="field"><label>로스팅일<span class="req">*</span></label><input type="date" id="f-roastdate"></div>
+        <div class="field"><label>패키징일<span class="req">*</span></label><input type="date" id="f-packagedate"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>용량</label>
+          <div class="unit-wrap"><input type="text" id="f-netweight" inputmode="decimal" placeholder="20"><span class="unit">g</span></div>
+        </div>
+        <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"></div>
+      </div>
+      <div class="field"><label>테이스팅 노트</label><textarea id="f-note" placeholder="Magnolia, Honey Peach, Bergamot"></textarea></div>
+      <div class="field"><label>메모</label><textarea id="f-memo" placeholder="재구매 의사, 추출 레시피 등 자유롭게"></textarea></div>
+      <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
 
       <datalist id="dl-origin">
         <option value="ETHIOPIA"><option value="COLOMBIA"><option value="BRAZIL">
@@ -333,6 +345,7 @@
 <script type="module">
 import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SPEC_POOL, SUB_POOL, BASE_URL }
   from "./label.js";
+import { parseBeanText, FIELD_LABELS_KO } from "./autofill.js";
 
 const SITE = "https://bnhd.pages.dev";
 const account = {
@@ -351,6 +364,12 @@ const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
 const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-variety","f-process",
   "f-altitude","f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
 const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
+const AUTOFILL_INPUT_IDS = {
+  ROASTERY: "f-roastery", ORIGIN: "f-origin", REGION: "f-region", PRODUCER: "f-producer",
+  LOT: "f-lot", VARIETY: "f-variety", PROCESS: "f-process", ALTITUDE: "f-altitude",
+  HARVEST: "f-harvest", NET_WEIGHT: "f-netweight", TASTING_NOTE: "f-note",
+  SOURCE_URL: "f-source", MEMO: "f-memo",
+};
 
 // 날짜: <input type=date>(ISO) ↔ 저장 포맷(yy.mm.dd) 상호 변환
 function isoToDot(iso) {
@@ -840,9 +859,36 @@ $("f-logo-file").addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
+$("btn-autofill").addEventListener("click", () => {
+  const raw = $("f-autofill-text").value.trim();
+  const status = $("autofill-status");
+  if (!raw) { status.textContent = "붙여넣을 텍스트가 없습니다."; status.className = "status-line error"; return; }
+  const parsed = parseBeanText(raw);
+  const filled = [];
+  for (const [field, inputId] of Object.entries(AUTOFILL_INPUT_IDS)) {
+    const v = parsed[field];
+    const el = $(inputId);
+    if (!v || !el || el.value.trim()) continue;   // 값이 없거나 이미 입력된 항목은 건너뜀
+    el.value = v;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    filled.push(FIELD_LABELS_KO[field] || field);
+  }
+  if (filled.length) {
+    status.textContent = `채움: ${filled.join(", ")} — 검토 후 저장하세요.`;
+    status.className = "status-line ok";
+    $("autofill-box").open = false;
+  } else {
+    status.textContent = "인식된 새 항목이 없습니다. 이미 채워진 필드는 덮어쓰지 않습니다.";
+    status.className = "status-line error";
+  }
+});
+
 $("btn-save").addEventListener("click", save);
 $("btn-new").addEventListener("click", () => {
   FORM_IDS.forEach(id => $(id).value = "");
+  $("f-autofill-text").value = "";
+  $("autofill-status").textContent = "";
+  $("autofill-box").open = true;
   setDateDefaults();
   setMode("new", null);
   setStatus("", true);
