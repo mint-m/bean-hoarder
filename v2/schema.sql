@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS beans (
   roastery     TEXT NOT NULL,
   origin       TEXT DEFAULT '',
   region       TEXT DEFAULT '',
+  producer     TEXT DEFAULT '',
+  lot          TEXT DEFAULT '',
   variety      TEXT DEFAULT '',
   process      TEXT DEFAULT '',
   altitude     TEXT DEFAULT '',

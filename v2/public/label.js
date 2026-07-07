@@ -21,8 +21,8 @@ export const SPEC_POOL = [
 export const SUB_POOL = [["REGION", "지역"], ["PROCESS", "가공"], ["VARIETY", "품종"], ["ALTITUDE", "고도"]];
 
 export const DEFAULT_DESIGN = {
-  headlineSize: 3.0,
-  specValueSize: 1.75,
+  headlineSize: 2.8,
+  specValueSize: 1.7,
   qrSize: 9.0,
   subFields: ["REGION", "PROCESS"],
   specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT"],
@@ -33,21 +33,61 @@ function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// 한글 등 전각 문자는 라틴 대비 약 1.8배 폭으로 계산
+function textUnits(text) {
+  let u = 0;
+  for (const ch of text) u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(ch) ? 1.8 : 1;
+  return u;
+}
+
+// 폭 초과 시 글자를 눌러 찌그러뜨리는 대신 말줄임(…)으로 잘라낸다.
+function fitText(text, size, factor, maxW) {
+  const unitW = size * factor;
+  if (textUnits(text) * unitW <= maxW) return text;
+  const budget = maxW / unitW - 1;   // "…" 자리 확보
+  let u = 0, out = "";
+  for (const ch of text) {
+    u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(ch) ? 1.8 : 1;
+    if (u > budget) break;
+    out += ch;
+  }
+  return out.trimEnd() + "…";
+}
+
+// 폭 예산에 맞춰 최대 2줄로 나누고, 2줄째도 넘치면 말줄임.
+function wrapTwo(text, size, factor, maxW) {
+  const unitW = size * factor;
+  if (textUnits(text) * unitW <= maxW) return [text];
+  const budget = maxW / unitW;
+  let u = 0, cut = 0, lastSpace = -1;
+  const chars = [...text];
+  for (let i = 0; i < chars.length; i++) {
+    u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(chars[i]) ? 1.8 : 1;
+    if (chars[i] === " ") lastSpace = i;
+    if (u > budget) { cut = i; break; }
+  }
+  if (lastSpace > cut * 0.55) cut = lastSpace;
+  const l1 = chars.slice(0, cut).join("").trim();
+  const l2 = chars.slice(cut).join("").trim();
+  return [l1, fitText(l2, size, factor, maxW)];
+}
+
 function textEl(x, y, text, size, opts) {
   if (!text) return "";
   const { factor, maxW, font = SANS, weight, style, spacing, anchor } = opts;
-  const w = Math.min(text.length * size * factor, maxW);
+  const fitted = fitText(text, size, factor, maxW);
+  const w = Math.min(textUnits(fitted) * size * factor, maxW);
   let attrs = `x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${font}" font-size="${size}" textLength="${w.toFixed(2)}" lengthAdjust="spacingAndGlyphs"`;
   if (weight) attrs += ` font-weight="${weight}"`;
   if (style) attrs += ` font-style="${style}"`;
   if (spacing != null) attrs += ` letter-spacing="${spacing}"`;
   if (anchor) attrs += ` text-anchor="${anchor}"`;
-  return `<text ${attrs}>${esc(text)}</text>`;
+  return `<text ${attrs}>${esc(fitted)}</text>`;
 }
 
 function specCell(x, y, label, value, valueMax, size) {
-  return textEl(x, y, label, 1.15, { factor: .55, maxW: 3.2, font: MONO })
-       + textEl(x + 3.6, y, value, size, { factor: .55, maxW: valueMax, font: MONO, weight: "bold" });
+  return textEl(x, y, label, 1.1, { factor: .55, maxW: 3.1, font: MONO })
+       + textEl(x + 3.5, y, value, size, { factor: .55, maxW: valueMax, font: MONO, weight: "bold" });
 }
 
 export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) {
@@ -65,20 +105,39 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     const [lx, ly, lw, lh] = LOGO_BOX;
     els.push(`<image x="${lx}" y="${ly}" width="${lw}" height="${lh}" preserveAspectRatio="xMaxYMin meet" href="${logoDataUrl}"/>`);
   }
-  els.push(textEl(MARGIN, 3.0, g("ROASTERY").toUpperCase(), 1.7, { factor: .70, maxW: headMax, weight: "bold", spacing: 0.14 }));
-  els.push(textEl(MARGIN, 6.4, g("ORIGIN").toUpperCase(), design.headlineSize, { factor: .68, maxW: headMax, weight: "bold" }));
-  const sub = design.subFields.map(f => g(f)).filter(Boolean).join(" · ");
-  els.push(textEl(MARGIN, 8.35, sub, 1.6, { factor: .52, maxW: LEFT_MAX }));
-  els.push(`<line x1="${MARGIN}" y1="9.4" x2="${(QR_X - QUIET).toFixed(2)}" y2="9.4" stroke="#000" stroke-width="0.12"/>`);
 
-  const colX = [MARGIN, MARGIN + 13.4];
+  // 1행 로스터리(소형 볼드) / 2행 국가 헤드라인
+  els.push(textEl(MARGIN, 2.6, g("ROASTERY").toUpperCase(), 1.5, { factor: .70, maxW: headMax, weight: "bold", spacing: 0.12 }));
+  els.push(textEl(MARGIN, 5.5, g("ORIGIN").toUpperCase(), design.headlineSize, { factor: .68, maxW: headMax, weight: "bold" }));
+
+  // 3~4행: 지역은 길어질 수 있어 전용 줄, 나머지(가공·품종·고도)는 한 줄로 합침
+  const infoLines = [];
+  if (design.subFields.includes("REGION") && g("REGION")) infoLines.push(g("REGION"));
+  const restLine = design.subFields.filter(f => f !== "REGION").map(f => g(f)).filter(Boolean).join(" · ");
+  if (restLine) infoLines.push(restLine);
+  const infoY = [7.35, 8.95];
+  infoLines.slice(0, 2).forEach((line, i) => {
+    els.push(textEl(MARGIN, infoY[i], line, 1.4, { factor: .52, maxW: LEFT_MAX }));
+  });
+
+  els.push(`<line x1="${MARGIN}" y1="9.9" x2="${(QR_X - QUIET).toFixed(2)}" y2="9.9" stroke="#000" stroke-width="0.12"/>`);
+
+  // 스펙 그리드 2×2 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
+  const colX = [MARGIN, MARGIN + 13.2];
   const labelOf = k => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
   design.specFields.slice(0, 4).forEach((f, i) => {
-    const val = g(f);
+    let val = g(f);
     if (!val) return;
-    els.push(specCell(colX[i % 2], 12.1 + Math.floor(i / 2) * 2.8, labelOf(f), val, 9.5, design.specValueSize));
+    if (f === "AGTRON") val = val.split(/\s+/)[0];
+    els.push(specCell(colX[i % 2], 12.3 + Math.floor(i / 2) * 2.5, labelOf(f), val, 9.6, design.specValueSize));
   });
-  els.push(textEl(MARGIN, 17.7, g("TASTING_NOTE"), 1.5, { factor: .50, maxW: LEFT_MAX, style: "italic" }));
+
+  // 테이스팅 노트: 최대 2줄, 넘치면 말줄임
+  const noteLines = g("TASTING_NOTE") ? wrapTwo(g("TASTING_NOTE"), 1.35, .50, LEFT_MAX) : [];
+  const noteY = [16.6, 18.35];
+  noteLines.slice(0, 2).forEach((line, i) => {
+    els.push(textEl(MARGIN, noteY[i], line, 1.35, { factor: .50, maxW: LEFT_MAX, style: "italic" }));
+  });
 
   const key = g("KEY").toUpperCase();
   const content = `${BASE_URL}/${key}`;

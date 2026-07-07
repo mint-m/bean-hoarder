@@ -23,10 +23,13 @@
   .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--sub); margin: 0 0 14px; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .field input[type=text], .field input[type=url], .field input[type=password], .field textarea {
+  .field input[type=text], .field input[type=url], .field input[type=password], .field input[type=date], .field textarea {
     width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px;
     font-family: var(--sans); font-size: 13px; background: #fff; color: var(--ink);
   }
+  .unit-wrap { position: relative; }
+  .unit-wrap input { padding-right: 26px; }
+  .unit-wrap .unit { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--sub); pointer-events: none; }
   .field textarea { resize: vertical; min-height: 44px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   button {
@@ -133,22 +136,30 @@
         <div class="field"><label>가공방식</label><input type="text" id="f-process" list="dl-process" placeholder="Washed"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>로스팅일<span class="req">*</span></label><input type="text" id="f-roastdate"></div>
-        <div class="field"><label>패키징일<span class="req">*</span></label><input type="text" id="f-packagedate"></div>
+        <div class="field"><label>로스팅일<span class="req">*</span></label><input type="date" id="f-roastdate"></div>
+        <div class="field"><label>패키징일<span class="req">*</span></label><input type="date" id="f-packagedate"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>용량</label><input type="text" id="f-netweight" placeholder="20g"></div>
-        <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="라이트 / 미디움 / 다크 또는 애그트론 수치"></div>
+        <div class="field"><label>용량</label>
+          <div class="unit-wrap"><input type="text" id="f-netweight" inputmode="decimal" placeholder="20"><span class="unit">g</span></div>
+        </div>
+        <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"></div>
       </div>
-      <div class="field"><label>테이스팅 노트</label><textarea id="f-note"></textarea></div>
+      <div class="field"><label>테이스팅 노트</label><textarea id="f-note" placeholder="Magnolia, Honey Peach, Bergamot"></textarea></div>
       <div class="field"><label>메모</label><textarea id="f-memo" placeholder="재구매 의사, 추출 레시피 등 자유롭게"></textarea></div>
       <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
 
       <details class="adv">
-        <summary>추가 정보 펼치기 (고도 · 수확시기)</summary>
+        <summary>추가 정보 펼치기 (고도 · 수확시기 · 생산자 · 랏)</summary>
         <div class="row2">
-          <div class="field"><label>고도</label><input type="text" id="f-altitude" placeholder="2100m"></div>
-          <div class="field"><label>수확시기</label><input type="text" id="f-harvest" placeholder="25/26"></div>
+          <div class="field"><label>고도</label>
+            <div class="unit-wrap"><input type="text" id="f-altitude" inputmode="numeric" placeholder="1900-2100"><span class="unit">m</span></div>
+          </div>
+          <div class="field"><label>수확시기</label><input type="text" id="f-harvest" list="dl-harvest" placeholder="25/26"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>생산자 / 농장</label><input type="text" id="f-producer" placeholder="Daniel Caro Lopez"></div>
+          <div class="field"><label>랏 · 워싱스테이션</label><input type="text" id="f-lot" placeholder="Sewda Premium"></div>
         </div>
       </details>
 
@@ -167,9 +178,10 @@
         <option value="Semi-Washed"><option value="블렌드 (여러 가공방식 혼합)">
       </datalist>
       <datalist id="dl-roastpoint">
-        <option value="라이트"><option value="미디움라이트"><option value="미디움">
-        <option value="미디움다크"><option value="다크">
+        <option value="#120 (울트라라이트)"><option value="#95 (라이트)"><option value="#75 (미디움라이트)">
+        <option value="#65 (미디움)"><option value="#55 (미디움다크)"><option value="#45 (다크)">
       </datalist>
+      <datalist id="dl-harvest"></datalist>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -226,14 +238,12 @@
         <button id="btn-copy-qr" disabled>QR 이미지 복사</button>
         <button id="btn-open-live" disabled>상세 페이지 열기 ↗</button>
       </div>
-      <details class="adv">
-        <summary>라벨 파일 다운로드 (선택)</summary>
-        <div class="btnrow" style="margin-top:0">
-          <button id="btn-dl-png203">PNG 203dpi (님봇)</button>
-          <button id="btn-dl-png320">PNG 320dpi</button>
-          <button id="btn-dl-svg">SVG</button>
-        </div>
-      </details>
+      <p class="hint" style="margin-top:12px">라벨 이미지 다운</p>
+      <div class="btnrow" style="margin-top:4px">
+        <button id="btn-dl-png203">PNG 203dpi (님봇)</button>
+        <button id="btn-dl-png320">PNG 320dpi</button>
+        <button id="btn-dl-svg">SVG</button>
+      </div>
       <p class="hint">
         등록 전 KEY는 다음 순번 예상값이며, 등록하면 서버가 확정 KEY를 부여하고 라벨이 다시 그려집니다.
         URL·QR 복사와 인쇄는 등록 후에 하세요. QR 검증(203dpi 실디코드)은 렌더링 때마다 자동 수행됩니다.
@@ -263,23 +273,43 @@ const subToggleInputs = {};  // key -> checkbox element (서브라인 자동 체
 
 const $ = id => document.getElementById(id);
 const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
-const FORM_IDS = ["f-roastery","f-origin","f-region","f-variety","f-process","f-altitude",
-  "f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
+const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-variety","f-process",
+  "f-altitude","f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
 const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
 
-function fmtDate(d) {
-  const y2 = String(d.getFullYear() % 100).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y2}.${mm}.${dd}`;
+// 날짜: <input type=date>(ISO) ↔ 저장 포맷(yy.mm.dd) 상호 변환
+function isoToDot(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? `${m[1].slice(2)}.${m[2]}.${m[3]}` : "";
 }
-(function setDatePlaceholders() {
-  const today = new Date();
-  const roastDay = new Date(today);
-  roastDay.setDate(today.getDate() - 10);
-  $("f-roastdate").placeholder = fmtDate(roastDay);
-  $("f-packagedate").placeholder = fmtDate(today);
+function dotToIso(dot) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(dot || "");
+  return m ? `20${m[1]}-${m[2]}-${m[3]}` : "";
+}
+function isoOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function setDateDefaults() {
+  $("f-roastdate").value = isoOffset(-10);
+  $("f-packagedate").value = isoOffset(0);
+}
+setDateDefaults();
+
+// 수확시기 제안: 25/26(크롭이어), 26, 25
+(function fillHarvestOptions() {
+  const y = parseInt(yy, 10);
+  const opts = [`${y - 1}/${y}`, `${y}`, `${y - 1}`];
+  $("dl-harvest").innerHTML = opts.map(o => `<option value="${o}">`).join("");
 })();
+
+// 용량·고도: 숫자만 입력하면 저장 시 단위(g/m) 자동 부착
+function withUnit(v, unit) {
+  const s = v.trim();
+  if (!s) return "";
+  return /^[\d\s.~\-–]+$/.test(s) && /\d/.test(s) ? s.replace(/\s+/g, "") + unit : s;
+}
 
 function setStatus(msg, ok) {
   const el = $("action-status");
@@ -320,13 +350,15 @@ function getRow() {
     ROASTERY: $("f-roastery").value.trim(),
     ORIGIN: $("f-origin").value.trim(),
     REGION: $("f-region").value.trim(),
+    PRODUCER: $("f-producer").value.trim(),
+    LOT: $("f-lot").value.trim(),
     VARIETY: $("f-variety").value.trim(),
     PROCESS: $("f-process").value.trim(),
-    ALTITUDE: $("f-altitude").value.trim(),
+    ALTITUDE: withUnit($("f-altitude").value, "m"),
     HARVEST: $("f-harvest").value.trim(),
-    ROAST_DATE: $("f-roastdate").value.trim(),
-    PACKAGE_DATE: $("f-packagedate").value.trim(),
-    NET_WEIGHT: $("f-netweight").value.trim(),
+    ROAST_DATE: isoToDot($("f-roastdate").value),
+    PACKAGE_DATE: isoToDot($("f-packagedate").value),
+    NET_WEIGHT: withUnit($("f-netweight").value, "g"),
     AGTRON: $("f-agtron").value.trim(),
     TASTING_NOTE: $("f-note").value.trim(),
     MEMO: $("f-memo").value.trim(),
@@ -440,13 +472,15 @@ function loadBeanForEdit(key, beans) {
   $("f-roastery").value = b.ROASTERY || "";
   $("f-origin").value = b.ORIGIN || "";
   $("f-region").value = b.REGION || "";
+  $("f-producer").value = b.PRODUCER || "";
+  $("f-lot").value = b.LOT || "";
   $("f-variety").value = b.VARIETY || "";
   $("f-process").value = b.PROCESS || "";
-  $("f-altitude").value = b.ALTITUDE || "";
+  $("f-altitude").value = (b.ALTITUDE || "").replace(/m$/, "");
   $("f-harvest").value = b.HARVEST || "";
-  $("f-roastdate").value = b.ROAST_DATE || "";
-  $("f-packagedate").value = b.PACKAGE_DATE || "";
-  $("f-netweight").value = b.NET_WEIGHT || "";
+  $("f-roastdate").value = dotToIso(b.ROAST_DATE);
+  $("f-packagedate").value = dotToIso(b.PACKAGE_DATE);
+  $("f-netweight").value = (b.NET_WEIGHT || "").replace(/g$/, "");
   $("f-agtron").value = b.AGTRON || "";
   $("f-note").value = b.TASTING_NOTE || "";
   $("f-memo").value = b.MEMO || "";
@@ -696,6 +730,11 @@ $("btn-signout").addEventListener("click", () => {
 });
 
 FORM_IDS.forEach(id => $(id).addEventListener("input", () => { autoCheckSubline(); renderAll(); }));
+// 로스팅 포인트: 숫자로 시작하면 # 자동 부착
+$("f-agtron").addEventListener("input", (e) => {
+  const v = e.target.value;
+  if (/^\d/.test(v)) e.target.value = "#" + v;
+});
 $("f-headline-size").addEventListener("input", e => { design.headlineSize = parseFloat(e.target.value); renderAll(); });
 $("f-specval-size").addEventListener("input", e => { design.specValueSize = parseFloat(e.target.value); renderAll(); });
 $("f-qr-size").addEventListener("input", e => { design.qrSize = parseFloat(e.target.value); renderAll(); });
@@ -711,6 +750,7 @@ $("f-logo-file").addEventListener("change", (e) => {
 $("btn-save").addEventListener("click", save);
 $("btn-new").addEventListener("click", () => {
   FORM_IDS.forEach(id => $(id).value = "");
+  setDateDefaults();
   setMode("new", null);
   setStatus("", true);
   refreshList();
