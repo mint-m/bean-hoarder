@@ -4,128 +4,194 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16100a" media="(prefers-color-scheme: dark)">
 <title>BEAN-HOARDER — 스튜디오</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%238b5e34' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23f4eee4' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/theme.css">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
-  :root {
-    --ink: #111; --sub: #666; --line: #ddd; --bg: #fafafa;
-    --mono: Consolas, "SF Mono", Menlo, monospace;
-    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  body { padding: 0 16px 96px; }
+
+  .topbar {
+    max-width: 960px; margin: 0 auto; padding: 18px 2px 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg); padding: 24px 16px 80px; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .lede { color: var(--sub); font-size: 13px; margin: 0 0 20px; }
-  .layout { display: grid; grid-template-columns: 1fr; gap: 20px; max-width: 920px; margin: 0 auto; }
-  @media (min-width: 860px) { .layout { grid-template-columns: 1fr 1fr; } }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
-  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--sub); margin: 0 0 14px; }
+  .topbar .wordmark { font-size: 17px; }
+  .topbar .wordmark span { font-weight: 600; font-size: 11px; letter-spacing: .24em; color: var(--sub); margin-left: 6px; }
+  .acct-chip {
+    display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--sub);
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 6px 5px 14px;
+  }
+  .acct-chip code { font-weight: 700; color: var(--ink); letter-spacing: .06em; }
+  .acct-chip button { padding: 4px 10px; font-size: 11.5px; border-radius: 999px; }
+
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--sub); margin: 0 0 14px; font-weight: 700; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .field input[type=text], .field input[type=url], .field input[type=password], .field input[type=date], .field textarea {
-    width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px;
-    font-family: var(--sans); font-size: 13px; background: #fff; color: var(--ink);
-  }
-  .unit-wrap { position: relative; }
-  .unit-wrap input { padding-right: 26px; }
-  .unit-wrap .unit { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--sub); pointer-events: none; }
-  .field textarea { resize: vertical; min-height: 44px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  button {
-    font-family: var(--sans); font-size: 12px; cursor: pointer;
-    border: 1px solid var(--line); background: #fff; color: var(--ink);
-    border-radius: 4px; padding: 7px 11px;
-  }
-  button:hover { border-color: #999; }
-  button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
-  button.danger { color: #a33; }
   .btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; }
-  .toggles label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
-  .slider-field { margin-bottom: 12px; }
-  .slider-field label { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .slider-field input[type=range] { width: 100%; }
+  .req { color: var(--bad); margin-left: 2px; }
+  .status-line { font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .divider { border: 0; border-top: 1px dashed var(--line); margin: 16px 0; }
+
+  .unit-wrap { position: relative; }
+  .unit-wrap input { padding-right: 28px; }
+  .unit-wrap .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 12.5px; color: var(--sub); pointer-events: none; }
+
   details.adv { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
   details.adv summary { font-size: 12px; color: var(--sub); cursor: pointer; user-select: none; margin-bottom: 10px; }
-  .preview-wrap { display: flex; justify-content: center; padding: 16px; background: #f3f3f0; border-radius: 6px; }
-  .preview-wrap svg { width: 100%; max-width: 420px; border: 1px solid var(--line); background: #fff; }
+
+  /* ---- 인증 뷰 (로그아웃 상태) ---- */
+  #acct-signed-out { max-width: 460px; margin: 24px auto 0; }
+  .auth-hero { text-align: center; margin-bottom: 20px; }
+  .auth-hero .beanmark { width: 40px; height: 40px; color: var(--accent); }
+  .auth-hero h1 { margin: 4px 0 6px; font-family: var(--display); font-weight: 800; font-size: 26px; }
+  .auth-hero p { margin: 0; font-size: 13.5px; color: var(--sub); }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .tabs button {
+    border: 0; background: none; border-radius: 8px 8px 0 0; padding: 8px 14px;
+    font-size: 13.5px; font-weight: 600; color: var(--sub); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* ---- 본 레이아웃 ---- */
+  .layout { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 960px; margin: 0 auto; }
+  @media (min-width: 880px) { .layout { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .layout .card + .card { margin-top: 16px; }
+  .sticky-col { position: sticky; top: 16px; }
+
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .toggles label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }
+  .slider-field { margin-bottom: 12px; }
+  .slider-field label { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+  .slider-field input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  .preview-wrap { display: flex; justify-content: center; padding: 18px; background: var(--surface-2); border-radius: 10px; }
+  .preview-wrap > div { width: 100%; max-width: 420px; }
+  .preview-wrap svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; border-radius: 3px; }
   .qr-info { font-family: var(--mono); font-size: 11px; color: var(--sub); margin-top: 8px; word-break: break-all; }
-  .verify { font-size: 12px; margin-top: 6px; }
-  .verify.ok { color: #274; }
-  .verify.bad { color: #a33; }
-  .hint { font-size: 11px; color: var(--sub); margin-top: 6px; line-height: 1.5; }
-  .error { color: #a33; }
-  .ok { color: #274; }
-  .status-line { font-size: 12px; margin-top: 8px; min-height: 16px; }
-  .hidden { display: none; }
-  .acct { font-size: 13px; }
-  .acct code { font-family: var(--mono); font-size: 14px; }
-  .divider { border: 0; border-top: 1px dashed var(--line); margin: 14px 0; }
-  .req { color: #a33; margin-left: 2px; }
-  table.beans { width: 100%; border-collapse: collapse; font-size: 12px; }
-  table.beans th { text-align: left; font-size: 10px; letter-spacing: .08em; color: var(--sub); padding: 4px 6px; border-bottom: 1px solid var(--line); }
-  table.beans td { padding: 6px; border-bottom: 1px solid #f0f0ec; vertical-align: middle; }
-  table.beans td.key { font-family: var(--mono); white-space: nowrap; }
-  table.beans .rowbtns { display: flex; gap: 4px; }
-  table.beans button { padding: 3px 7px; font-size: 11px; }
-  #recovery-box.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .recovery-card { padding: 16px; background: #fff8e6; border: 1px solid #e8d38a; border-radius: 8px; max-width: 380px; width: 100%; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
-  .recovery-card p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
-  .recovery-key { font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: .04em; word-break: break-all; text-align: center; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 4px; margin: 8px 0; }
-  .recovery-ack { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; font-size: 12px; cursor: pointer; }
+  .verify { font-size: 12px; margin-top: 6px; font-weight: 600; }
+  .verify.ok { color: var(--ok); }
+  .verify.bad { color: var(--bad); }
+
+  /* ---- 원두 목록 ---- */
+  .bean-rows { display: flex; flex-direction: column; }
+  .bean-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 2px; border-bottom: 1px solid var(--line);
+  }
+  .bean-row:last-child { border-bottom: 0; }
+  .bean-row-main { min-width: 0; }
+  .bean-row .bkey { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+  .bean-row .borigin { font-size: 13.5px; font-weight: 700; margin-left: 8px; }
+  .bean-row .bmeta { display: block; font-size: 12px; color: var(--sub); margin-top: 1px; }
+  .bean-row .rowbtns { display: flex; gap: 4px; flex-shrink: 0; }
+  .bean-row button { padding: 4px 9px; font-size: 11.5px; }
+
+  /* ---- 복구키 모달 ---- */
+  #recovery-box.modal-overlay {
+    position: fixed; inset: 0; background: rgba(20, 12, 5, .55); z-index: 1000;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .recovery-card {
+    padding: 20px; background: var(--surface); border: 1.5px solid var(--gold);
+    border-radius: var(--radius); max-width: 400px; width: 100%; box-shadow: var(--shadow);
+  }
+  .recovery-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; }
+  .recovery-key {
+    font-family: var(--mono); font-size: 17px; font-weight: 700; letter-spacing: .05em;
+    word-break: break-all; text-align: center; padding: 10px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; margin: 10px 0;
+  }
+  .recovery-ack { display: flex; align-items: flex-start; gap: 7px; margin-top: 14px; font-size: 12.5px; cursor: pointer; }
   .recovery-ack input { margin-top: 2px; }
+
+  /* ---- 모바일 미리보기 시트 ---- */
+  #fab-preview {
+    position: fixed; right: 16px; bottom: 16px; z-index: 900; display: none;
+    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+    border-radius: 999px; padding: 12px 18px; font-size: 13.5px; box-shadow: var(--shadow);
+  }
+  @media (max-width: 879px) { body.signed-in #fab-preview { display: block; } }
+  #sheet { position: fixed; inset: 0; z-index: 950; background: rgba(20, 12, 5, .45); display: flex; align-items: flex-end; }
+  .sheet-card {
+    width: 100%; background: var(--surface); border-radius: 18px 18px 0 0;
+    padding: 16px 18px 24px; border-top: 1px solid var(--line); max-height: 80dvh; overflow-y: auto;
+  }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .sheet-head h2 { margin: 0; }
 </style>
 </head>
 <body>
-<div class="layout">
 
-  <div>
-    <h1>Bean-Hoarder 스튜디오</h1>
-    <p class="lede">여러 로스터리에서 사 모은 원두를 소분·등록하고 QR 라벨로 관리합니다. 등록·수정에만 암호가 필요하고, QR 스캔 조회는 누구나 가능합니다.</p>
+<header class="topbar">
+  <a class="wordmark" href="/">Bean-Hoarder<span>STUDIO</span></a>
+  <div id="acct-signed-in" class="acct-chip hidden">
+    <code id="acct-usercode"></code>
+    <button id="btn-signout">로그아웃</button>
+  </div>
+</header>
 
-    <div class="card">
-      <h2>0. 계정</h2>
-      <div id="acct-signed-out">
-        <div class="row2">
-          <div class="field"><label>초대코드</label><input type="password" id="a-invite" placeholder="운영자에게 받은 코드"></div>
-          <div class="field"><label>사용할 암호 (숫자 4자리)</label><input type="password" id="a-pin" maxlength="4" inputmode="numeric" placeholder="0000"></div>
-        </div>
-        <div class="btnrow">
-          <button class="primary" id="btn-signup">가입 — 유저코드 발급</button>
-        </div>
-        <hr class="divider">
-        <div class="row2">
-          <div class="field"><label>기존 유저코드</label><input type="text" id="a-usercode" maxlength="4" placeholder="ABCD"></div>
-          <div class="field"><label>암호</label><input type="password" id="a-pin2" maxlength="4" inputmode="numeric" placeholder="0000"></div>
-        </div>
-        <div class="btnrow">
-          <button id="btn-login">이 브라우저에 로그인</button>
-        </div>
-        <hr class="divider">
-        <p class="hint">유저코드나 암호를 잊으셨나요? 가입 시 저장해둔 복구키로 새 암호를 설정하세요.</p>
-        <div class="row2">
-          <div class="field"><label>복구키</label><input type="text" id="a-recovery" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"></div>
-          <div class="field"><label>새 암호 (숫자 4자리)</label><input type="password" id="a-pin3" maxlength="4" inputmode="numeric" placeholder="0000"></div>
-        </div>
-        <div class="btnrow">
-          <button id="btn-recover">복구키로 재설정</button>
-        </div>
-        <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). <b>복구키는 계정을 되찾을 수 있는 유일한 수단</b>이니 오프라인(메모장, 인쇄물 등)에 꼭 보관하세요 — 서버는 다시 보여줄 수 없습니다.</p>
-      </div>
-      <div id="acct-signed-in" class="acct hidden">
-        <div>유저코드 <code id="acct-usercode"></code> — 이 브라우저에 저장됨</div>
-        <div class="btnrow">
-          <button id="btn-signout">로그아웃</button>
-        </div>
-      </div>
-      <div id="recovery-box" class="hidden"></div>
-      <div class="status-line" id="acct-status"></div>
+<!-- ══════ 인증 (로그아웃 상태) ══════ -->
+<div id="acct-signed-out">
+  <div class="auth-hero">
+    <svg class="beanmark" viewBox="0 0 48 48" aria-hidden="true">
+      <ellipse cx="24" cy="24" rx="14" ry="19" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
+      <path d="M18 8C28 18 20 30 30 40" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
+    </svg>
+    <h1>스튜디오</h1>
+    <p>원두를 등록하고 QR 라벨을 만드는 공간입니다.<br>QR 스캔 조회는 로그인 없이 누구나 가능합니다.</p>
+  </div>
+  <div class="card">
+    <div class="tabs" id="auth-tabs">
+      <button data-tab="login" class="active" type="button">로그인</button>
+      <button data-tab="signup" type="button">가입</button>
+      <button data-tab="recover" type="button">계정 복구</button>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h2 id="form-title">1. 원두 정보</h2>
-      <p class="hint" id="form-hint">붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.</p>
+    <div id="pane-login">
+      <div class="row2">
+        <div class="field"><label>유저코드</label><input type="text" id="a-usercode" maxlength="4" placeholder="ABCD" autocomplete="off"></div>
+        <div class="field"><label>암호 (숫자 4자리)</label><input type="password" id="a-pin2" maxlength="4" inputmode="numeric" placeholder="0000"></div>
+      </div>
+      <div class="btnrow"><button class="primary" id="btn-login">이 브라우저에 로그인</button></div>
+    </div>
+
+    <div id="pane-signup" class="hidden">
+      <div class="row2">
+        <div class="field"><label>초대코드</label><input type="password" id="a-invite" placeholder="운영자에게 받은 코드"></div>
+        <div class="field"><label>사용할 암호 (숫자 4자리)</label><input type="password" id="a-pin" maxlength="4" inputmode="numeric" placeholder="0000"></div>
+      </div>
+      <div class="btnrow"><button class="primary" id="btn-signup">가입 — 유저코드 발급</button></div>
+      <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). 가입 직후 표시되는 <b>복구키가 계정을 되찾을 수 있는 유일한 수단</b>이니 오프라인(메모장, 인쇄물 등)에 꼭 보관하세요.</p>
+    </div>
+
+    <div id="pane-recover" class="hidden">
+      <p class="hint" style="margin: 0 0 10px">유저코드나 암호를 잊으셨나요? 가입 시 저장해둔 복구키로 새 암호를 설정하세요. 성공하면 복구키는 새로 발급됩니다.</p>
+      <div class="row2">
+        <div class="field"><label>복구키</label><input type="text" id="a-recovery" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off"></div>
+        <div class="field"><label>새 암호 (숫자 4자리)</label><input type="password" id="a-pin3" maxlength="4" inputmode="numeric" placeholder="0000"></div>
+      </div>
+      <div class="btnrow"><button class="primary" id="btn-recover">복구키로 재설정</button></div>
+    </div>
+
+    <div class="status-line" id="acct-status"></div>
+  </div>
+</div>
+
+<!-- ══════ 스튜디오 본 화면 (로그인 상태) ══════ -->
+<div id="app-view" class="layout hidden">
+
+  <div>
+    <div class="card">
+      <h2 id="form-title">원두 정보</h2>
+      <p class="hint" id="form-hint" style="margin: -6px 0 14px">붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.</p>
       <div class="field"><label>로스터리 (이 원두를 만든 곳)<span class="req">*</span></label><input type="text" id="f-roastery" placeholder="SEY"></div>
       <div class="row2">
         <div class="field"><label>국가(산지)<span class="req">*</span></label><input type="text" id="f-origin" list="dl-origin" placeholder="ETHIOPIA"></div>
@@ -184,36 +250,36 @@
       <datalist id="dl-harvest"></datalist>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h2>2. 라벨 디자인</h2>
-      <p class="hint">라벨 부제목에 함께 표시할 정보 (원산지 아래 한 줄) — 값을 입력하면 자동으로 체크됩니다</p>
+    <div class="card">
+      <h2>라벨 디자인</h2>
+      <p class="hint" style="margin: -6px 0 10px">부제목 줄에 함께 표시할 정보 — 값을 입력하면 자동으로 체크됩니다</p>
       <div class="toggles" id="toggle-sub"></div>
-      <p class="hint" style="margin-top:12px">라벨 하단 칸에 표시할 정보 (최대 4개, 직접 선택)</p>
+      <p class="hint" style="margin: 14px 0 10px">하단 스펙 칸에 표시할 정보 (최대 4개, 직접 선택)</p>
       <div class="toggles" id="toggle-spec"></div>
       <details class="adv">
         <summary>사이즈 조정 펼치기</summary>
         <div class="slider-field">
-          <label><span>헤드라인 크기</span><span id="lbl-headline">3.0mm</span></label>
-          <input type="range" id="f-headline-size" min="2.4" max="3.4" step="0.1" value="3.0">
+          <label><span>헤드라인 크기</span><span id="lbl-headline">2.8mm</span></label>
+          <input type="range" id="f-headline-size" min="2.4" max="3.4" step="0.1" value="2.8">
         </div>
         <div class="slider-field">
-          <label><span>스펙 값 크기</span><span id="lbl-specval">1.75mm</span></label>
-          <input type="range" id="f-specval-size" min="1.4" max="2.0" step="0.05" value="1.75">
+          <label><span>스펙 값 크기</span><span id="lbl-specval">1.70mm</span></label>
+          <input type="range" id="f-specval-size" min="1.4" max="2.0" step="0.05" value="1.7">
         </div>
         <div class="slider-field">
           <label><span>QR 크기</span><span id="lbl-qrsize">9.0mm</span></label>
           <input type="range" id="f-qr-size" min="7" max="10" step="0.5" value="9">
         </div>
       </details>
-      <div class="field" style="margin-top:12px">
-        <label><input type="checkbox" id="f-show-logo" checked> 로고 표시 (업로드 시)</label>
+      <div class="field" style="margin: 12px 0 0">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (업로드 시)</label>
         <input type="file" id="f-logo-file" accept="image/png,image/svg+xml" style="margin-top:6px">
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h2>3. 내 원두 목록</h2>
-      <div id="bean-list"><p class="hint">로그인하면 목록이 표시됩니다.</p></div>
+    <div class="card">
+      <h2>내 원두 목록</h2>
+      <div id="bean-list"><p class="hint">불러오는 중…</p></div>
       <div class="btnrow">
         <button id="btn-refresh-list">새로고침</button>
         <button id="btn-export">CSV 백업 다운로드</button>
@@ -222,8 +288,8 @@
   </div>
 
   <div>
-    <div class="card" style="position:sticky; top:16px;">
-      <h2>미리보기 <span style="text-transform:none;letter-spacing:0" id="preview-key-label"></span></h2>
+    <div class="card sticky-col">
+      <h2>라벨 미리보기 <span style="text-transform:none;letter-spacing:0" id="preview-key-label"></span></h2>
       <div class="preview-wrap"><div id="svg-holder"></div></div>
       <div class="qr-info" id="qr-target"></div>
       <div class="verify" id="verify-badge"></div>
@@ -253,7 +319,19 @@
 
 </div>
 
-<canvas id="raster-canvas" style="display:none"></canvas>
+<button id="fab-preview" type="button">라벨 미리보기</button>
+<div id="sheet" class="hidden">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <h2>라벨 미리보기</h2>
+      <button id="sheet-close" type="button">닫기</button>
+    </div>
+    <div class="preview-wrap"><div id="sheet-svg"></div></div>
+    <div class="verify" id="sheet-verify"></div>
+  </div>
+</div>
+
+<div id="recovery-box" class="hidden"></div>
 
 <script type="module">
 import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SPEC_POOL, SUB_POOL, BASE_URL }
@@ -321,6 +399,12 @@ function setAcctStatus(msg, ok) {
   el.textContent = msg;
   el.className = "status-line " + (ok ? "ok" : "error");
 }
+function setVerify(text, cls) {
+  ["verify-badge", "sheet-verify"].forEach(id => {
+    $(id).textContent = text;
+    $(id).className = "verify " + (cls || "");
+  });
+}
 
 function authHeader() {
   return { "Authorization": `Bearer ${account.usercode}:${account.pin}` };
@@ -333,9 +417,12 @@ function saveAccount() {
 }
 
 function renderAccount() {
-  $("acct-signed-out").classList.toggle("hidden", signedIn());
-  $("acct-signed-in").classList.toggle("hidden", !signedIn());
-  if (signedIn()) $("acct-usercode").textContent = account.usercode;
+  const on = signedIn();
+  $("acct-signed-out").classList.toggle("hidden", on);
+  $("acct-signed-in").classList.toggle("hidden", !on);
+  $("app-view").classList.toggle("hidden", !on);
+  document.body.classList.toggle("signed-in", on);
+  if (on) $("acct-usercode").textContent = account.usercode;
 }
 
 function currentKey() {
@@ -380,12 +467,7 @@ function setMode(newMode, key) {
 
 let verifySeq = 0;
 async function renderAll() {
-  if (!signedIn()) {
-    $("svg-holder").innerHTML = "";
-    $("qr-target").textContent = "가입 또는 로그인 후 미리보기가 표시됩니다.";
-    $("verify-badge").textContent = "";
-    return;
-  }
+  if (!signedIn()) return;
   $("lbl-headline").textContent = design.headlineSize.toFixed(1) + "mm";
   $("lbl-specval").textContent = design.specValueSize.toFixed(2) + "mm";
   $("lbl-qrsize").textContent = design.qrSize.toFixed(1) + "mm";
@@ -394,17 +476,16 @@ async function renderAll() {
 
   const { svg, content } = buildLabelSVG(getRow(), design, logoDataUrl);
   $("svg-holder").innerHTML = svg;
+  if (!$("sheet").classList.contains("hidden")) $("sheet-svg").innerHTML = svg;
   $("qr-target").textContent = "QR: " + content;
   window.__svg = svg;
 
-  const badge = $("verify-badge");
-  badge.textContent = "QR 검증 중…";
-  badge.className = "verify";
+  setVerify("QR 검증 중…", "");
   const mySeq = ++verifySeq;
   const v = await verifyQr(svg, content, 203);
   if (mySeq !== verifySeq) return;
-  badge.textContent = v.ok ? "QR 검증 OK — 203dpi 실디코드 통과" : "QR 검증 실패 — QR 크기를 키워보세요";
-  badge.className = "verify " + (v.ok ? "ok" : "bad");
+  setVerify(v.ok ? "QR 검증 OK — 203dpi 실디코드 통과" : "QR 검증 실패 — QR 크기를 키워보세요",
+    v.ok ? "ok" : "bad");
 }
 
 // 서브라인 필드(지역/가공/품종/고도)에 값이 있으면 해당 표시 체크박스를 자동으로 켠다.
@@ -431,7 +512,7 @@ async function api(path, opts = {}) {
 
 async function refreshList() {
   const holder = $("bean-list");
-  if (!signedIn()) { holder.innerHTML = '<p class="hint">로그인하면 목록이 표시됩니다.</p>'; return; }
+  if (!signedIn()) return;
   const { body } = await api("/api/beans");
   if (!body || !body.ok) { holder.innerHTML = '<p class="hint error">목록을 불러오지 못했습니다.</p>'; return; }
   const beans = body.beans;
@@ -441,23 +522,23 @@ async function refreshList() {
   previewSeq = max + 1;
   if (mode === "new") renderAll();
 
-  if (!beans.length) { holder.innerHTML = '<p class="hint">아직 등록된 원두가 없습니다.</p>'; return; }
+  if (!beans.length) { holder.innerHTML = '<p class="hint">아직 등록된 원두가 없습니다. 첫 원두를 등록해 보세요.</p>'; return; }
   const rows = beans.map(b => `
-    <tr data-key="${b.KEY}">
-      <td class="key">${b.KEY}</td>
-      <td>${escapeHtml(b.ORIGIN || "")}</td>
-      <td>${escapeHtml(b.ROASTERY || "")}</td>
-      <td><div class="rowbtns">
+    <div class="bean-row" data-key="${b.KEY}">
+      <div class="bean-row-main">
+        <span class="bkey">${b.KEY}</span><span class="borigin">${escapeHtml(b.ORIGIN || "")}</span>
+        <span class="bmeta">${escapeHtml(b.ROASTERY || "")}${b.ROAST_DATE ? " · 로스팅 " + escapeHtml(b.ROAST_DATE) : ""}</span>
+      </div>
+      <div class="rowbtns">
         <button data-act="edit">수정</button>
         <button data-act="url">URL</button>
         <button data-act="del" class="danger">삭제</button>
-      </div></td>
-    </tr>`).join("");
-  holder.innerHTML = `<table class="beans">
-    <tr><th>KEY</th><th>산지</th><th>로스터리</th><th></th></tr>${rows}</table>`;
+      </div>
+    </div>`).join("");
+  holder.innerHTML = `<div class="bean-rows">${rows}</div>`;
   holder.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", () => {
-      const key = btn.closest("tr").dataset.key;
+      const key = btn.closest(".bean-row").dataset.key;
       const act = btn.dataset.act;
       if (act === "url") { copyText(`${SITE}/${key}`); setStatus(`${key} 상세 URL 복사됨`, true); }
       if (act === "edit") loadBeanForEdit(key, beans);
@@ -595,7 +676,6 @@ async function signup() {
     account.pin = pin;
     saveAccount();
     renderAccount();
-    setAcctStatus(`가입 완료 — 유저코드 ${body.usercode}. 아래 복구키를 꼭 저장하세요.`, true);
     showRecoveryBox(body.usercode, body.recovery_key);
     refreshList();
     renderAll();
@@ -614,7 +694,6 @@ async function login() {
   if (res.ok) {
     account.usercode = uc; account.pin = pin;
     saveAccount(); renderAccount();
-    setAcctStatus("로그인 완료", true);
     refreshList(); renderAll();
   } else {
     setAcctStatus("유저코드 또는 암호가 올바르지 않습니다.", false);
@@ -634,7 +713,6 @@ async function recover() {
   if (body && body.ok) {
     account.usercode = body.usercode; account.pin = pin;
     saveAccount(); renderAccount();
-    setAcctStatus(`복구 완료 — 유저코드 ${body.usercode}. 복구키가 새로 발급되었으니 다시 저장하세요.`, true);
     showRecoveryBox(body.usercode, body.recovery_key);
     refreshList(); renderAll();
   } else {
@@ -719,6 +797,26 @@ function buildToggles(containerId, pool, selected, max, refStore) {
 }
 buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
 buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4);
+
+// 인증 탭 전환
+document.querySelectorAll("#auth-tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#auth-tabs button").forEach(b => b.classList.toggle("active", b === btn));
+    ["login", "signup", "recover"].forEach(t =>
+      $(`pane-${t}`).classList.toggle("hidden", t !== btn.dataset.tab));
+    setAcctStatus("", true);
+  });
+});
+
+// 모바일 미리보기 시트
+$("fab-preview").addEventListener("click", () => {
+  $("sheet").classList.remove("hidden");
+  $("sheet-svg").innerHTML = window.__svg || "";
+  $("sheet-verify").textContent = $("verify-badge").textContent;
+  $("sheet-verify").className = $("verify-badge").className;
+});
+$("sheet-close").addEventListener("click", () => $("sheet").classList.add("hidden"));
+$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) $("sheet").classList.add("hidden"); });
 
 $("btn-signup").addEventListener("click", signup);
 $("btn-login").addEventListener("click", login);

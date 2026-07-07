@@ -4,58 +4,126 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4eee4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16100a" media="(prefers-color-scheme: dark)">
 <title>BEAN-HOARDER — 원두 조회</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%238b5e34' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23f4eee4' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/theme.css">
 <style>
-  :root {
-    --ink: #111; --sub: #666; --line: #ddd; --bg: #fafafa;
-    --mono: Consolas, "SF Mono", Menlo, monospace;
-    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
+  main { width: 100%; max-width: 440px; flex: 1; }
+  .brand {
+    display: inline-block; font-family: var(--display); font-weight: 800; font-size: 13px;
+    letter-spacing: .22em; color: var(--sub); text-decoration: none; margin: 0 0 14px 2px;
   }
-  * { box-sizing: border-box; margin: 0; }
-  body {
-    font-family: var(--sans); color: var(--ink); background: var(--bg);
-    display: flex; justify-content: center; padding: 28px 16px 60px;
-  }
-  main { width: 100%; max-width: 420px; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 24px 22px; }
-  .eyebrow {
-    font-size: 11px; font-weight: 700; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--sub); margin-bottom: 6px;
-  }
-  h1.origin { font-size: 30px; font-weight: 800; letter-spacing: .01em; text-transform: uppercase; line-height: 1.1; }
-  .subline { font-size: 14px; margin-top: 6px; }
-  .subline .sep { color: var(--sub); padding: 0 4px; }
-  hr { border: 0; border-top: 1px solid var(--ink); margin: 16px 0 14px; }
-  dl.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; font-family: var(--mono); font-size: 13px; }
-  dl.specs > div { display: flex; flex-direction: column; }
-  dt { font-size: 10px; letter-spacing: .12em; color: var(--sub); }
-  dd { margin-top: 2px; }
-  .note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); font-style: italic; font-size: 14px; color: #333; }
-  .keyline { margin-top: 18px; display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--sub); }
-  .keyline a { color: var(--sub); }
-  .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px; }
-  .status .code { font-family: var(--mono); color: var(--ink); }
-  .status a { color: var(--ink); }
-  .memo { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
-  .memo .memo-label { font-size: 10px; letter-spacing: .12em; color: var(--sub); margin-bottom: 2px; }
-  .memo .memo-body { font-size: 14px; color: #333; }
-  .hidden { display: none; }
+  footer { margin-top: 28px; font-size: 11px; letter-spacing: .08em; color: var(--sub); }
+
+  /* ---- 원두 카드 ---- */
+  .bean { padding: 30px 26px 24px; }
   .preview-badge {
-    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--sub); border-bottom: 1px dashed var(--line); padding-bottom: 10px; margin-bottom: 14px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--gold); border-bottom: 1px dashed var(--line); padding-bottom: 12px; margin-bottom: 16px;
   }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+  }
+  h1.origin {
+    margin: 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(34px, 9.5vw, 44px); line-height: 1.04;
+    letter-spacing: .005em; text-transform: uppercase; text-wrap: balance;
+  }
+  .subline { margin: 10px 0 0; font-size: 14.5px; color: var(--ink); }
+  .subline .sep { color: var(--sub); padding: 0 5px; }
+
+  ul.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; padding: 0; }
+  ul.chips li {
+    font-size: 12.5px; padding: 3.5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  }
+  .note { margin: 16px 0 0; font-style: italic; font-size: 14px; color: var(--ink); }
+
+  hr.strong { border: 0; border-top: 1.5px solid var(--ink); margin: 20px 0 14px; }
+
+  .freshline {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    font-size: 13px; font-family: var(--mono); color: var(--ink); margin-bottom: 14px;
+  }
+  .freshline .sep { color: var(--sub); padding: 0 5px; }
+  .freshline .dday {
+    font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--line); margin-left: 4px;
+  }
+
+  dl.specs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; margin: 0; }
+  dl.specs > div { display: flex; flex-direction: column; min-width: 0; }
+  dt { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--sub); }
+  dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+  .memo { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .memo-label { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--sub); margin-bottom: 3px; }
+  .memo-body { font-size: 14px; }
+
+  .keyline {
+    margin-top: 22px; display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 12px; color: var(--sub);
+  }
+  .keyline a { color: var(--accent); text-decoration: none; }
+  .keyline a:hover { text-decoration: underline; }
+
+  /* ---- 상태 / 랜딩 ---- */
+  .status { text-align: center; padding: 52px 22px; color: var(--sub); font-size: 14px; }
+  .status .code { font-family: var(--mono); color: var(--ink); }
+  .status a { color: var(--accent); }
+
+  .landing { text-align: center; padding: 40px 26px 32px; }
+  .beanmark { width: 44px; height: 44px; color: var(--accent); margin-bottom: 10px; }
+  .landing h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; letter-spacing: .01em; }
+  .landing .tagline { margin: 10px 0 22px; font-size: 14px; color: var(--sub); }
+  #code-form { display: flex; gap: 8px; }
+  #code-form input { font-family: var(--mono); text-transform: uppercase; }
+  #code-form button { white-space: nowrap; flex-shrink: 0; }
+  .landing-links { margin-top: 18px; font-size: 13px; color: var(--sub); }
+  .landing-links a { text-decoration: none; font-weight: 600; }
+  .landing-links a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 <main>
+  <a class="brand" href="/">BEAN-HOARDER</a>
+
   <div id="status" class="card status">불러오는 중…</div>
-  <div id="bean" class="card hidden">
+
+  <div id="landing" class="card landing hidden">
+    <svg class="beanmark" viewBox="0 0 48 48" aria-hidden="true">
+      <ellipse cx="24" cy="24" rx="14" ry="19" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
+      <path d="M18 8C28 18 20 30 30 40" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
+    </svg>
+    <h1>Bean-Hoarder</h1>
+    <p class="tagline">여러 로스터리에서 사 모은 원두를 소분하고,<br>QR 라벨 하나로 정보를 다시 꺼내 봅니다.</p>
+    <form id="code-form">
+      <input id="code-input" type="text" placeholder="라벨 코드 (예: DEMO26-001)" autocomplete="off" spellcheck="false">
+      <button class="primary" type="submit">조회</button>
+    </form>
+    <div class="landing-links">
+      <a href="/DEMO26-001">데모 원두 보기</a> &nbsp;·&nbsp; <a href="/admin">스튜디오 (등록·관리)</a>
+    </div>
+  </div>
+
+  <article id="bean" class="card bean hidden">
+    <div id="f-preview-badge" class="preview-badge hidden"></div>
     <div class="eyebrow" id="f-roastery"></div>
     <h1 class="origin" id="f-origin"></h1>
-    <div class="subline" id="f-subline"></div>
-    <hr>
-    <dl class="specs" id="f-specs"></dl>
+    <p class="subline hidden" id="f-subline"></p>
+    <ul class="chips hidden" id="f-chips"></ul>
     <div class="note hidden" id="f-note"></div>
+    <hr class="strong">
+    <div class="freshline hidden" id="f-fresh"></div>
+    <dl class="specs" id="f-specs"></dl>
     <div class="memo hidden" id="f-memo">
       <div class="memo-label">MEMO</div>
       <div class="memo-body" id="f-memo-body"></div>
@@ -64,15 +132,16 @@
       <span id="f-key"></span>
       <a id="f-source" class="hidden" target="_blank" rel="noopener">원본 페이지 ↗</a>
     </div>
-  </div>
+  </article>
 </main>
+<footer>BEAN-HOARDER — 원두 소분 라벨 아카이브</footer>
+
 <script>
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
+// 지역·생산자는 서브라인, 날짜는 프레시라인에 표시하므로 스펙 그리드에서 제외
 const SPEC_FIELDS = [
-  ["REGION", "REGION"], ["PRODUCER", "PRODUCER"], ["LOT", "LOT"],
-  ["VARIETY", "VARIETY"], ["PROCESS", "PROCESS"],
-  ["ALTITUDE", "ALT"], ["HARVEST", "HARVEST"], ["ROAST_DATE", "ROASTED"],
-  ["PACKAGE_DATE", "PACKAGED"], ["NET_WEIGHT", "NET"], ["AGTRON", "ROAST POINT"],
+  ["PROCESS", "PROCESS"], ["VARIETY", "VARIETY"], ["AGTRON", "ROAST PT"],
+  ["NET_WEIGHT", "NET"], ["ALTITUDE", "ALTITUDE"], ["HARVEST", "HARVEST"], ["LOT", "LOT"],
 ];
 
 function getCode() {
@@ -86,38 +155,76 @@ function escapeHtml(s) {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+function hideAll() {
+  ["status", "landing", "bean"].forEach(id => document.getElementById(id).classList.add("hidden"));
+}
 function show(msg) {
+  hideAll();
   const el = document.getElementById("status");
   el.innerHTML = msg;
   el.classList.remove("hidden");
-  document.getElementById("bean").classList.add("hidden");
+}
+function showLanding() {
+  hideAll();
+  document.getElementById("landing").classList.remove("hidden");
+  const form = document.getElementById("code-form");
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const v = document.getElementById("code-input").value.trim().toUpperCase();
+    if (v) location.href = "/" + encodeURIComponent(v);
+  });
+}
+
+function parseDot(d) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(d || "");
+  return m ? new Date(2000 + +m[1], +m[2] - 1, +m[3]) : null;
 }
 
 function render(row, isPreview) {
   const g = k => (row[k] || "").trim();
-  document.getElementById("status").classList.add("hidden");
-  const bean = document.getElementById("bean");
-  bean.classList.remove("hidden");
+  hideAll();
+  document.getElementById("bean").classList.remove("hidden");
 
-  let badge = document.getElementById("f-preview-badge");
-  if (isPreview) {
-    if (!badge) {
-      badge = document.createElement("div");
-      badge.id = "f-preview-badge";
-      badge.className = "preview-badge";
-      bean.prepend(badge);
-    }
-    badge.textContent = "초안 미리보기 · 아직 등록되지 않음";
-    badge.classList.remove("hidden");
-  } else if (badge) {
-    badge.classList.add("hidden");
-  }
+  const badge = document.getElementById("f-preview-badge");
+  badge.classList.toggle("hidden", !isPreview);
+  if (isPreview) badge.textContent = "초안 미리보기 · 아직 등록되지 않음";
 
   document.getElementById("f-roastery").textContent = g("ROASTERY");
   document.getElementById("f-origin").textContent = g("ORIGIN");
-  document.getElementById("f-subline").innerHTML =
-    [g("VARIETY"), g("PROCESS")].filter(Boolean)
-      .map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
+
+  const subParts = [g("REGION"), g("PRODUCER")].filter(Boolean);
+  const sub = document.getElementById("f-subline");
+  sub.classList.toggle("hidden", !subParts.length);
+  sub.innerHTML = subParts.map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
+
+  // 테이스팅 노트: 짧은 항목들이면 칩으로, 긴 문장이면 이탤릭 문단으로
+  const chips = document.getElementById("f-chips");
+  const note = document.getElementById("f-note");
+  chips.classList.add("hidden"); note.classList.add("hidden");
+  const noteRaw = g("TASTING_NOTE");
+  if (noteRaw) {
+    const segs = noteRaw.split(/[,·]/).map(s => s.trim()).filter(Boolean);
+    if (segs.length && segs.every(s => s.length <= 28)) {
+      chips.innerHTML = segs.map(s => `<li>${escapeHtml(s)}</li>`).join("");
+      chips.classList.remove("hidden");
+    } else {
+      note.textContent = noteRaw;
+      note.classList.remove("hidden");
+    }
+  }
+
+  // 로스팅/소분 날짜 + D+N
+  const fresh = document.getElementById("f-fresh");
+  const rd = g("ROAST_DATE"), pd = g("PACKAGE_DATE");
+  fresh.classList.toggle("hidden", !rd && !pd);
+  const parts = [];
+  if (rd) {
+    const d = parseDot(rd);
+    const n = d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null;
+    parts.push(`로스팅 ${escapeHtml(rd)}${n != null && n >= 0 && !isPreview ? `<span class="dday">D+${n}</span>` : ""}`);
+  }
+  if (pd) parts.push(`소분 ${escapeHtml(pd)}`);
+  fresh.innerHTML = parts.join('<span class="sep">·</span>');
 
   const dl = document.getElementById("f-specs");
   dl.innerHTML = "";
@@ -129,22 +236,15 @@ function render(row, isPreview) {
     dl.appendChild(div);
   }
 
-  const note = document.getElementById("f-note");
-  if (g("TASTING_NOTE")) {
-    note.textContent = g("TASTING_NOTE");
-    note.classList.remove("hidden");
-  }
   const memo = document.getElementById("f-memo");
-  if (g("MEMO")) {
-    document.getElementById("f-memo-body").textContent = g("MEMO");
-    memo.classList.remove("hidden");
-  }
+  memo.classList.toggle("hidden", !g("MEMO"));
+  if (g("MEMO")) document.getElementById("f-memo-body").textContent = g("MEMO");
+
   document.getElementById("f-key").textContent = g("KEY");
   const src = document.getElementById("f-source");
-  if (g("SOURCE_URL")) {
-    src.href = g("SOURCE_URL");
-    src.classList.remove("hidden");
-  }
+  src.classList.toggle("hidden", !g("SOURCE_URL"));
+  if (g("SOURCE_URL")) src.href = g("SOURCE_URL");
+
   document.title = `${g("ORIGIN")} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
 }
 
@@ -163,13 +263,9 @@ async function main() {
     return;
   }
   const code = getCode();
-  if (!code) {
-    show("라벨의 QR을 스캔하거나<br>URL 뒤에 코드를 붙여 접속하세요.<br><br><span class='code'>/DEMO26-001</span>" +
-      "<br><br>원두를 등록하려면 <a href='/admin'>스튜디오로 이동 →</a>");
-    return;
-  }
+  if (!code) { showLanding(); return; }
   if (!KEY_RE.test(code)) {
-    show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span><br><br><a href="/">처음으로 ←</a>`);
     return;
   }
   let res;
@@ -180,7 +276,7 @@ async function main() {
     return;
   }
   if (res.status === 404) {
-    show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span>`);
+    show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span><br><br><a href="/">처음으로 ←</a>`);
     return;
   }
   if (!res.ok) {
