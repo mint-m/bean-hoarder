@@ -16,7 +16,7 @@ const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const FIELDS = ["origin","region","variety","process","altitude","harvest",
   "roast_date","package_date","net_weight","agtron","tasting_note","memo","source_url"];
 const REQUIRED_LABELS = {
-  origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일", net_weight: "용량",
+  origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일",
 };
 
 function json(obj, status = 200) {

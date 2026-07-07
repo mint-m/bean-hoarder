@@ -108,6 +108,7 @@
         <div class="btnrow">
           <button id="btn-recover">복구키로 재설정</button>
         </div>
+        <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). <b>복구키는 계정을 되찾을 수 있는 유일한 수단</b>이니 오프라인(메모장, 인쇄물 등)에 꼭 보관하세요 — 서버는 다시 보여줄 수 없습니다.</p>
       </div>
       <div id="acct-signed-in" class="acct hidden">
         <div>유저코드 <code id="acct-usercode"></code> — 이 브라우저에 저장됨</div>
@@ -117,7 +118,6 @@
       </div>
       <div id="recovery-box" class="hidden"></div>
       <div class="status-line" id="acct-status"></div>
-      <p class="hint">암호는 도난돼도 무방한 편의용입니다(등록·수정 방지용). <b>복구키는 계정을 되찾을 수 있는 유일한 수단</b>이니 오프라인(메모장, 인쇄물 등)에 꼭 보관하세요 — 서버는 다시 보여줄 수 없습니다.</p>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -137,7 +137,7 @@
         <div class="field"><label>패키징일<span class="req">*</span></label><input type="text" id="f-packagedate"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>용량<span class="req">*</span></label><input type="text" id="f-netweight" placeholder="20g"></div>
+        <div class="field"><label>용량</label><input type="text" id="f-netweight" placeholder="20g"></div>
         <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="라이트 / 미디움 / 다크 또는 애그트론 수치"></div>
       </div>
       <div class="field"><label>테이스팅 노트</label><textarea id="f-note"></textarea></div>
@@ -476,7 +476,6 @@ function missingRequiredFields(row) {
   if (!row.ORIGIN) missing.push("국가(산지)");
   if (!row.ROAST_DATE) missing.push("로스팅일");
   if (!row.PACKAGE_DATE) missing.push("패키징일");
-  if (!row.NET_WEIGHT) missing.push("용량");
   return missing;
 }
 
