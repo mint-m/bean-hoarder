@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#f4eee4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#16100a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
 <title>BEAN-HOARDER — 스튜디오</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%238b5e34' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23f4eee4' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%23f04e1c' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23ffffff' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
@@ -266,10 +266,7 @@
           <label><span>스펙 값 크기</span><span id="lbl-specval">1.70mm</span></label>
           <input type="range" id="f-specval-size" min="1.4" max="2.0" step="0.05" value="1.7">
         </div>
-        <div class="slider-field">
-          <label><span>QR 크기</span><span id="lbl-qrsize">9.0mm</span></label>
-          <input type="range" id="f-qr-size" min="7" max="10" step="0.5" value="9">
-        </div>
+        <p class="hint">QR은 님봇 인쇄 도트 격자에 맞춘 고정 크기(9.4mm)로, 스캔 안정성을 위해 조절하지 않습니다.</p>
       </details>
       <div class="field" style="margin: 12px 0 0">
         <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (업로드 시)</label>
@@ -470,7 +467,6 @@ async function renderAll() {
   if (!signedIn()) return;
   $("lbl-headline").textContent = design.headlineSize.toFixed(1) + "mm";
   $("lbl-specval").textContent = design.specValueSize.toFixed(2) + "mm";
-  $("lbl-qrsize").textContent = design.qrSize.toFixed(1) + "mm";
   $("preview-key-label").textContent = confirmedKey
     ? `— 확정 KEY ${confirmedKey}` : `— 예상 KEY ${currentKey()}`;
 
@@ -835,7 +831,6 @@ $("f-agtron").addEventListener("input", (e) => {
 });
 $("f-headline-size").addEventListener("input", e => { design.headlineSize = parseFloat(e.target.value); renderAll(); });
 $("f-specval-size").addEventListener("input", e => { design.specValueSize = parseFloat(e.target.value); renderAll(); });
-$("f-qr-size").addEventListener("input", e => { design.qrSize = parseFloat(e.target.value); renderAll(); });
 $("f-show-logo").addEventListener("change", e => { design.showLogo = e.target.checked; renderAll(); });
 $("f-logo-file").addEventListener("change", (e) => {
   const file = e.target.files[0];

@@ -23,20 +23,28 @@ export const SUB_POOL = [["REGION", "지역"], ["PROCESS", "가공"], ["VARIETY"
 export const DEFAULT_DESIGN = {
   headlineSize: 2.8,
   specValueSize: 1.7,
-  qrSize: 9.0,
   subFields: ["REGION", "PROCESS"],
   specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT"],
   showLogo: true,
 };
+
+// 님봇 도트 피치 ≈ 0.12512mm(203dpi). 렌더 캔버스가 40mm→320px로 반올림되므로
+// 0.125mm(8px/mm) 격자로 스냅하면 검증·다운로드 PNG에서 모듈 경계가 픽셀에 정확히 떨어진다.
+// (실제 도트와 0.1% 차이 — 물리 인쇄에는 무의미)
+const DOT = 0.125;
+const QR_MODULE_DOTS = 3;   // 모듈 = 3도트 = 0.375mm → 버전2(25모듈) QR = 9.375mm
 
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // 한글 등 전각 문자는 라틴 대비 약 1.8배 폭으로 계산
+function unitsOf(ch) {
+  return /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(ch) ? 1.8 : 1;
+}
 function textUnits(text) {
   let u = 0;
-  for (const ch of text) u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(ch) ? 1.8 : 1;
+  for (const ch of text) u += unitsOf(ch);
   return u;
 }
 
@@ -47,29 +55,37 @@ function fitText(text, size, factor, maxW) {
   const budget = maxW / unitW - 1;   // "…" 자리 확보
   let u = 0, out = "";
   for (const ch of text) {
-    u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(ch) ? 1.8 : 1;
+    u += unitsOf(ch);
     if (u > budget) break;
     out += ch;
   }
   return out.trimEnd() + "…";
 }
 
-// 폭 예산에 맞춰 최대 2줄로 나누고, 2줄째도 넘치면 말줄임.
-function wrapTwo(text, size, factor, maxW) {
+// 폭 예산에 맞춰 최대 maxLines줄로 나누고, 마지막 줄이 넘치면 말줄임.
+function wrapN(text, size, factor, maxW, maxLines) {
   const unitW = size * factor;
-  if (textUnits(text) * unitW <= maxW) return [text];
-  const budget = maxW / unitW;
-  let u = 0, cut = 0, lastSpace = -1;
-  const chars = [...text];
-  for (let i = 0; i < chars.length; i++) {
-    u += /[ᄀ-ᇿ　-鿿가-힯＀-￯]/.test(chars[i]) ? 1.8 : 1;
-    if (chars[i] === " ") lastSpace = i;
-    if (u > budget) { cut = i; break; }
+  const lines = [];
+  let rest = text.trim();
+  while (rest && lines.length < maxLines) {
+    if (textUnits(rest) * unitW <= maxW || lines.length === maxLines - 1) {
+      lines.push(fitText(rest, size, factor, maxW));
+      return lines;
+    }
+    const budget = maxW / unitW;
+    let u = 0, cut = 0, lastSpace = -1;
+    const chars = [...rest];
+    for (let i = 0; i < chars.length; i++) {
+      u += unitsOf(chars[i]);
+      if (chars[i] === " ") lastSpace = i;
+      if (u > budget) { cut = i; break; }
+    }
+    if (lastSpace > cut * 0.55) cut = lastSpace;
+    if (cut <= 0) cut = 1;
+    lines.push(chars.slice(0, cut).join("").trim());
+    rest = chars.slice(cut).join("").trim();
   }
-  if (lastSpace > cut * 0.55) cut = lastSpace;
-  const l1 = chars.slice(0, cut).join("").trim();
-  const l2 = chars.slice(cut).join("").trim();
-  return [l1, fitText(l2, size, factor, maxW)];
+  return lines;
 }
 
 function textEl(x, y, text, size, opts) {
@@ -92,9 +108,18 @@ function specCell(x, y, label, value, valueMax, size) {
 
 export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) {
   const g = k => (row[k] || "").trim();
-  const QR_SIZE = design.qrSize;
-  const QR_X = W - 1.3 - QR_SIZE;
-  const QR_Y = 8.4;
+
+  // QR을 먼저 만들어 도트 격자에 스냅된 실제 크기·위치를 확정한다.
+  const key = g("KEY").toUpperCase();
+  const content = `${BASE_URL}/${key}`;
+  const qr = qrcode(0, "M");
+  qr.addData(content, "Alphanumeric");
+  qr.make();
+  const n = qr.getModuleCount();
+  const module = QR_MODULE_DOTS * DOT;
+  const QR_SIZE = module * n;
+  const QR_X = Math.round((W - 1.3 - QR_SIZE) / DOT) * DOT;
+  const QR_Y = Math.round(8.4 / DOT) * DOT;
   const LEFT_MAX = QR_X - QUIET - MARGIN;
   const FULL_MAX = W - MARGIN * 2;
   const hasLogo = design.showLogo && logoDataUrl;
@@ -110,47 +135,57 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   els.push(textEl(MARGIN, 2.6, g("ROASTERY").toUpperCase(), 1.5, { factor: .70, maxW: headMax, weight: "bold", spacing: 0.12 }));
   els.push(textEl(MARGIN, 5.5, g("ORIGIN").toUpperCase(), design.headlineSize, { factor: .68, maxW: headMax, weight: "bold" }));
 
-  // 3~4행: 지역은 길어질 수 있어 전용 줄, 나머지(가공·품종·고도)는 한 줄로 합침
-  const infoLines = [];
-  if (design.subFields.includes("REGION") && g("REGION")) infoLines.push(g("REGION"));
-  const restLine = design.subFields.filter(f => f !== "REGION").map(f => g(f)).filter(Boolean).join(" · ");
-  if (restLine) infoLines.push(restLine);
-  const infoY = [7.35, 8.95];
-  infoLines.slice(0, 2).forEach((line, i) => {
-    els.push(textEl(MARGIN, infoY[i], line, 1.4, { factor: .52, maxW: LEFT_MAX }));
-  });
+  // 라벨 인쇄용 축약: 괄호 속 상세 설명("Washed (36 hours ...)" 등)은
+  // QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
+  const stripParen = s => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
+  const labelVal = f => {
+    const v = g(f);
+    return (f === "REGION" || f === "PROCESS" || f === "VARIETY") ? stripParen(v) : v;
+  };
 
-  els.push(`<line x1="${MARGIN}" y1="9.9" x2="${(QR_X - QUIET).toFixed(2)}" y2="9.9" stroke="#000" stroke-width="0.12"/>`);
+  // ── 좌측 컬럼 플로우 레이아웃: 고정 좌표 대신 내용량에 따라 y를 흘려 배치 ──
+  // 서브라인 정보를 하나의 텍스트로 합쳐 최대 3줄까지 줄바꿈 (말줄임은 마지막 안전장치)
+  const INFO_LH = 1.6, SPEC_LH = 2.4, NOTE_LH = 1.7, NOTE_BOTTOM = 19.4;
+  const subOrder = SUB_POOL.map(([k]) => k).filter(k => design.subFields.includes(k));
+  const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
+  let yCur = 7.4;                      // 다음 텍스트 베이스라인
+  if (infoText) {
+    for (const line of wrapN(infoText, 1.35, .52, LEFT_MAX, 3)) {
+      els.push(textEl(MARGIN, yCur, line, 1.35, { factor: .52, maxW: LEFT_MAX }));
+      yCur += INFO_LH;
+    }
+  }
 
-  // 스펙 그리드 2×2 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
-  const colX = [MARGIN, MARGIN + 13.2];
+  const divY = Math.max(6.6, yCur - INFO_LH + 0.55);
+  els.push(`<line x1="${MARGIN}" y1="${divY.toFixed(2)}" x2="${(QR_X - QUIET).toFixed(2)}" y2="${divY.toFixed(2)}" stroke="#000" stroke-width="0.12"/>`);
+
+  // 스펙 그리드: 값이 있는 항목만 2열로 채움 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
   const labelOf = k => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
-  design.specFields.slice(0, 4).forEach((f, i) => {
-    let val = g(f);
-    if (!val) return;
-    if (f === "AGTRON") val = val.split(/\s+/)[0];
-    els.push(specCell(colX[i % 2], 12.3 + Math.floor(i / 2) * 2.5, labelOf(f), val, 9.6, design.specValueSize));
+  const specs = design.specFields.slice(0, 4)
+    .map(f => [f, f === "AGTRON" ? g(f).split(/\s+/)[0] : g(f)])
+    .filter(([, v]) => v);
+  const colX = [MARGIN, MARGIN + 13.2];
+  specs.forEach(([f, val], i) => {
+    els.push(specCell(colX[i % 2], divY + 1.95 + Math.floor(i / 2) * SPEC_LH, labelOf(f), val, 9.6, design.specValueSize));
   });
+  const specRows = Math.ceil(specs.length / 2);
+  let noteY = specRows > 0 ? divY + 1.95 + (specRows - 1) * SPEC_LH + 1.9 : divY + 1.7;
 
-  // 테이스팅 노트: 최대 2줄, 넘치면 말줄임
-  const noteLines = g("TASTING_NOTE") ? wrapTwo(g("TASTING_NOTE"), 1.35, .50, LEFT_MAX) : [];
-  const noteY = [16.6, 18.35];
-  noteLines.slice(0, 2).forEach((line, i) => {
-    els.push(textEl(MARGIN, noteY[i], line, 1.35, { factor: .50, maxW: LEFT_MAX, style: "italic" }));
-  });
+  // 테이스팅 노트: 스펙 그리드 아래 남는 공간만큼 (최대 2줄)
+  if (g("TASTING_NOTE") && noteY <= NOTE_BOTTOM) {
+    const allowed = Math.min(2, Math.floor((NOTE_BOTTOM - noteY) / NOTE_LH) + 1);
+    for (const line of wrapN(g("TASTING_NOTE"), 1.3, .50, LEFT_MAX, allowed)) {
+      els.push(textEl(MARGIN, noteY, line, 1.3, { factor: .50, maxW: LEFT_MAX, style: "italic" }));
+      noteY += NOTE_LH;
+    }
+  }
 
-  const key = g("KEY").toUpperCase();
-  const content = `${BASE_URL}/${key}`;
-  const qr = qrcode(0, "M");
-  qr.addData(content, "Alphanumeric");
-  qr.make();
-  const n = qr.getModuleCount();
-  const module = QR_SIZE / n;
+  // QR 렌더: 도트 격자 스냅 좌표 (소수 4자리 유지로 누적 오차 방지)
   let rects = "";
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       if (qr.isDark(r, c)) {
-        rects += `<rect x="${(QR_X + c * module).toFixed(3)}" y="${(QR_Y + r * module).toFixed(3)}" width="${(module + 0.01).toFixed(3)}" height="${(module + 0.01).toFixed(3)}" fill="#000"/>`;
+        rects += `<rect x="${(QR_X + c * module).toFixed(4)}" y="${(QR_Y + r * module).toFixed(4)}" width="${module.toFixed(4)}" height="${module.toFixed(4)}" fill="#000"/>`;
       }
     }
   }

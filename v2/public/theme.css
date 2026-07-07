@@ -1,42 +1,41 @@
-/* Bean-Hoarder — 공용 디자인 토큰 & 기본 컴포넌트 (index / admin 공유) */
+/* Bean-Hoarder — 공용 디자인 토큰 & 기본 컴포넌트 (index / admin 공유)
+   컨셉: 모바일 보딩패스/월렛 — 화이트·블랙 베이스 + 포인트 컬러 하나 */
 
 :root {
   color-scheme: light dark;
-  --bg: #f4eee4;
-  --surface: #fffdf8;
-  --surface-2: #ece3d2;
-  --ink: #271b10;
-  --sub: #96856f;
-  --line: #e2d7c4;
-  --accent: #8b5e34;
-  --accent-hover: #6f4a27;
-  --accent-ink: #fffdf8;
-  --gold: #b98a4e;
-  --ok: #35704b;
-  --bad: #b0483e;
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --ink: #101012;
+  --sub: #74747c;
+  --line: #e4e4e7;
+  --accent: #f04e1c;        /* 포인트 컬러 (탠저린) */
+  --accent-hover: #d13f12;
+  --accent-ink: #ffffff;
+  --ok: #178744;
+  --bad: #d4341f;
   --mono: "SF Mono", Consolas, Menlo, monospace;
   --sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
           "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --display: "Fraunces", "Times New Roman", Georgia, serif;
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(39, 27, 16, .05), 0 14px 36px -18px rgba(39, 27, 16, .28);
+  --display: "Space Grotesk", "Pretendard Variable", Pretendard, sans-serif;
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(16, 16, 18, .05), 0 16px 40px -20px rgba(16, 16, 18, .25);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16100a;
-    --surface: #201810;
-    --surface-2: #2b2115;
-    --ink: #efe6d6;
-    --sub: #9c8b73;
-    --line: #382c1e;
-    --accent: #c79a5e;
-    --accent-hover: #d9ae74;
-    --accent-ink: #1d150b;
-    --gold: #a8813f;
-    --ok: #7fb08c;
-    --bad: #d98a80;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 14px 36px -18px rgba(0, 0, 0, .7);
+    --bg: #0a0a0b;
+    --surface: #17171a;
+    --surface-2: #232327;
+    --ink: #f4f4f5;
+    --sub: #8e8e96;
+    --line: #2b2b30;
+    --accent: #ff6a3d;
+    --accent-hover: #ff8259;
+    --accent-ink: #17110d;
+    --ok: #5dbb80;
+    --bad: #f08575;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 16px 40px -20px rgba(0, 0, 0, .8);
   }
 }
 
@@ -73,13 +72,13 @@ button, .btn {
   padding: 8px 14px;
   transition: border-color .15s, background .15s, color .15s;
 }
-button:hover { border-color: var(--accent); }
+button:hover { border-color: var(--ink); }
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
 }
-button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 button.danger { color: var(--bad); }
 button:disabled { opacity: .4; cursor: not-allowed; }
 
@@ -95,17 +94,17 @@ input[type=search], textarea {
   color: var(--ink);
 }
 input:focus-visible, textarea:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
   outline-offset: 0;
   border-color: var(--accent);
 }
-::placeholder { color: color-mix(in srgb, var(--sub) 75%, transparent); }
+::placeholder { color: color-mix(in srgb, var(--sub) 70%, transparent); }
 textarea { resize: vertical; min-height: 48px; }
 
 .wordmark {
   font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: .01em;
+  font-weight: 700;
+  letter-spacing: .02em;
   color: var(--ink);
   text-decoration: none;
 }
