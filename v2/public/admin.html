@@ -66,9 +66,12 @@
   table.beans td.key { font-family: var(--mono); white-space: nowrap; }
   table.beans .rowbtns { display: flex; gap: 4px; }
   table.beans button { padding: 3px 7px; font-size: 11px; }
-  .recovery-card { margin-top: 12px; padding: 12px; background: #fff8e6; border: 1px solid #e8d38a; border-radius: 6px; }
-  .recovery-card p { margin: 0 0 8px; font-size: 12px; }
-  .recovery-key { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .04em; word-break: break-all; }
+  #recovery-box.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .recovery-card { padding: 16px; background: #fff8e6; border: 1px solid #e8d38a; border-radius: 8px; max-width: 380px; width: 100%; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+  .recovery-card p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+  .recovery-key { font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: .04em; word-break: break-all; text-align: center; padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 4px; margin: 8px 0; }
+  .recovery-ack { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; font-size: 12px; cursor: pointer; }
+  .recovery-ack input { margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -503,17 +506,24 @@ async function save() {
   }
 }
 
-function showRecoveryBox(usercode, recoveryKey) {
+async function showRecoveryBox(usercode, recoveryKey) {
   const box = $("recovery-box");
   box.classList.remove("hidden");
+  box.classList.add("modal-overlay");
   box.innerHTML = `
     <div class="recovery-card">
-      <p><b>오프라인 복구키</b> — 지금 이 순간만 표시됩니다. 유저코드나 암호를 잊어도 이 키만 있으면 계정을 되찾을 수 있습니다.</p>
+      <p><b>오프라인 복구키</b> — 지금 이 순간만 표시됩니다. 유저코드나 암호를 잊어도 이 키만 있으면 계정을 되찾을 수 있습니다. 클립보드에 자동으로 복사해두었어요.</p>
       <div class="recovery-key">${recoveryKey}</div>
       <div class="btnrow">
-        <button id="btn-copy-recovery">복사</button>
+        <button id="btn-copy-recovery">다시 복사</button>
         <button id="btn-dl-recovery">텍스트 파일로 저장</button>
-        <button id="btn-dismiss-recovery">저장했습니다</button>
+      </div>
+      <label class="recovery-ack">
+        <input type="checkbox" id="recovery-ack">
+        복구키를 안전한 곳에 저장했습니다 (이 창은 다시 표시되지 않습니다)
+      </label>
+      <div class="btnrow">
+        <button class="primary" id="btn-dismiss-recovery" disabled>계속하기</button>
       </div>
     </div>`;
   $("btn-copy-recovery").addEventListener("click", async () => {
@@ -525,7 +535,16 @@ function showRecoveryBox(usercode, recoveryKey) {
       + `이 파일은 안전한 곳에 오프라인으로(인쇄물, USB 등) 보관하세요.\n분실 시 계정을 복구할 수 없습니다.\n`;
     download(`beanhoarder_recovery_${usercode}.txt`, new Blob([text], { type: "text/plain;charset=utf-8" }));
   });
-  $("btn-dismiss-recovery").addEventListener("click", () => box.classList.add("hidden"));
+  $("recovery-ack").addEventListener("change", (e) => {
+    $("btn-dismiss-recovery").disabled = !e.target.checked;
+  });
+  $("btn-dismiss-recovery").addEventListener("click", () => {
+    box.classList.add("hidden");
+    box.classList.remove("modal-overlay");
+    box.innerHTML = "";
+  });
+  // 가입/복구 시점에 바로 클립보드로 저장을 유도 (실패해도 조용히 무시 — 버튼으로 재시도 가능)
+  await copyText(recoveryKey);
 }
 
 async function signup() {
