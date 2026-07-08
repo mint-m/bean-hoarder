@@ -27,10 +27,13 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      # --branch=main 고정: 실제 체크아웃 브랜치는 'deploy'지만, 이걸 안 주면 wrangler가
+      # 그 브랜치명을 그대로 Cloudflare Pages 브랜치로 써서 deploy.bnhd.pages.dev라는
+      # 프리뷰 별칭에만 올라가고 프로덕션 루트 도메인은 갱신되지 않는다.
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: v2
-          command: pages deploy public --project-name=bnhd
+          command: pages deploy public --project-name=bnhd --branch=main
