@@ -192,13 +192,23 @@
         <p class="hint">QR은 인쇄 도트 격자에 맞춘 사이즈별 고정 크기(40×20: 9.4mm · 50×30: 12.5mm · 50×60: 15.6mm)로, 스캔 안정성을 위해 조절하지 않습니다.</p>
       </details>
       <div class="field" style="margin: 12px 0 0">
-        <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (파일 업로드 또는 이미지 링크)</label>
-        <p class="hint" style="margin:4px 0 6px">로스터리 이름이 입력된 상태에서 로고를 올리면 그 로스터리에 저장되어, 다음부터 이름만 입력해도 자동 적용됩니다.</p>
-        <input type="file" id="f-logo-file" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="margin-top:6px">
-        <div style="display:flex; gap:8px; margin-top:6px">
-          <input type="url" id="f-logo-url" placeholder="이미지 URL — https://.../logo.png">
-          <button type="button" id="btn-logo-url" style="white-space:nowrap; flex-shrink:0">불러오기</button>
-          <button type="button" id="btn-logo-del" style="white-space:nowrap; flex-shrink:0">저장된 로고 삭제</button>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (라벨 우상단)</label>
+        <p class="hint" style="margin:4px 0 8px">로스터리 이름이 입력된 상태에서 로고를 올리면 그 로스터리에 저장되어, 다음부터 어느 기기에서든 이름만 입력하면 자동 적용됩니다.</p>
+        <div class="logo-row">
+          <div class="logo-thumb" id="logo-thumb"><span class="logo-thumb-empty" id="logo-thumb-empty">로고<br>없음</span></div>
+          <div class="logo-controls">
+            <div class="logo-state" id="logo-state">로고 없음</div>
+            <input type="file" id="f-logo-file" accept="image/png,image/svg+xml,image/jpeg,image/webp">
+            <div style="display:flex; gap:8px; margin-top:6px">
+              <input type="url" id="f-logo-url" placeholder="이미지 URL — https://.../logo.png">
+              <button type="button" id="btn-logo-url" style="white-space:nowrap; flex-shrink:0">불러오기</button>
+            </div>
+            <div class="status-line" id="logo-status" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button type="button" id="btn-logo-clear">현재 로고 지우기</button>
+          <button type="button" id="btn-logo-del" class="danger">저장된 로고 삭제</button>
         </div>
       </div>
     </div>

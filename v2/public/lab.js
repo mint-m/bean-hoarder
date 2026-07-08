@@ -223,10 +223,45 @@ async function api(path, opts = {}) {
 
 // ── 로스터리 datalist + 서버 저장 로고 ──────────────────────
 
+// 등록 이력에서 뽑은 로스터리명 캐시 — 로고 저장/삭제로 refreshRoasteryOptions가
+// beans 없이 호출돼도 이 캐시와 로고 저장 로스터리를 항상 병합해 제안 목록이 줄지 않게 한다.
+let beanRoasteries = [];
+
+// 로고가 저장된 로스터리를 목록 맨 앞에 두고(★ 표시), 나머지는 가나다/ABC 순.
 function refreshRoasteryOptions(beans) {
-  const names = new Set(Object.keys(logosMap));
-  (beans || []).forEach(b => { const r = (b.ROASTERY || "").trim(); if (r) names.add(r.toUpperCase()); });
-  $("dl-roastery").innerHTML = [...names].sort().map(n => `<option value="${escapeHtml(n)}">`).join("");
+  if (beans) beanRoasteries = beans.map(b => (b.ROASTERY || "").trim().toUpperCase()).filter(Boolean);
+  const withLogo = new Set(Object.keys(logosMap));
+  const all = new Set([...withLogo, ...beanRoasteries]);
+  const sorted = [...all].sort();
+  // 로고 보유 로스터리를 먼저, 그 다음 나머지
+  const ordered = [...sorted.filter(n => withLogo.has(n)), ...sorted.filter(n => !withLogo.has(n))];
+  $("dl-roastery").innerHTML = ordered
+    .map(n => `<option value="${escapeHtml(n)}">${withLogo.has(n) ? "★ 저장된 로고" : ""}</option>`)
+    .join("");
+}
+
+// 로고 컨트롤 옆 전용 상태줄 (메인 액션 상태와 분리해 피드백을 가까이 보여준다)
+function setLogoStatus(msg, cls) {
+  const el = $("logo-status");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.className = "status-line logo-status " + (cls || "");
+}
+
+// 썸네일 + 상태 배지 갱신: 현재 로고 이미지와 "저장됨/미저장/없음"을 표시
+function renderLogoUi() {
+  const thumb = $("logo-thumb"), state = $("logo-state");
+  if (!thumb || !state) return;
+  const rst = $("f-roastery").value.trim().toUpperCase();
+  if (logoDataUrl) {
+    thumb.innerHTML = `<img src="${logoDataUrl}" alt="로고 미리보기">`;
+    if (logoSource === "server") { state.textContent = `저장된 로고 적용됨${rst ? ` — ${rst}` : ""}`; state.className = "logo-state saved"; }
+    else { state.textContent = rst ? `새 로고 (${rst}에 저장됨)` : "새 로고 — 로스터리 이름 입력 시 저장"; state.className = "logo-state unsaved"; }
+  } else {
+    thumb.innerHTML = `<span class="logo-thumb-empty">로고<br>없음</span>`;
+    state.textContent = rst && logosMap[rst] ? `${rst}에 저장된 로고 있음 — 표시하려면 로고 표시 체크` : "로고 없음";
+    state.className = "logo-state none";
+  }
 }
 
 async function refreshLogos() {
@@ -237,6 +272,7 @@ async function refreshLogos() {
     body.logos.forEach(l => logosMap[l.roastery] = l.data_url);
     refreshRoasteryOptions();
     applySavedLogo();
+    renderLogoUi();
     renderAll();
   }
 }
@@ -248,6 +284,7 @@ function applySavedLogo() {
   const saved = rst && logosMap[rst];
   if (saved) { logoDataUrl = saved; logoSource = "server"; }
   else if (logoSource === "server") { logoDataUrl = null; logoSource = null; }
+  renderLogoUi();
 }
 
 // 로고 원본을 라벨 해상도에 맞게 축소(긴 변 256px, PNG)해 저장 용량을 통제한다.
@@ -276,21 +313,23 @@ function downscaleLogo(dataUrl) {
 async function setManualLogo(rawDataUrl) {
   let dataUrl;
   try { dataUrl = await downscaleLogo(rawDataUrl); }
-  catch (e) { setStatus("로고 이미지를 읽지 못했습니다.", false); return; }
-  if (dataUrl.length > LOGO_MAX_LEN) { setStatus("로고 이미지가 너무 큽니다 (100KB 제한).", false); return; }
+  catch (e) { setLogoStatus("로고 이미지를 읽지 못했습니다.", "error"); return; }
+  if (dataUrl.length > LOGO_MAX_LEN) { setLogoStatus("로고 이미지가 너무 큽니다 (100KB 제한).", "error"); return; }
   logoDataUrl = dataUrl;
   logoSource = "manual";
   $("f-show-logo").checked = true;
   design.showLogo = true;
   saveDesign();
+  renderLogoUi();
   renderAll();
   await saveLogoForRoastery();
 }
 
 async function saveLogoForRoastery() {
   const rst = $("f-roastery").value.trim().toUpperCase();
-  if (!rst) { setStatus("로고를 불러왔습니다. 로스터리 이름을 입력하면 저장되어 다음부터 자동 적용됩니다.", true); return; }
+  if (!rst) { setLogoStatus("로고를 불러왔습니다. 로스터리 이름을 입력하면 저장되어 다음부터 자동 적용됩니다.", "ok"); renderLogoUi(); return; }
   if (!signedIn() || !logoDataUrl) return;
+  setLogoStatus(`${rst} 로고 저장 중…`, "loading");
   const { body } = await api("/api/logos", {
     method: "PUT", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ roastery: rst, data_url: logoDataUrl }),
@@ -299,16 +338,27 @@ async function saveLogoForRoastery() {
     logosMap[rst] = logoDataUrl;
     logoSource = "server";
     refreshRoasteryOptions();
-    setStatus(`${rst} 로고 저장됨 — 다음부터 이름만 입력해도 자동 적용됩니다.`, true);
+    setLogoStatus(`✓ ${rst} 로고 저장됨 — 다음부터 이름만 입력해도 자동 적용됩니다.`, "ok");
   } else {
-    setStatus((body && body.error) || "로고 저장 실패", false);
+    setLogoStatus((body && body.error) || "로고 저장 실패", "error");
   }
+  renderLogoUi();
+}
+
+// 현재 미리보기의 로고만 지운다 (서버 저장본은 유지)
+function clearCurrentLogo() {
+  logoDataUrl = null;
+  logoSource = null;
+  renderLogoUi();
+  renderAll();
+  setLogoStatus("현재 로고를 지웠습니다 (저장된 로고는 그대로).", "");
 }
 
 async function deleteSavedLogo() {
   const rst = $("f-roastery").value.trim().toUpperCase();
-  if (!rst) { setStatus("삭제할 로스터리 이름을 먼저 입력하세요.", false); return; }
-  if (!logosMap[rst]) { setStatus(`${rst} 에 저장된 로고가 없습니다.`, false); return; }
+  if (!rst) { setLogoStatus("삭제할 로스터리 이름을 먼저 입력하세요.", "error"); return; }
+  if (!logosMap[rst]) { setLogoStatus(`${rst}에 저장된 로고가 없습니다.`, "error"); return; }
+  if (!confirm(`${rst}에 저장된 로고를 삭제할까요?`)) return;
   const { body } = await api("/api/logos", {
     method: "DELETE", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ roastery: rst }),
@@ -317,10 +367,11 @@ async function deleteSavedLogo() {
     delete logosMap[rst];
     if (logoSource === "server") { logoDataUrl = null; logoSource = null; }
     refreshRoasteryOptions();
+    renderLogoUi();
     renderAll();
-    setStatus(`${rst} 저장 로고 삭제됨`, true);
+    setLogoStatus(`${rst} 저장 로고 삭제됨`, "ok");
   } else {
-    setStatus((body && body.error) || "로고 삭제 실패", false);
+    setLogoStatus((body && body.error) || "로고 삭제 실패", "error");
   }
 }
 
@@ -790,8 +841,8 @@ $("btn-signout").addEventListener("click", () => {
 });
 
 FORM_IDS.forEach(id => $(id).addEventListener("input", () => { autoCheckSubline(); renderAll(); }));
-// 로스터리 입력 시 저장된 로고 자동 적용
-$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderAll(); });
+// 로스터리 입력 시 저장된 로고 자동 적용 + 로고 상태 UI 갱신
+$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); renderAll(); });
 // 로스팅 포인트: 숫자로 시작하면 # 자동 부착
 $("f-agtron").addEventListener("input", (e) => {
   const v = e.target.value;
@@ -808,6 +859,7 @@ $("f-logo-file").addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 $("btn-logo-del").addEventListener("click", deleteSavedLogo);
+$("btn-logo-clear").addEventListener("click", clearCurrentLogo);
 
 // 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우고, 곧바로 인식 실행
 $("btn-autofill-url").addEventListener("click", async () => {
@@ -833,16 +885,25 @@ $("btn-autofill-url").addEventListener("click", async () => {
 // 로고를 이미지 링크로 불러오기 (서버 프록시로 CORS 우회 → dataURL로 변환해 캔버스 오염 방지)
 $("btn-logo-url").addEventListener("click", async () => {
   const url = $("f-logo-url").value.trim();
-  if (!url) { setStatus("로고 이미지 URL을 입력하세요.", false); return; }
-  if (!signedIn()) { setStatus("로그인이 필요합니다.", false); return; }
-  setStatus("로고 이미지를 가져오는 중…", true);
-  const { body } = await api("/api/fetch", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
-  });
-  if (body && body.ok && body.kind === "image") {
-    setManualLogo(body.dataUrl);
-  } else {
-    setStatus((body && body.error) || "이미지를 가져오지 못했습니다 — 이미지 파일 URL인지 확인하세요.", false);
+  if (!url) { setLogoStatus("로고 이미지 URL을 입력하세요.", "error"); return; }
+  if (!signedIn()) { setLogoStatus("로그인이 필요합니다.", "error"); return; }
+  const btn = $("btn-logo-url");
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "불러오는 중…";
+  setLogoStatus("이미지를 가져오는 중…", "loading");
+  try {
+    const { body } = await api("/api/fetch", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+    });
+    if (body && body.ok && body.kind === "image") {
+      await setManualLogo(body.dataUrl);   // 성공 피드백·저장은 setManualLogo가 처리
+    } else if (body && body.ok) {
+      setLogoStatus("이 URL은 이미지가 아닙니다 — 이미지 파일(.png/.jpg/.svg 등) 주소인지 확인하세요.", "error");
+    } else {
+      setLogoStatus((body && body.error) || "이미지를 가져오지 못했습니다.", "error");
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = label;
   }
 });
 
@@ -888,6 +949,8 @@ $("btn-new").addEventListener("click", () => {
   setDateDefaults();
   logoDataUrl = null;
   logoSource = null;
+  setLogoStatus("", "");
+  renderLogoUi();
   setMode("new", null);
   setStatus("", true);
   refreshList();
@@ -936,6 +999,7 @@ $("btn-dl-png320").addEventListener("click", async () => {
 
 setMode("new", null);
 renderAccount();
+renderLogoUi();
 renderAll();
 refreshLogos();
 refreshList();
