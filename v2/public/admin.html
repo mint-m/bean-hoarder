@@ -13,121 +13,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<style>
-  body { padding: 0 16px 96px; }
-
-  .topbar {
-    max-width: 960px; margin: 0 auto; padding: 18px 2px 14px;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  }
-  .topbar .wordmark { font-size: 17px; }
-  .topbar .wordmark span { font-weight: 600; font-size: 11px; letter-spacing: .24em; color: var(--sub); margin-left: 6px; }
-  .acct-chip {
-    display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--sub);
-    border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 6px 5px 14px;
-  }
-  .acct-chip code { font-weight: 700; color: var(--ink); letter-spacing: .06em; }
-  .acct-chip button { padding: 4px 10px; font-size: 11.5px; border-radius: 999px; }
-
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; color: var(--sub); margin: 0 0 14px; font-weight: 700; }
-  .field { margin-bottom: 12px; }
-  .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .req { color: var(--bad); margin-left: 2px; }
-  .status-line { font-size: 12px; margin-top: 8px; min-height: 16px; }
-  .divider { border: 0; border-top: 1px dashed var(--line); margin: 16px 0; }
-
-  .unit-wrap { position: relative; }
-  .unit-wrap input { padding-right: 28px; }
-  .unit-wrap .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 12.5px; color: var(--sub); pointer-events: none; }
-
-  details.adv { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
-  details.adv summary { font-size: 12px; color: var(--sub); cursor: pointer; user-select: none; margin-bottom: 10px; }
-
-  /* ---- 인증 뷰 (로그아웃 상태) ---- */
-  #acct-signed-out { max-width: 460px; margin: 24px auto 0; }
-  .auth-hero { text-align: center; margin-bottom: 20px; }
-  .auth-hero .beanmark { width: 40px; height: 40px; color: var(--accent); }
-  .auth-hero h1 { margin: 4px 0 6px; font-family: var(--display); font-weight: 800; font-size: 26px; }
-  .auth-hero p { margin: 0; font-size: 13.5px; color: var(--sub); }
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
-  .tabs button {
-    border: 0; background: none; border-radius: 8px 8px 0 0; padding: 8px 14px;
-    font-size: 13.5px; font-weight: 600; color: var(--sub); border-bottom: 2px solid transparent; margin-bottom: -1px;
-  }
-  .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
-
-  /* ---- 본 레이아웃 ---- */
-  .layout { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 960px; margin: 0 auto; }
-  @media (min-width: 880px) { .layout { grid-template-columns: 1fr 1fr; align-items: start; } }
-  .layout .card + .card { margin-top: 16px; }
-  .sticky-col { position: sticky; top: 16px; }
-
-  .toggles { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-  .toggles label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }
-  .slider-field { margin-bottom: 12px; }
-  .slider-field label { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .slider-field input[type=range] { width: 100%; accent-color: var(--accent); }
-
-  .preview-wrap { display: flex; justify-content: center; padding: 18px; background: var(--surface-2); border-radius: 10px; }
-  .preview-wrap > div { width: 100%; max-width: 420px; }
-  .preview-wrap svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; border-radius: 3px; }
-  .qr-info { font-family: var(--mono); font-size: 11px; color: var(--sub); margin-top: 8px; word-break: break-all; }
-  .verify { font-size: 12px; margin-top: 6px; font-weight: 600; }
-  .verify.ok { color: var(--ok); }
-  .verify.bad { color: var(--bad); }
-
-  /* ---- 원두 목록 ---- */
-  .bean-rows { display: flex; flex-direction: column; }
-  .bean-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 10px 2px; border-bottom: 1px solid var(--line);
-  }
-  .bean-row:last-child { border-bottom: 0; }
-  .bean-row-main { min-width: 0; }
-  .bean-row .bkey { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-  /* 입력 대소문자가 제각각이어도 목록 표기는 대문자로 통일 (한글·날짜는 영향 없음) */
-  .bean-row .borigin { font-size: 13.5px; font-weight: 700; margin-left: 8px; text-transform: uppercase; }
-  .bean-row .bmeta { display: block; font-size: 12px; color: var(--sub); margin-top: 1px; text-transform: uppercase; }
-  .bean-row .rowbtns { display: flex; gap: 4px; flex-shrink: 0; }
-  .bean-row button { padding: 4px 9px; font-size: 11.5px; }
-
-  /* ---- 복구키 모달 ---- */
-  #recovery-box.modal-overlay {
-    position: fixed; inset: 0; background: rgba(20, 12, 5, .55); z-index: 1000;
-    display: flex; align-items: center; justify-content: center; padding: 16px;
-  }
-  .recovery-card {
-    padding: 20px; background: var(--surface); border: 1.5px solid var(--gold);
-    border-radius: var(--radius); max-width: 400px; width: 100%; box-shadow: var(--shadow);
-  }
-  .recovery-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; }
-  .recovery-key {
-    font-family: var(--mono); font-size: 17px; font-weight: 700; letter-spacing: .05em;
-    word-break: break-all; text-align: center; padding: 10px;
-    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; margin: 10px 0;
-  }
-  .recovery-ack { display: flex; align-items: flex-start; gap: 7px; margin-top: 14px; font-size: 12.5px; cursor: pointer; }
-  .recovery-ack input { margin-top: 2px; }
-
-  /* ---- 모바일 미리보기 시트 ---- */
-  #fab-preview {
-    position: fixed; right: 16px; bottom: 16px; z-index: 900; display: none;
-    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
-    border-radius: 999px; padding: 12px 18px; font-size: 13.5px; box-shadow: var(--shadow);
-  }
-  @media (max-width: 879px) { body.signed-in #fab-preview { display: block; } }
-  #sheet { position: fixed; inset: 0; z-index: 950; background: rgba(20, 12, 5, .45); display: flex; align-items: flex-end; }
-  .sheet-card {
-    width: 100%; background: var(--surface); border-radius: 18px 18px 0 0;
-    padding: 16px 18px 24px; border-top: 1px solid var(--line); max-height: 80dvh; overflow-y: auto;
-  }
-  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .sheet-head h2 { margin: 0; }
-</style>
+<link rel="stylesheet" href="/lab.css">
+<script src="/vendor/qrcode.js"></script>
+<script src="/vendor/jsQR.js"></script>
 </head>
 <body>
 
@@ -202,13 +90,25 @@
         <textarea id="f-autofill-text" style="min-height:76px" placeholder="또는 페이지 텍스트를 직접 붙여넣기&#10;예) Process: Washed (36 hours wet fermentation + 21 days drying on raised beds)&#10;Altitude: 1900-2250m"></textarea>
         <div class="btnrow">
           <button type="button" id="btn-autofill">인식해서 빈 칸 채우기</button>
+          <button type="button" id="btn-autofill-ai">AI로 인식 (Gemini)</button>
           <span class="status-line" id="autofill-status" style="margin:0"></span>
         </div>
         <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다. 인식 결과는 반드시 검토 후 저장하세요 — 완벽한 인식을 보장하지 않습니다. 일부 사이트는 봇 차단·스크립트 렌더링 때문에 링크 가져오기가 실패할 수 있으니, 그 경우 텍스트를 직접 붙여넣으세요.</p>
+        <details class="adv" id="ai-settings">
+          <summary>AI 인식 설정 — 본인 Google AI API 키 사용 (무료 등급으로 충분)</summary>
+          <div class="row2">
+            <div class="field"><label>Gemini API 키</label><input type="password" id="f-gemini-key" placeholder="AIza..." autocomplete="off"></div>
+            <div class="field"><label>모델</label><input type="text" id="f-gemini-model" list="dl-gemini-model" placeholder="gemini-2.5-flash-lite"></div>
+          </div>
+          <datalist id="dl-gemini-model">
+            <option value="gemini-2.5-flash-lite"><option value="gemini-3-flash-preview"><option value="gemini-2.5-flash">
+          </datalist>
+          <p class="hint">키는 이 브라우저(localStorage)에만 저장됩니다. 인식 시 붙여넣은 텍스트가 <b>내 키로 Google API에 직접 전송</b>되며 이 서비스의 서버를 거치지 않습니다. 키 발급: aistudio.google.com (무료)</p>
+        </details>
       </details>
       <hr class="divider">
 
-      <div class="field"><label>로스터리<span class="req">*</span></label><input type="text" id="f-roastery" placeholder="SEY"></div>
+      <div class="field"><label>로스터리<span class="req">*</span></label><input type="text" id="f-roastery" list="dl-roastery" placeholder="SEY"></div>
       <div class="row2">
         <div class="field"><label>국가(산지)<span class="req">*</span></label><input type="text" id="f-origin" list="dl-origin" placeholder="ETHIOPIA"></div>
         <div class="field"><label>세부 지역</label><input type="text" id="f-region" placeholder="Yirgacheffe, Gedeb"></div>
@@ -246,9 +146,10 @@
         <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"></div>
       </div>
       <div class="field"><label>테이스팅 노트</label><textarea id="f-note" placeholder="Magnolia, Honey Peach, Bergamot"></textarea></div>
-      <div class="field"><label>메모</label><textarea id="f-memo" placeholder="재구매 의사, 추출 레시피 등 자유롭게"></textarea></div>
+      <div class="field"><label>메모 <span style="color:var(--sub);font-weight:400">— QR 조회 페이지에 공개 표시됩니다</span></label><textarea id="f-memo" placeholder="일반 항목으로 담기 어려운 원두 이야기 — 산지·농장·로스터리의 스토리, 랏의 배경 등"></textarea></div>
       <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
 
+      <datalist id="dl-roastery"></datalist>
       <datalist id="dl-origin">
         <option value="ETHIOPIA"><option value="COLOMBIA"><option value="BRAZIL">
         <option value="KENYA"><option value="GUATEMALA"><option value="HONDURAS">
@@ -272,7 +173,9 @@
 
     <div class="card">
       <h2>라벨 디자인</h2>
-      <p class="hint" style="margin: -6px 0 10px">부제목 줄에 함께 표시할 정보 — 값을 입력하면 자동으로 체크됩니다</p>
+      <p class="hint" style="margin: -6px 0 10px">라벨 사이즈 (mm)</p>
+      <div class="toggles" id="size-radios"></div>
+      <p class="hint" style="margin: 14px 0 10px">부제목 줄에 함께 표시할 정보 — 값을 입력하면 자동으로 체크됩니다</p>
       <div class="toggles" id="toggle-sub"></div>
       <p class="hint" style="margin: 14px 0 10px">하단 스펙 칸에 표시할 정보 (최대 4개, 직접 선택)</p>
       <div class="toggles" id="toggle-spec"></div>
@@ -286,14 +189,16 @@
           <label><span>스펙 값 크기</span><span id="lbl-specval">1.70mm</span></label>
           <input type="range" id="f-specval-size" min="1.4" max="2.0" step="0.05" value="1.7">
         </div>
-        <p class="hint">QR은 님봇 인쇄 도트 격자에 맞춘 고정 크기(9.4mm)로, 스캔 안정성을 위해 조절하지 않습니다.</p>
+        <p class="hint">QR은 인쇄 도트 격자에 맞춘 사이즈별 고정 크기(40×20: 9.4mm · 50×30: 12.5mm · 50×60: 15.6mm)로, 스캔 안정성을 위해 조절하지 않습니다.</p>
       </details>
       <div class="field" style="margin: 12px 0 0">
         <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (파일 업로드 또는 이미지 링크)</label>
-        <input type="file" id="f-logo-file" accept="image/png,image/svg+xml" style="margin-top:6px">
+        <p class="hint" style="margin:4px 0 6px">로스터리 이름이 입력된 상태에서 로고를 올리면 그 로스터리에 저장되어, 다음부터 이름만 입력해도 자동 적용됩니다.</p>
+        <input type="file" id="f-logo-file" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="margin-top:6px">
         <div style="display:flex; gap:8px; margin-top:6px">
           <input type="url" id="f-logo-url" placeholder="이미지 URL — https://.../logo.png">
           <button type="button" id="btn-logo-url" style="white-space:nowrap; flex-shrink:0">불러오기</button>
+          <button type="button" id="btn-logo-del" style="white-space:nowrap; flex-shrink:0">저장된 로고 삭제</button>
         </div>
       </div>
     </div>
@@ -304,8 +209,11 @@
       <div class="btnrow">
         <button id="btn-refresh-list">새로고침</button>
         <button id="btn-export">CSV 백업 다운로드</button>
+        <button id="btn-import">CSV 백업 복원</button>
         <button id="btn-open-deck">덱으로 보기 ↗</button>
       </div>
+      <input type="file" id="f-import" accept=".csv,text/csv" class="hidden">
+      <p class="hint" style="margin-top:8px">복원은 내 유저코드의 KEY만 반영되며, 같은 KEY는 백업 내용으로 덮어씁니다 — 실수 삭제·악의적 수정을 백업 시점으로 되돌릴 수 있습니다.</p>
     </div>
   </div>
 
@@ -328,7 +236,7 @@
       </div>
       <p class="hint" style="margin-top:12px">라벨 이미지 다운</p>
       <div class="btnrow" style="margin-top:4px">
-        <button id="btn-dl-png203">PNG 203dpi</button>
+        <button id="btn-dl-png203">PNG 203dpi (인쇄용)</button>
         <button id="btn-dl-png320">PNG 320dpi</button>
         <button id="btn-dl-svg">SVG</button>
       </div>
@@ -355,662 +263,6 @@
 
 <div id="recovery-box" class="hidden"></div>
 
-<script type="module">
-import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SPEC_POOL, SUB_POOL, BASE_URL }
-  from "./label.js";
-import { parseBeanText, FIELD_LABELS_KO } from "./autofill.js";
-
-const SITE = "https://bnhd.pages.dev";
-const account = {
-  usercode: localStorage.getItem("bh_usercode") || "",
-  pin: localStorage.getItem("bh_pin") || "",
-};
-const design = structuredClone(DEFAULT_DESIGN);
-let logoDataUrl = null;
-let mode = "new";            // "new" | "edit"
-let confirmedKey = null;     // 서버에 존재하는 KEY (등록 완료 or 수정 대상)
-let previewSeq = 1;
-const subToggleInputs = {};  // key -> checkbox element (서브라인 자동 체크용)
-
-const $ = id => document.getElementById(id);
-const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
-const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-washingstation","f-variety","f-process",
-  "f-altitude","f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
-const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
-const AUTOFILL_INPUT_IDS = {
-  ROASTERY: "f-roastery", ORIGIN: "f-origin", REGION: "f-region", PRODUCER: "f-producer",
-  LOT: "f-lot", WASHING_STATION: "f-washingstation", VARIETY: "f-variety", PROCESS: "f-process", ALTITUDE: "f-altitude",
-  HARVEST: "f-harvest", NET_WEIGHT: "f-netweight", TASTING_NOTE: "f-note",
-  SOURCE_URL: "f-source", MEMO: "f-memo",
-};
-
-// 날짜: <input type=date>(ISO) ↔ 저장 포맷(yy.mm.dd) 상호 변환
-function isoToDot(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-  return m ? `${m[1].slice(2)}.${m[2]}.${m[3]}` : "";
-}
-function dotToIso(dot) {
-  const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(dot || "");
-  return m ? `20${m[1]}-${m[2]}-${m[3]}` : "";
-}
-function isoOffset(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function setDateDefaults() {
-  $("f-roastdate").value = isoOffset(-10);
-  $("f-packagedate").value = isoOffset(0);
-}
-setDateDefaults();
-
-// 수확시기 제안: 25/26(크롭이어), 26, 25
-(function fillHarvestOptions() {
-  const y = parseInt(yy, 10);
-  const opts = [`${y - 1}/${y}`, `${y}`, `${y - 1}`];
-  $("dl-harvest").innerHTML = opts.map(o => `<option value="${o}">`).join("");
-})();
-
-// 용량·고도: 숫자만 입력하면 저장 시 단위(g/m) 자동 부착
-function withUnit(v, unit) {
-  const s = v.trim();
-  if (!s) return "";
-  return /^[\d\s.~\-–]+$/.test(s) && /\d/.test(s) ? s.replace(/\s+/g, "") + unit : s;
-}
-
-function setStatus(msg, ok) {
-  const el = $("action-status");
-  el.textContent = msg;
-  el.className = "status-line " + (ok ? "ok" : "error");
-}
-function setAcctStatus(msg, ok) {
-  const el = $("acct-status");
-  el.textContent = msg;
-  el.className = "status-line " + (ok ? "ok" : "error");
-}
-function setVerify(text, cls) {
-  ["verify-badge", "sheet-verify"].forEach(id => {
-    $(id).textContent = text;
-    $(id).className = "verify " + (cls || "");
-  });
-}
-
-function authHeader() {
-  return { "Authorization": `Bearer ${account.usercode}:${account.pin}` };
-}
-function signedIn() { return !!account.usercode && !!account.pin; }
-
-function saveAccount() {
-  localStorage.setItem("bh_usercode", account.usercode);
-  localStorage.setItem("bh_pin", account.pin);
-}
-
-function renderAccount() {
-  const on = signedIn();
-  $("acct-signed-out").classList.toggle("hidden", on);
-  $("acct-signed-in").classList.toggle("hidden", !on);
-  $("app-view").classList.toggle("hidden", !on);
-  document.body.classList.toggle("signed-in", on);
-  if (on) $("acct-usercode").textContent = account.usercode;
-}
-
-function currentKey() {
-  if (confirmedKey) return confirmedKey;
-  const uc = account.usercode || "????";
-  return `${uc}${yy}-${String(previewSeq).padStart(3, "0")}`;
-}
-
-function getRow() {
-  return {
-    KEY: currentKey(),
-    ROASTERY: $("f-roastery").value.trim(),
-    ORIGIN: $("f-origin").value.trim(),
-    REGION: $("f-region").value.trim(),
-    PRODUCER: $("f-producer").value.trim(),
-    LOT: $("f-lot").value.trim(),
-    WASHING_STATION: $("f-washingstation").value.trim(),
-    VARIETY: $("f-variety").value.trim(),
-    PROCESS: $("f-process").value.trim(),
-    ALTITUDE: withUnit($("f-altitude").value, "m"),
-    HARVEST: $("f-harvest").value.trim(),
-    ROAST_DATE: isoToDot($("f-roastdate").value),
-    PACKAGE_DATE: isoToDot($("f-packagedate").value),
-    NET_WEIGHT: withUnit($("f-netweight").value, "g"),
-    AGTRON: $("f-agtron").value.trim(),
-    TASTING_NOTE: $("f-note").value.trim(),
-    MEMO: $("f-memo").value.trim(),
-    SOURCE_URL: $("f-source").value.trim(),
-  };
-}
-
-function setMode(newMode, key) {
-  mode = newMode;
-  confirmedKey = key || null;
-  $("btn-save").textContent = mode === "edit" ? `수정 저장 (${confirmedKey})` : "등록 — KEY 발급받기";
-  $("btn-new").classList.toggle("hidden", mode !== "edit");
-  const enabled = !!confirmedKey;
-  ["btn-copy-url", "btn-copy-qr", "btn-open-live"].forEach(id => $(id).disabled = !enabled);
-  $("form-hint").innerHTML = mode === "edit"
-    ? `<b>${confirmedKey}</b> 수정 중 — 붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다.`
-    : `붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.`;
-}
-
-let verifySeq = 0;
-async function renderAll() {
-  if (!signedIn()) return;
-  $("lbl-headline").textContent = design.headlineSize.toFixed(1) + "mm";
-  $("lbl-specval").textContent = design.specValueSize.toFixed(2) + "mm";
-  $("preview-key-label").textContent = confirmedKey
-    ? `— 확정 KEY ${confirmedKey}` : `— 예상 KEY ${currentKey()}`;
-
-  const { svg, content } = buildLabelSVG(getRow(), design, logoDataUrl);
-  $("svg-holder").innerHTML = svg;
-  if (!$("sheet").classList.contains("hidden")) $("sheet-svg").innerHTML = svg;
-  $("qr-target").textContent = "QR: " + content;
-  window.__svg = svg;
-
-  setVerify("QR 검증 중…", "");
-  const mySeq = ++verifySeq;
-  const v = await verifyQr(svg, content, 203);
-  if (mySeq !== verifySeq) return;
-  setVerify(v.ok ? "QR 검증 OK — 203dpi 실디코드 통과" : "QR 검증 실패 — QR 크기를 키워보세요",
-    v.ok ? "ok" : "bad");
-}
-
-// 서브라인 필드(지역/가공/품종/고도)에 값이 있으면 해당 표시 체크박스를 자동으로 켠다.
-// 사용자가 직접 끈 체크는 건드리지 않음(값이 있어도 강제로 다시 켜지 않음) — 단, 값이 막 채워진 시점엔 켠다.
-// 이미 스펙 칸에 표시 중인 항목은 중복 표시가 되므로 자동으로 켜지 않는다.
-function autoCheckSubline() {
-  Object.entries(SUB_FIELD_INPUT_IDS).forEach(([key, inputId]) => {
-    const inputEl = $(inputId);
-    const checkbox = subToggleInputs[key];
-    if (!inputEl || !checkbox) return;
-    if (inputEl.value.trim() && !checkbox.checked && !design.specFields.includes(key)) {
-      checkbox.checked = true;
-      if (!design.subFields.includes(key)) design.subFields.push(key);
-    }
-  });
-}
-
-async function api(path, opts = {}) {
-  opts.headers = Object.assign({}, opts.headers, signedIn() ? authHeader() : {});
-  const res = await fetch(path, opts);
-  let body = null;
-  try { body = await res.json(); } catch (e) {}
-  return { status: res.status, body, raw: res };
-}
-
-async function refreshList() {
-  const holder = $("bean-list");
-  if (!signedIn()) return;
-  const { body } = await api("/api/beans");
-  if (!body || !body.ok) { holder.innerHTML = '<p class="hint error">목록을 불러오지 못했습니다.</p>'; return; }
-  const beans = body.beans;
-  const re = new RegExp(`^${account.usercode}${yy}-(\\d{3})$`);
-  let max = 0;
-  beans.forEach(b => { const m = re.exec(b.KEY); if (m) max = Math.max(max, parseInt(m[1], 10)); });
-  previewSeq = max + 1;
-  if (mode === "new") renderAll();
-
-  if (!beans.length) { holder.innerHTML = '<p class="hint">아직 등록된 원두가 없습니다. 첫 원두를 등록해 보세요.</p>'; return; }
-  const rows = beans.map(b => `
-    <div class="bean-row" data-key="${b.KEY}">
-      <div class="bean-row-main">
-        <span class="bkey">${b.KEY}</span><span class="borigin">${escapeHtml(b.ORIGIN || "")}</span>
-        <span class="bmeta">${escapeHtml(b.ROASTERY || "")}${b.ROAST_DATE ? " · 로스팅 " + escapeHtml(b.ROAST_DATE) : ""}</span>
-      </div>
-      <div class="rowbtns">
-        <button data-act="edit">수정</button>
-        <button data-act="url">URL</button>
-        <button data-act="del" class="danger">삭제</button>
-      </div>
-    </div>`).join("");
-  holder.innerHTML = `<div class="bean-rows">${rows}</div>`;
-  holder.querySelectorAll("button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.closest(".bean-row").dataset.key;
-      const act = btn.dataset.act;
-      if (act === "url") { copyText(`${SITE}/${key}`); setStatus(`${key} 상세 URL 복사됨`, true); }
-      if (act === "edit") loadBeanForEdit(key, beans);
-      if (act === "del") deleteBean(key);
-    });
-  });
-}
-
-function loadBeanForEdit(key, beans) {
-  const b = beans.find(x => x.KEY === key);
-  if (!b) return;
-  $("f-roastery").value = b.ROASTERY || "";
-  $("f-origin").value = b.ORIGIN || "";
-  $("f-region").value = b.REGION || "";
-  $("f-producer").value = b.PRODUCER || "";
-  $("f-lot").value = b.LOT || "";
-  $("f-washingstation").value = b.WASHING_STATION || "";
-  $("f-variety").value = b.VARIETY || "";
-  $("f-process").value = b.PROCESS || "";
-  $("f-altitude").value = (b.ALTITUDE || "").replace(/m$/, "");
-  $("f-harvest").value = b.HARVEST || "";
-  $("f-roastdate").value = dotToIso(b.ROAST_DATE);
-  $("f-packagedate").value = dotToIso(b.PACKAGE_DATE);
-  $("f-netweight").value = (b.NET_WEIGHT || "").replace(/g$/, "");
-  $("f-agtron").value = b.AGTRON || "";
-  $("f-note").value = b.TASTING_NOTE || "";
-  $("f-memo").value = b.MEMO || "";
-  $("f-source").value = b.SOURCE_URL || "";
-  setMode("edit", key);
-  setStatus(`${key} 를 수정 중입니다.`, true);
-  autoCheckSubline();
-  renderAll();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function deleteBean(key) {
-  if (!confirm(`${key} 를 삭제할까요? 인쇄된 라벨의 QR은 더 이상 조회되지 않습니다.`)) return;
-  const { body } = await api(`/api/bean/${key}`, { method: "DELETE" });
-  if (body && body.ok) {
-    setStatus(`${key} 삭제됨`, true);
-    if (confirmedKey === key) { setMode("new", null); }
-    refreshList();
-  } else {
-    setStatus((body && body.error) || "삭제 실패", false);
-  }
-}
-
-function missingRequiredFields(row) {
-  const missing = [];
-  if (!row.ROASTERY) missing.push("로스터리");
-  if (!row.ORIGIN) missing.push("국가(산지)");
-  if (!row.ROAST_DATE) missing.push("로스팅일");
-  if (!row.PACKAGE_DATE) missing.push("패키징일");
-  return missing;
-}
-
-async function save() {
-  if (!signedIn()) { setStatus("가입 또는 로그인이 필요합니다.", false); return; }
-  const row = getRow();
-  const missing = missingRequiredFields(row);
-  if (missing.length) { setStatus(`필수 항목을 입력하세요: ${missing.join(", ")}`, false); return; }
-  const payload = Object.assign({}, row, { YEAR: yy });
-  delete payload.KEY;
-  const wasEdit = mode === "edit";
-  setStatus(wasEdit ? "수정 저장 중…" : "등록 중…", true);
-  const { body } = wasEdit
-    ? await api(`/api/bean/${confirmedKey}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-    : await api("/api/beans", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  if (body && body.ok) {
-    setMode("edit", body.key);
-    setStatus(wasEdit
-      ? `수정 저장 완료 — ${body.key}`
-      : `등록 완료 — KEY ${body.key} 확정. URL·QR 복사와 인쇄를 진행하세요.`, true);
-    renderAll();
-    refreshList();
-  } else {
-    setStatus((body && body.error) || "저장 실패", false);
-  }
-}
-
-async function showRecoveryBox(usercode, recoveryKey) {
-  const box = $("recovery-box");
-  box.classList.remove("hidden");
-  box.classList.add("modal-overlay");
-  box.innerHTML = `
-    <div class="recovery-card">
-      <p><b>오프라인 복구키</b> — 지금 이 순간만 표시됩니다. 유저코드나 암호를 잊어도 이 키만 있으면 계정을 되찾을 수 있습니다. 클립보드에 자동으로 복사해두었어요.</p>
-      <div class="recovery-key">${recoveryKey}</div>
-      <div class="btnrow">
-        <button id="btn-copy-recovery">다시 복사</button>
-        <button id="btn-dl-recovery">텍스트 파일로 저장</button>
-      </div>
-      <label class="recovery-ack">
-        <input type="checkbox" id="recovery-ack">
-        복구키를 안전한 곳에 저장했습니다 (이 창은 다시 표시되지 않습니다)
-      </label>
-      <div class="btnrow">
-        <button class="primary" id="btn-dismiss-recovery" disabled>계속하기</button>
-      </div>
-    </div>`;
-  $("btn-copy-recovery").addEventListener("click", async () => {
-    const ok = await copyText(recoveryKey);
-    setAcctStatus(ok ? "복구키가 복사되었습니다." : "복사 실패 — 직접 선택해 복사하세요.", ok);
-  });
-  $("btn-dl-recovery").addEventListener("click", () => {
-    const text = `Bean-Hoarder 복구 정보\n유저코드: ${usercode}\n복구키: ${recoveryKey}\n\n`
-      + `이 파일은 안전한 곳에 오프라인으로(인쇄물, USB 등) 보관하세요.\n분실 시 계정을 복구할 수 없습니다.\n`;
-    download(`beanhoarder_recovery_${usercode}.txt`, new Blob([text], { type: "text/plain;charset=utf-8" }));
-  });
-  $("recovery-ack").addEventListener("change", (e) => {
-    $("btn-dismiss-recovery").disabled = !e.target.checked;
-  });
-  $("btn-dismiss-recovery").addEventListener("click", () => {
-    box.classList.add("hidden");
-    box.classList.remove("modal-overlay");
-    box.innerHTML = "";
-  });
-  // 가입/복구 시점에 바로 클립보드로 저장을 유도 (실패해도 조용히 무시 — 버튼으로 재시도 가능)
-  await copyText(recoveryKey);
-}
-
-async function signup() {
-  const invite = $("a-invite").value.trim();
-  const pin = $("a-pin").value.trim();
-  if (!invite) { setAcctStatus("초대코드를 입력하세요.", false); return; }
-  if (!/^\d{4}$/.test(pin)) { setAcctStatus("암호는 숫자 4자리여야 합니다.", false); return; }
-  const res = await fetch("/api/signup", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ invite, password: pin }),
-  });
-  const body = await res.json().catch(() => null);
-  if (body && body.ok) {
-    account.usercode = body.usercode;
-    account.pin = pin;
-    saveAccount();
-    renderAccount();
-    showRecoveryBox(body.usercode, body.recovery_key);
-    refreshList();
-    renderAll();
-  } else {
-    setAcctStatus((body && body.error) || "가입 실패", false);
-  }
-}
-
-async function login() {
-  const uc = $("a-usercode").value.trim().toUpperCase();
-  const pin = $("a-pin2").value.trim();
-  if (!/^[A-Z0-9]{4}$/.test(uc) || !/^\d{4}$/.test(pin)) {
-    setAcctStatus("유저코드 4자리와 숫자 암호 4자리를 입력하세요.", false); return;
-  }
-  const res = await fetch("/api/beans", { headers: { "Authorization": `Bearer ${uc}:${pin}` } });
-  if (res.ok) {
-    account.usercode = uc; account.pin = pin;
-    saveAccount(); renderAccount();
-    refreshList(); renderAll();
-  } else {
-    setAcctStatus("유저코드 또는 암호가 올바르지 않습니다.", false);
-  }
-}
-
-async function recover() {
-  const key = $("a-recovery").value.trim();
-  const pin = $("a-pin3").value.trim();
-  if (!key) { setAcctStatus("복구키를 입력하세요.", false); return; }
-  if (!/^\d{4}$/.test(pin)) { setAcctStatus("새 암호는 숫자 4자리여야 합니다.", false); return; }
-  const res = await fetch("/api/recover", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recovery_key: key, password: pin }),
-  });
-  const body = await res.json().catch(() => null);
-  if (body && body.ok) {
-    account.usercode = body.usercode; account.pin = pin;
-    saveAccount(); renderAccount();
-    showRecoveryBox(body.usercode, body.recovery_key);
-    refreshList(); renderAll();
-  } else {
-    setAcctStatus((body && body.error) || "복구 실패", false);
-  }
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch (e) { /* 권한 차단 시 레거시 방식 폴백 */ }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.cssText = "position:absolute;left:-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    return ok;
-  } catch (e) { return false; }
-}
-
-// QR 단독 이미지(콰이엇존 4모듈 포함, 512px급)를 클립보드에 복사
-async function copyQrImage(key) {
-  const qr = qrcode(0, "M");
-  qr.addData(`${BASE_URL}/${key}`, "Alphanumeric");
-  qr.make();
-  const n = qr.getModuleCount();
-  const quiet = 4, scale = 16;
-  const size = (n + quiet * 2) * scale;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = "#000";
-  for (let r = 0; r < n; r++)
-    for (let c = 0; c < n; c++)
-      if (qr.isDark(r, c)) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
-  const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
-  try {
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, blob };
-  }
-}
-
-function download(filename, blob) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function buildToggles(containerId, pool, selected, max, refStore) {
-  const el = $(containerId);
-  pool.forEach(entry => {
-    const key = entry[0];
-    const label = entry[entry.length - 1];
-    const wrap = document.createElement("label");
-    wrap.innerHTML = `<input type="checkbox" ${selected.includes(key) ? "checked" : ""}> ${label}`;
-    el.appendChild(wrap);
-    const input = wrap.querySelector("input");
-    if (refStore) refStore[key] = input;
-    input.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        if (max && selected.length >= max) { e.target.checked = false; return; }
-        if (!selected.includes(key)) selected.push(key);
-      } else {
-        const i = selected.indexOf(key);
-        if (i >= 0) selected.splice(i, 1);
-      }
-      renderAll();
-    });
-  });
-}
-const specToggleInputs = {};
-buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
-buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4, specToggleInputs);
-
-// 같은 정보(예: 고도)가 서브라인과 스펙 칸에 동시에 표시되지 않도록 상호 배타 처리:
-// 한쪽에서 체크하면 다른 쪽에 켜져 있던 같은 항목은 자동으로 꺼진다.
-function uncheckIn(inputs, arr, key) {
-  const other = inputs[key];
-  if (other && other.checked) {
-    other.checked = false;
-    const i = arr.indexOf(key);
-    if (i >= 0) arr.splice(i, 1);
-    renderAll();
-  }
-}
-Object.entries(subToggleInputs).forEach(([key, input]) => {
-  input.addEventListener("change", () => { if (input.checked) uncheckIn(specToggleInputs, design.specFields, key); });
-});
-Object.entries(specToggleInputs).forEach(([key, input]) => {
-  input.addEventListener("change", () => { if (input.checked) uncheckIn(subToggleInputs, design.subFields, key); });
-});
-
-// 인증 탭 전환
-document.querySelectorAll("#auth-tabs button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("#auth-tabs button").forEach(b => b.classList.toggle("active", b === btn));
-    ["login", "signup", "recover"].forEach(t =>
-      $(`pane-${t}`).classList.toggle("hidden", t !== btn.dataset.tab));
-    setAcctStatus("", true);
-  });
-});
-
-// 모바일 미리보기 시트
-$("fab-preview").addEventListener("click", () => {
-  $("sheet").classList.remove("hidden");
-  $("sheet-svg").innerHTML = window.__svg || "";
-  $("sheet-verify").textContent = $("verify-badge").textContent;
-  $("sheet-verify").className = $("verify-badge").className;
-});
-$("sheet-close").addEventListener("click", () => $("sheet").classList.add("hidden"));
-$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) $("sheet").classList.add("hidden"); });
-
-$("btn-signup").addEventListener("click", signup);
-$("btn-login").addEventListener("click", login);
-$("btn-recover").addEventListener("click", recover);
-$("btn-signout").addEventListener("click", () => {
-  localStorage.removeItem("bh_usercode");
-  localStorage.removeItem("bh_pin");
-  location.reload();
-});
-
-FORM_IDS.forEach(id => $(id).addEventListener("input", () => { autoCheckSubline(); renderAll(); }));
-// 로스팅 포인트: 숫자로 시작하면 # 자동 부착
-$("f-agtron").addEventListener("input", (e) => {
-  const v = e.target.value;
-  if (/^\d/.test(v)) e.target.value = "#" + v;
-});
-$("f-headline-size").addEventListener("input", e => { design.headlineSize = parseFloat(e.target.value); renderAll(); });
-$("f-specval-size").addEventListener("input", e => { design.specValueSize = parseFloat(e.target.value); renderAll(); });
-$("f-show-logo").addEventListener("change", e => { design.showLogo = e.target.checked; renderAll(); });
-$("f-logo-file").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { logoDataUrl = reader.result; renderAll(); };
-  reader.readAsDataURL(file);
-});
-
-// 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우고, 곧바로 인식 실행
-$("btn-autofill-url").addEventListener("click", async () => {
-  const url = $("f-autofill-url").value.trim();
-  const status = $("autofill-status");
-  if (!url) { status.textContent = "상품 페이지 URL을 입력하세요."; status.className = "status-line error"; return; }
-  if (!signedIn()) { status.textContent = "로그인이 필요합니다."; status.className = "status-line error"; return; }
-  status.textContent = "페이지를 가져오는 중…"; status.className = "status-line";
-  const { body } = await api("/api/fetch", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
-  });
-  if (!body || !body.ok || body.kind !== "text") {
-    status.textContent = (body && body.error) || "가져오기 실패 — 텍스트를 직접 붙여넣어 보세요.";
-    status.className = "status-line error";
-    return;
-  }
-  $("f-autofill-text").value = body.text;
-  if (!$("f-source").value.trim()) {
-    $("f-source").value = url;
-    $("f-source").dispatchEvent(new Event("input", { bubbles: true }));
-  }
-  $("btn-autofill").click();
-});
-
-// 로고를 이미지 링크로 불러오기 (서버 프록시로 CORS 우회 → dataURL로 변환해 캔버스 오염 방지)
-$("btn-logo-url").addEventListener("click", async () => {
-  const url = $("f-logo-url").value.trim();
-  if (!url) { setStatus("로고 이미지 URL을 입력하세요.", false); return; }
-  if (!signedIn()) { setStatus("로그인이 필요합니다.", false); return; }
-  setStatus("로고 이미지를 가져오는 중…", true);
-  const { body } = await api("/api/fetch", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
-  });
-  if (body && body.ok && body.kind === "image") {
-    logoDataUrl = body.dataUrl;
-    $("f-show-logo").checked = true;
-    design.showLogo = true;
-    renderAll();
-    setStatus("로고를 불러왔습니다.", true);
-  } else {
-    setStatus((body && body.error) || "이미지를 가져오지 못했습니다 — 이미지 파일 URL인지 확인하세요.", false);
-  }
-});
-
-$("btn-open-deck").addEventListener("click", () => window.open("/deck", "_blank"));
-
-$("btn-autofill").addEventListener("click", () => {
-  const raw = $("f-autofill-text").value.trim();
-  const status = $("autofill-status");
-  if (!raw) { status.textContent = "붙여넣을 텍스트가 없습니다."; status.className = "status-line error"; return; }
-  const parsed = parseBeanText(raw);
-  const filled = [];
-  for (const [field, inputId] of Object.entries(AUTOFILL_INPUT_IDS)) {
-    const v = parsed[field];
-    const el = $(inputId);
-    if (!v || !el || el.value.trim()) continue;   // 값이 없거나 이미 입력된 항목은 건너뜀
-    el.value = v;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    filled.push(FIELD_LABELS_KO[field] || field);
-  }
-  if (filled.length) {
-    status.textContent = `채움: ${filled.join(", ")} — 검토 후 저장하세요.`;
-    status.className = "status-line ok";
-    $("autofill-box").open = false;
-  } else {
-    status.textContent = "인식된 새 항목이 없습니다. 이미 채워진 필드는 덮어쓰지 않습니다.";
-    status.className = "status-line error";
-  }
-});
-
-$("btn-save").addEventListener("click", save);
-$("btn-new").addEventListener("click", () => {
-  FORM_IDS.forEach(id => $(id).value = "");
-  $("f-autofill-text").value = "";
-  $("autofill-status").textContent = "";
-  $("autofill-box").open = true;
-  setDateDefaults();
-  setMode("new", null);
-  setStatus("", true);
-  refreshList();
-  renderAll();
-});
-$("btn-copy-url").addEventListener("click", async () => {
-  const ok = await copyText(`${SITE}/${confirmedKey}`);
-  setStatus(ok ? `상세 URL 복사됨 — ${SITE}/${confirmedKey}` : "복사 실패 — 브라우저 권한을 확인하세요.", ok);
-});
-$("btn-copy-qr").addEventListener("click", async () => {
-  const r = await copyQrImage(confirmedKey);
-  if (r.ok) {
-    setStatus("QR 이미지가 클립보드에 복사되었습니다.", true);
-  } else {
-    download(`${confirmedKey}_qr.png`, r.blob);
-    setStatus("이 브라우저는 이미지 클립보드를 지원하지 않아 PNG로 다운로드했습니다.", true);
-  }
-});
-$("btn-open-live").addEventListener("click", () => window.open(`/${confirmedKey}`, "_blank"));
-$("btn-refresh-list").addEventListener("click", refreshList);
-$("btn-export").addEventListener("click", async () => {
-  if (!signedIn()) { setStatus("로그인이 필요합니다.", false); return; }
-  const res = await fetch("/api/export.csv", { headers: authHeader() });
-  if (!res.ok) { setStatus("내보내기 실패", false); return; }
-  download(`bean_sheet_${account.usercode}.csv`, await res.blob());
-  setStatus("CSV 백업 저장 완료", true);
-});
-$("btn-dl-svg").addEventListener("click", () => {
-  download(`${currentKey()}.svg`, new Blob([window.__svg], { type: "image/svg+xml" }));
-});
-$("btn-dl-png203").addEventListener("click", async () => {
-  download(`${currentKey()}_203dpi.png`, await renderPngBlob(window.__svg, 203));
-});
-$("btn-dl-png320").addEventListener("click", async () => {
-  download(`${currentKey()}_320dpi.png`, await renderPngBlob(window.__svg, 320));
-});
-
-setMode("new", null);
-renderAccount();
-renderAll();
-refreshList();
-</script>
+<script type="module" src="/lab.js"></script>
 </body>
 </html>
