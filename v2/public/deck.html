@@ -40,10 +40,10 @@
     position: relative; z-index: 1; transition: transform .16s ease, box-shadow .16s ease;
   }
   .wcard:first-child { margin-top: 0; }
-  /* 호버·포커스: 카드를 위로 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록) */
+  /* 호버·포커스: 카드를 크게 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록) */
   .wcard:hover, .wcard:focus-visible {
-    transform: translateY(-10px); z-index: 10;
-    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 26px 50px -22px rgba(16,16,18,.42);
+    transform: translateY(-26px) scale(1.03); z-index: 10;
+    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 32px 60px -22px rgba(16,16,18,.46);
   }
   .w-top { display: flex; justify-content: space-between; align-items: baseline; }
   .w-roastery {
@@ -73,7 +73,7 @@
     border-top: 1px dashed transparent; margin-top: 0;
   }
   .wcard:hover .w-detail, .wcard:focus-visible .w-detail {
-    max-height: 220px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line);
+    max-height: 320px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line);
   }
   .w-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; padding: 0; }
   .w-chips li {
