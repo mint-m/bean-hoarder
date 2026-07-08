@@ -1,0 +1,36 @@
+name: deploy
+
+# 배포는 main이 아니라 별도 deploy 브랜치 전용 — main에 머지된다고 자동으로 라이브에 반영되지 않는다.
+# 배포하려면 main → deploy 로 병합(PR 권장)하거나 workflow_dispatch로 수동 실행.
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: v2
+          command: pages deploy public --project-name=bnhd

@@ -50,7 +50,9 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 
 ## 운영
 
-- **배포**: `cd v2 && npx wrangler pages deploy`
+- **배포(자동)**: 라이브 반영은 `main`이 아니라 **`deploy` 브랜치 전용**. `main`에 머지돼도 자동 배포되지 않으며, `main → deploy` PR을 병합(또는 fast-forward)해야 GitHub Actions(`.github/workflows/deploy.yml`)가 `node --test` 통과 후 `wrangler pages deploy`를 실행한다. 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
+  - 최초 1회 리포 secret 등록 필요: `CLOUDFLARE_API_TOKEN`(Pages 편집 권한), `CLOUDFLARE_ACCOUNT_ID` — 둘 다 비어있으면 배포 잡이 실패한다(테스트 잡은 별개로 통과).
+- **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화(선택)**: 4자리 암호 특성상 Cloudflare 대시보드의 무료 Rate Limiting 룰 1개를 `/api/*`에 걸어두면 좋다. 미적용 시에도 데이터 손실은 CSV 백업·복원으로 회복 가능.
 - **DB 백업**: `npx wrangler d1 export bnhd-v2 --remote` / 사용자는 각자 CSV 내보내기
@@ -84,11 +86,13 @@ npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8
 | 2026-07-08 | **종합 개선 라운드** — ① 라벨 사이즈 3종(40×20·50×30·50×60, 사이즈별 맞춤 레이아웃) ② 로스터리 로고 서버 저장·자동 적용 + 이름 자동 제안 ③ CSV 백업 **복원** 기능(같은 KEY 덮어쓰기) ④ 초대코드를 Cloudflare secret으로 이전 ⑤ 암호 해시 PBKDF2 전환(무중단) ⑥ CSV 수식 인젝션 가드 ⑦ 링크 프록시 SSRF 가드 강화(DoH 검사 + 리다이렉트 홉별 재검사) ⑧ **Gemini AI 인식**(사용자 본인 키, 브라우저 직접 호출) ⑨ 라벨 디자인 설정 localStorage 영속화 ⑩ 스튜디오 코드 모듈 분리(lab.js/lab.css) + QR 라이브러리 vendoring ⑪ 단위 테스트 + GitHub Actions CI ⑫ MIT 라이선스 |
 | 2026-07-08 | **UX 다듬기 라운드** — ① 조회 페이지에 **카메라 QR 스캔** 버튼(별도 앱 없이 폰에서 바로 스캔→조회) ② 덱 카드 **호버 시 상세 확장**(품종·고도·수확·생산자·랏·노트, 터치 기기는 항상 표시) ③ 로고 관리 UI 개편(썸네일 미리보기 + 저장 상태 배지 + 전용 피드백 줄, 링크 로드 진행/성공/실패 명확화, "현재 로고 지우기" 분리) ④ 로스터리 자동완성 보정(로고 저장/삭제 시에도 등록 이력 제안 유지, 로고 보유 로스터리 우선·★ 표시) |
 | 2026-07-08 | **메모/사이즈/색상 다듬기 라운드** — ① 메모 필드를 "산지·로스터리·생산자 스토리" 전용 공간으로 재안내(개인 감상평 아님을 명시, "About Beans" 형식 예시 플레이스홀더로 교체) ② 라벨 사이즈 라디오를 미리보기 카드에도 복제해 빠른 전환 제공(두 곳 동기화) + **사이즈별 기본 표시 항목 확대**(50×30·50×60은 품종·고도 등 기본 노출 항목 추가, 커스터마이즈한 항목은 유지) ③ "새 원두 입력" 초기화 버튼을 항상 노출(기존엔 등록 완료 후에만 보여 입력 중이던 내용을 손으로 지워야 했음) ④ **덱·조회 카드 산지별 색상 구분** 추가(`origin-color.js`, 산지 문자열 해시 → 카드 상단 띠 색, 라벨 인쇄 색상과는 무관) ⑤ 자동 채우기 파서가 "라벨"과 값이 서로 다른 줄(블록)에 나뉘는 사이트 구조도 인식하도록 보강, 소개글(About/Description/Story)을 메모 후보로 인식 |
+| 2026-07-08 | **배포 자동화** — `main`과 분리된 `deploy` 브랜치 도입, 해당 브랜치 푸시 시 GitHub Actions가 단위 테스트 통과 확인 후 `wrangler pages deploy` 자동 실행(`.github/workflows/deploy.yml`). `main` 머지는 더 이상 라이브에 자동 반영되지 않으며, 배포는 `main → deploy` 병합으로 명시적으로 승격 |
 
 ## 남은 일
 
 - [ ] 실제 인쇄(3개 사이즈) → 폰 카메라 스캔 테스트
 - [ ] 운영 배포 절차: `wrangler pages secret put INVITE_CODE` 실행 + 기존 초대코드 폐기, `migrate_logos.sql` 적용, `seed.sql` 재실행(데모 갱신)
+- [ ] 배포 자동화 활성화: 리포 Settings > Secrets에 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 등록 (미등록 시 `deploy` 브랜치 푸시해도 배포 잡 실패)
 - [ ] Cloudflare 대시보드에서 `/api/*` Rate Limiting 룰 1개 적용(선택)
 - [ ] 첫 실사용자 초대 (초대코드 전달)
 - [ ] 링크 가져오기 파서 품질을 실제 봇 차단·JS 렌더링 사이트 대상으로 계속 검증(현재 개발 환경은 외부망 접근이 막혀 있어 실사이트로 직접 재현 검증하지 못함 — 안 되는 사례 재현되면 이슈로 남겨줄 것)
