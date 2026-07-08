@@ -51,3 +51,35 @@ test("5kg 초과 무게는 오탐으로 무시", () => {
 test("빈 텍스트는 빈 결과", () => {
   assert.deepEqual(parseBeanText("   \n  "), {});
 });
+
+test("라벨 한 줄 + 다음 줄 값 (콜론 없이 블록으로만 분리되는 사이트 구조)", () => {
+  // <div>Region</div><div>Villa Rica, Junín</div> 류가 htmlToText를 거치면 이런 모양이 된다
+  const out = parseBeanText([
+    "Region", "Villa Rica, Junín",
+    "Producer", "Gilber Sedano",
+    "Variety", "Catimor",
+    "Process", "Washed",
+  ].join("\n"));
+  assert.equal(out.REGION, "Villa Rica, Junín");
+  assert.equal(out.PRODUCER, "Gilber Sedano");
+  assert.equal(out.VARIETY, "Catimor");
+  assert.equal(out.PROCESS, "Washed");
+});
+
+test("MEMO: About/Description 표제 다음 여러 줄 문단을 이어붙이고 다음 라벨 줄에서 멈춤", () => {
+  const out = parseBeanText([
+    "About this coffee",
+    "This lot was grown by smallholder farmers on the slopes above the village.",
+    "It was selected during our 2026 cupping trip for its floral sweetness.",
+    "Region",
+    "Yirgacheffe",
+  ].join("\n"));
+  assert.equal(out.MEMO, "This lot was grown by smallholder farmers on the slopes above the village. "
+    + "It was selected during our 2026 cupping trip for its floral sweetness.");
+  assert.equal(out.REGION, "Yirgacheffe");
+});
+
+test("라벨 한 줄 패턴도 이미 채워진 필드는 덮어쓰지 않는다", () => {
+  const out = parseBeanText(["Region: Gedeb", "Region", "Yirgacheffe"].join("\n"));
+  assert.equal(out.REGION, "Gedeb, Yirgacheffe");   // REGION은 계층 병합이 의도된 예외
+});

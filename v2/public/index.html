@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
 <script src="/vendor/jsQR.js"></script>
+<script src="/origin-color.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
   main { width: 100%; max-width: 430px; flex: 1; }
@@ -328,6 +329,10 @@ function render(row, isPreview) {
   document.getElementById("f-key").textContent = g("KEY");
   document.getElementById("f-roastery").textContent = g("ROASTERY");
   document.getElementById("f-origin").textContent = g("ORIGIN");
+
+  // 산지별 색상 코딩: 상단 스트립을 산지 해시 색으로 (라벨 물리 인쇄 색과는 무관, 조회 화면 전용)
+  const originColor = typeof bhOriginColor === "function" ? bhOriginColor(g("ORIGIN")) : null;
+  document.getElementById("bean").style.borderTopColor = originColor || "";
 
   const subParts = [g("REGION"), g("PRODUCER")].filter(Boolean);
   const sub = document.getElementById("f-subline");

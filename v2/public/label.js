@@ -70,12 +70,20 @@ export const SIZE_SPECS = {
   },
 };
 
+// 사이즈가 커질수록 물리적 여유가 생기므로 기본으로 표시하는 항목 수도 늘린다.
+// (사용자가 직접 토글을 바꾼 뒤에는 사이즈를 바꿔도 이 기본값으로 되돌리지 않는다 — lab.js 참고)
+export const SIZE_DEFAULT_FIELDS = {
+  "40x20": { subFields: ["REGION", "PROCESS"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT"] },
+  "50x30": { subFields: ["REGION", "PROCESS", "VARIETY"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT", "AGTRON"] },
+  "50x60": { subFields: ["REGION", "PROCESS", "VARIETY", "ALTITUDE"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT", "AGTRON"] },
+};
+
 export const DEFAULT_DESIGN = {
   size: "40x20",
   headlineSize: SIZE_SPECS["40x20"].headline.def,
   specValueSize: SIZE_SPECS["40x20"].specVal.def,
-  subFields: ["REGION", "PROCESS"],
-  specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT"],
+  subFields: SIZE_DEFAULT_FIELDS["40x20"].subFields.slice(),
+  specFields: SIZE_DEFAULT_FIELDS["40x20"].specFields.slice(),
   showLogo: true,
 };
 

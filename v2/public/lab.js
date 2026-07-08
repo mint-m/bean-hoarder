@@ -2,7 +2,7 @@
 // 렌더링은 label.js, 텍스트 인식은 autofill.js가 담당하고, 이 파일은
 // 계정·폼·목록·백업/복원·로고 재사용·AI 인식 등 화면 동작을 묶는다.
 
-import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SIZE_SPECS, SPEC_POOL, SUB_POOL, BASE_URL }
+import { buildLabelSVG, renderPngBlob, verifyQr, DEFAULT_DESIGN, SIZE_SPECS, SIZE_DEFAULT_FIELDS, SPEC_POOL, SUB_POOL, BASE_URL }
   from "./label.js";
 import { parseBeanText, FIELD_LABELS_KO } from "./autofill.js";
 
@@ -167,7 +167,6 @@ function setMode(newMode, key) {
   mode = newMode;
   confirmedKey = key || null;
   $("btn-save").textContent = mode === "edit" ? `수정 저장 (${confirmedKey})` : "등록 — KEY 발급받기";
-  $("btn-new").classList.toggle("hidden", mode !== "edit");
   const enabled = !!confirmedKey;
   ["btn-copy-url", "btn-copy-qr", "btn-open-live"].forEach(id => $(id).disabled = !enabled);
   $("form-hint").innerHTML = mode === "edit"
@@ -745,21 +744,59 @@ function syncSliders() {
   v.min = S.specVal.min; v.max = S.specVal.max; v.value = design.specValueSize;
 }
 
-function buildSizeRadios() {
-  const el = $("size-radios");
+// 사이즈 라디오는 "라벨 디자인" 카드와 미리보기 카드 두 곳에 둔다(빠른 전환 접근성) —
+// 두 그룹 모두 같은 design.size를 가리키므로 한쪽에서 바꾸면 다른 쪽도 함께 갱신한다.
+const sizeRadioGroups = [];
+
+function sameFieldSet(a, b) {
+  return !!a && !!b && a.length === b.length && a.every(k => b.includes(k));
+}
+
+function syncSizeRadiosUi() {
+  sizeRadioGroups.forEach(inputs => {
+    Object.entries(inputs).forEach(([key, input]) => { input.checked = design.size === key; });
+  });
+}
+
+// 사용자가 직접 커스터마이즈하지 않은(=현재 사이즈의 기본값 그대로인) 표시 항목만
+// 새 사이즈의 기본값으로 바꿔준다 — 이미 손댄 토글은 사이즈를 바꿔도 그대로 유지.
+function selectSize(key) {
+  const S = SIZE_SPECS[key];
+  if (!S) return;
+  const prevDefaults = SIZE_DEFAULT_FIELDS[design.size];
+  const subCustomized = !sameFieldSet(design.subFields, prevDefaults && prevDefaults.subFields);
+  const specCustomized = !sameFieldSet(design.specFields, prevDefaults && prevDefaults.specFields);
+  design.size = key;
+  design.headlineSize = S.headline.def;
+  design.specValueSize = S.specVal.def;
+  const nextDefaults = SIZE_DEFAULT_FIELDS[key];
+  // 배열을 통째로 교체하지 않고 내용만 바꾼다 — buildToggles()의 체크박스 change 핸들러가
+  // design.subFields/specFields의 "원래 배열 참조"를 클로저로 들고 있어, 참조를 바꾸면
+  // 이후 체크박스 조작이 낡은 배열에 반영되는 버그가 생긴다.
+  if (nextDefaults) {
+    if (!subCustomized) { design.subFields.length = 0; design.subFields.push(...nextDefaults.subFields); }
+    if (!specCustomized) { design.specFields.length = 0; design.specFields.push(...nextDefaults.specFields); }
+  }
+  syncSliders();
+  syncSizeRadiosUi();
+  syncFieldTogglesUi();
+  saveDesign();
+  renderAll();
+}
+
+function buildSizeRadios(containerId, groupName) {
+  const el = $(containerId);
+  if (!el) return;
+  const inputs = {};
   Object.entries(SIZE_SPECS).forEach(([key, S]) => {
     const wrap = document.createElement("label");
-    wrap.innerHTML = `<input type="radio" name="lbl-size" value="${key}" ${design.size === key ? "checked" : ""}> ${S.label}`;
+    wrap.innerHTML = `<input type="radio" name="${groupName}" value="${key}" ${design.size === key ? "checked" : ""}> ${S.label}`;
     el.appendChild(wrap);
-    wrap.querySelector("input").addEventListener("change", () => {
-      design.size = key;
-      design.headlineSize = S.headline.def;
-      design.specValueSize = S.specVal.def;
-      syncSliders();
-      saveDesign();
-      renderAll();
-    });
+    const input = wrap.querySelector("input");
+    inputs[key] = input;
+    input.addEventListener("change", () => selectSize(key));
   });
+  sizeRadioGroups.push(inputs);
 }
 
 function buildToggles(containerId, pool, selected, max, refStore) {
@@ -785,10 +822,17 @@ function buildToggles(containerId, pool, selected, max, refStore) {
     });
   });
 }
-buildSizeRadios();
+buildSizeRadios("size-radios", "lbl-size");
+buildSizeRadios("size-radios-quick", "lbl-size-quick");
 syncSliders();
 buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
 buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4, specToggleInputs);
+
+// selectSize()가 프로그램적으로 subFields/specFields를 바꿨을 때 체크박스 UI를 맞춘다.
+function syncFieldTogglesUi() {
+  Object.entries(subToggleInputs).forEach(([key, input]) => { input.checked = design.subFields.includes(key); });
+  Object.entries(specToggleInputs).forEach(([key, input]) => { input.checked = design.specFields.includes(key); });
+}
 
 // 같은 정보(예: 고도)가 서브라인과 스펙 칸에 동시에 표시되지 않도록 상호 배타 처리:
 // 한쪽에서 체크하면 다른 쪽에 켜져 있던 같은 항목은 자동으로 꺼진다.

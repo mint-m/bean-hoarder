@@ -146,7 +146,7 @@
         <div class="field"><label>로스팅 포인트</label><input type="text" id="f-agtron" list="dl-roastpoint" placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"></div>
       </div>
       <div class="field"><label>테이스팅 노트</label><textarea id="f-note" placeholder="Magnolia, Honey Peach, Bergamot"></textarea></div>
-      <div class="field"><label>메모 <span style="color:var(--sub);font-weight:400">— QR 조회 페이지에 공개 표시됩니다</span></label><textarea id="f-memo" placeholder="일반 항목으로 담기 어려운 원두 이야기 — 산지·농장·로스터리의 스토리, 랏의 배경 등"></textarea></div>
+      <div class="field"><label>메모 <span style="color:var(--sub);font-weight:400">— 개인 감상평이 아닌, 산지·로스터리·생산자의 스토리나 정보를 적는 칸. QR 조회 페이지에 공개 표시됩니다</span></label><textarea id="f-memo" style="min-height:96px" placeholder="About Beans:&#10;&#10;During our 2026 origin trip to Ethiopia, Testi prepared a cupping session of 28 outstanding washed coffees. In the blind selection process, Sewda once again stood out and was selected for our 2026 harvest lineup.&#10;&#10;The 2026 crop of Sewda continues the lot’s signature profile of elegant magnolia florals and sweet apricot-like fruit. This year, however, the cup shows greater sweetness and more weight, with a firmer, more structured body, while maintaining the refined clarity and cleanliness that define this coffee.&#10;&#10;Through this washed Sewda, we believe you can experience what we remember as the finest expression of washed Ethiopian coffee—uplifting fresh florals, bright and lively acidity, and a refreshing, lingering sweetness."></textarea></div>
       <div class="field"><label>원본 페이지 URL</label><input type="url" id="f-source" placeholder="https://..."></div>
 
       <datalist id="dl-roastery"></datalist>
@@ -230,13 +230,14 @@
   <div>
     <div class="card sticky-col">
       <h2>라벨 미리보기 <span style="text-transform:none;letter-spacing:0" id="preview-key-label"></span></h2>
+      <div class="toggles" id="size-radios-quick" style="margin:-2px 0 12px"></div>
       <div class="preview-wrap"><div id="svg-holder"></div></div>
       <div class="qr-info" id="qr-target"></div>
       <div class="verify" id="verify-badge"></div>
 
       <div class="btnrow">
         <button class="primary" id="btn-save">등록 — KEY 발급받기</button>
-        <button id="btn-new" class="hidden">새 원두 입력</button>
+        <button id="btn-new">새 원두 입력</button>
       </div>
       <div class="status-line" id="action-status"></div>
       <div class="btnrow">

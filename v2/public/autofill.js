@@ -25,8 +25,20 @@ const LABEL_SYNONYMS = {
   HARVEST: ["harvest", "crop year", "수확시기", "수확"],
   NET_WEIGHT: ["net weight", "weight", "용량", "중량"],
   TASTING_NOTE: ["tasting notes", "tasting note", "notes", "flavor", "cup", "테이스팅 노트", "노트"],
-  MEMO: ["memo", "비고", "메모"],
+  MEMO: ["memo", "비고", "메모", "about", "about beans", "about this coffee", "about the coffee",
+    "our story", "the story", "story", "description", "배경", "소개"],
 };
+
+// 값이 라벨과 같은 줄이 아니라 "라벨" 한 줄 + 다음 줄(들)에 값이 오는 사이트 구조용
+// (예: <div>Region</div><div>Villa Rica</div> 처럼 콜론 없이 블록만 나뉘는 경우).
+// 오탐을 줄이기 위해 이 줄 전체가 라벨 동의어와 "정확히" 일치할 때만 매칭한다.
+function findFieldForLabelExact(raw) {
+  const n = normLabel(raw.replace(/^[-•*]\s*/, "").replace(/[:：]\s*$/, ""));
+  for (const [field, syns] of Object.entries(LABEL_SYNONYMS)) {
+    if (syns.some(s => n === s)) return field;
+  }
+  return null;
+}
 
 const MONTHS = {
   jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
@@ -82,6 +94,31 @@ export function parseBeanText(text) {
       out.REGION = out.REGION ? `${out.REGION}, ${value}` : value;
     } else if (!out[field]) {
       out[field] = value;
+    }
+  }
+
+  // 1b) "라벨"만 있는 줄 다음에 값이 오는 구조 (콜론 없이 블록 요소로만 라벨/값이 분리되는
+  //     사이트에서 흔함 — 위 1)의 "같은 줄" 패턴으로는 못 잡는다).
+  //     MEMO는 서술형 문단일 수 있어 다음 라벨 줄이 나오기 전까지 여러 줄을 이어붙인다.
+  for (let i = 0; i < lines.length; i++) {
+    const field = findFieldForLabelExact(lines[i]);
+    if (!field) continue;
+    if (out[field] && field !== "REGION" && field !== "MEMO") continue;
+    if (field === "MEMO") {
+      const parts = [];
+      let chars = 0;
+      for (let j = i + 1; j < lines.length && chars < 600; j++) {
+        if (findFieldForLabelExact(lines[j])) break;
+        parts.push(lines[j]);
+        chars += lines[j].length;
+      }
+      if (parts.length) out.MEMO = (out.MEMO ? out.MEMO + " " : "") + parts.join(" ").trim();
+    } else {
+      const next = lines[i + 1];
+      if (next && !findFieldForLabelExact(next)) {
+        if (field === "REGION") out.REGION = out.REGION ? `${out.REGION}, ${next}` : next;
+        else out[field] = next;
+      }
     }
   }
 
