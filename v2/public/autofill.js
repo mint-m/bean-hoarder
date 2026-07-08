@@ -107,17 +107,22 @@ export function parseBeanText(text) {
     if (field === "MEMO") {
       const parts = [];
       let chars = 0;
-      for (let j = i + 1; j < lines.length && chars < 600; j++) {
+      let j = i + 1;
+      for (; j < lines.length && chars < 600; j++) {
         if (findFieldForLabelExact(lines[j])) break;
         parts.push(lines[j]);
         chars += lines[j].length;
       }
-      if (parts.length) out.MEMO = (out.MEMO ? out.MEMO + " " : "") + parts.join(" ").trim();
+      if (parts.length) {
+        out.MEMO = (out.MEMO ? out.MEMO + " " : "") + parts.join(" ").trim();
+        i = j - 1;   // 소비한 줄들을 다시 라벨 후보로 재검사하지 않도록 건너뛴다
+      }
     } else {
       const next = lines[i + 1];
       if (next && !findFieldForLabelExact(next)) {
         if (field === "REGION") out.REGION = out.REGION ? `${out.REGION}, ${next}` : next;
         else out[field] = next;
+        i++;
       }
     }
   }

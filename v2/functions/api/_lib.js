@@ -124,6 +124,7 @@ export function guardCsvCell(v) {
   return FORMULA_TRIGGER.test(v) ? "'" + v : v;
 }
 export function unguardCsvCell(v) {
+  if (typeof v !== "string") return v;
   return v.startsWith("'") && FORMULA_TRIGGER.test(v.slice(1)) ? v.slice(1) : v;
 }
 

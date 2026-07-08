@@ -214,10 +214,16 @@ function autoCheckSubline() {
 
 async function api(path, opts = {}) {
   opts.headers = Object.assign({}, opts.headers, signedIn() ? authHeader() : {});
-  const res = await fetch(path, opts);
-  let body = null;
-  try { body = await res.json(); } catch (e) {}
-  return { status: res.status, body, raw: res };
+  try {
+    const res = await fetch(path, opts);
+    let body = null;
+    try { body = await res.json(); } catch (e) {}
+    return { status: res.status, body, raw: res };
+  } catch (e) {
+    // 네트워크 자체가 끊긴 경우(오프라인, DNS 실패 등) fetch가 던지는 예외 —
+    // 호출부는 전부 "body.ok" 패턴으로 결과를 확인하므로 같은 모양으로 돌려준다.
+    return { status: 0, body: { ok: false, error: "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해 주세요." }, raw: null };
+  }
 }
 
 // ── 로스터리 datalist + 서버 저장 로고 ──────────────────────

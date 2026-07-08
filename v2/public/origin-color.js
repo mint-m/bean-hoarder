@@ -16,7 +16,7 @@
     const hue = hashHue(key);
     const sat = 68;
     const light = dark ? 64 : 45;
-    return `hsl(${hue} ${sat}% ${light}%)`;
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
   }
 
   global.bhOriginColor = bhOriginColor;
