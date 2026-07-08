@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
+<script src="/origin-color.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 0 16px 40px; }
   .topbar {
@@ -36,10 +37,14 @@
     background: var(--surface); border-radius: 16px; box-shadow: var(--shadow);
     border-top: 5px solid var(--accent);
     padding: 13px 18px 16px; margin-top: -58px;
-    position: relative; transition: transform .16s ease;
+    position: relative; z-index: 1; transition: transform .16s ease, box-shadow .16s ease;
   }
   .wcard:first-child { margin-top: 0; }
-  .wcard:hover, .wcard:focus-visible { transform: translateY(-10px); }
+  /* 호버·포커스: 카드를 위로 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록) */
+  .wcard:hover, .wcard:focus-visible {
+    transform: translateY(-10px); z-index: 10;
+    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 26px 50px -22px rgba(16,16,18,.42);
+  }
   .w-top { display: flex; justify-content: space-between; align-items: baseline; }
   .w-roastery {
     font-size: 11px; font-weight: 700; letter-spacing: .18em;
@@ -51,6 +56,8 @@
     text-transform: uppercase; margin-top: 3px;
     display: flex; align-items: center; gap: 10px; justify-content: space-between;
   }
+  .w-origin-label { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+  .w-origin-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
   .w-origin .dday {
     font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0;
     background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 2px 9px;
@@ -58,6 +65,27 @@
   .w-meta { font-size: 12.5px; color: var(--sub); margin-top: 4px; text-transform: uppercase;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .w-foot { font-family: var(--mono); font-size: 11.5px; color: var(--sub); margin-top: 8px; }
+
+  /* 호버 시 펼쳐지는 상세 (품종·고도·수확·테이스팅 노트) */
+  .w-detail {
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .2s ease, opacity .2s ease, margin-top .2s ease;
+    border-top: 1px dashed transparent; margin-top: 0;
+  }
+  .wcard:hover .w-detail, .wcard:focus-visible .w-detail {
+    max-height: 220px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line);
+  }
+  .w-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; padding: 0; }
+  .w-chips li {
+    font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--sub);
+  }
+  .w-note { font-size: 12.5px; font-style: italic; color: var(--ink); margin: 0; }
+  .w-hint-tap { display: none; }
+  /* 터치 기기: 호버가 없으므로 상세를 항상 펼쳐 보여준다 */
+  @media (hover: none) {
+    .w-detail { max-height: 220px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line); }
+  }
 </style>
 </head>
 <body>
@@ -103,11 +131,33 @@ function cardHTML(b) {
     g("NET_WEIGHT") && `NET ${g("NET_WEIGHT")}`,
     g("AGTRON") && g("AGTRON").split(/\s+/)[0],
   ].filter(Boolean).join(" · ");
-  return `<a class="wcard" href="/${g("KEY")}">
+
+  // 호버 시 펼쳐지는 상세: 품종·고도·수확·생산자·랏을 칩으로, 테이스팅 노트를 이탤릭으로
+  const chips = [
+    g("VARIETY") && `품종 ${g("VARIETY")}`,
+    g("ALTITUDE") && `고도 ${g("ALTITUDE")}`,
+    g("HARVEST") && `수확 ${g("HARVEST")}`,
+    g("PRODUCER"),
+    g("LOT") && `랏 ${g("LOT")}`,
+    g("WASHING_STATION"),
+    g("PACKAGE_DATE") && `PKGD ${g("PACKAGE_DATE")}`,
+  ].filter(Boolean);
+  const chipsHtml = chips.length
+    ? `<ul class="w-chips">${chips.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>` : "";
+  const note = g("TASTING_NOTE");
+  const noteHtml = note ? `<p class="w-note">${escapeHtml(note)}</p>` : "";
+  const detail = (chipsHtml || noteHtml)
+    ? `<div class="w-detail">${chipsHtml}${noteHtml}</div>` : "";
+
+  const originColor = bhOriginColor(g("ORIGIN"));
+  const borderStyle = originColor ? ` style="border-top-color:${originColor}"` : "";
+  const dot = originColor ? `<span class="w-origin-dot" style="background:${originColor}"></span>` : "";
+  return `<a class="wcard"${borderStyle} href="/${g("KEY")}">
     <div class="w-top"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
-    <div class="w-origin"><span>${escapeHtml(g("ORIGIN"))}</span>${dday}</div>
+    <div class="w-origin"><span class="w-origin-label">${dot}${escapeHtml(g("ORIGIN"))}</span>${dday}</div>
     ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
     ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
+    ${detail}
   </a>`;
 }
 

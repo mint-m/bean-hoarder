@@ -7,5 +7,6 @@ binding = "DB"
 database_name = "bnhd-v2"
 database_id = "f6b539d0-3394-4011-9f00-f3961d549409"
 
-[vars]
-INVITE_CODE = "BH-56JQKGQT"
+# INVITE_CODE는 저장소에 커밋하지 않는다 — Cloudflare secret으로 관리:
+#   npx wrangler pages secret put INVITE_CODE
+# (교체도 같은 명령으로. 대시보드 Settings > Environment variables에서도 가능)

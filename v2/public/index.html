@@ -13,6 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
+<script src="/vendor/jsQR.js"></script>
+<script src="/origin-color.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
   main { width: 100%; max-width: 430px; flex: 1; }
@@ -103,6 +105,35 @@
   .landing-links { margin-top: 18px; font-size: 13px; color: var(--sub); }
   .landing-links a { text-decoration: none; font-weight: 600; }
   .landing-links a:hover { text-decoration: underline; }
+
+  /* ---- 카메라 QR 스캔 ---- */
+  .scan-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    margin-top: 10px; width: 100%; padding: 11px 14px;
+    border: 1px solid var(--accent); color: var(--accent); background: var(--surface);
+    border-radius: 11px; font-size: 14px; font-weight: 600;
+  }
+  .scan-btn:hover { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .scanner {
+    position: fixed; inset: 0; z-index: 1000; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scanner-inner { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  #scan-video { width: 100%; height: 100%; object-fit: cover; }
+  .scan-frame {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(66vw, 260px); aspect-ratio: 1; border-radius: 18px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5); border: 2px solid rgba(255, 255, 255, .9);
+  }
+  .scan-hint {
+    position: absolute; left: 0; right: 0; bottom: 92px; text-align: center;
+    color: #fff; font-size: 14px; padding: 0 24px; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  }
+  .scan-close {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.35);
+    border-radius: 999px; padding: 10px 22px; font-size: 14px; font-weight: 600; backdrop-filter: blur(4px);
+  }
 </style>
 </head>
 <body>
@@ -122,8 +153,24 @@
       <input id="code-input" type="text" placeholder="라벨 코드 (예: DEMO26-001)" autocomplete="off" spellcheck="false">
       <button class="primary" type="submit">조회</button>
     </form>
+    <button id="scan-btn" class="scan-btn hidden" type="button">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/>
+      </svg>
+      카메라로 QR 스캔
+    </button>
     <div class="landing-links">
       <a href="/DEMO26-001">데모 원두</a> &nbsp;·&nbsp; <a href="/deck">내 원두 덱</a> &nbsp;·&nbsp; <a href="/admin">랩 (등록·관리)</a>
+    </div>
+  </div>
+
+  <div id="scanner" class="scanner hidden">
+    <div class="scanner-inner">
+      <video id="scan-video" playsinline muted></video>
+      <div class="scan-frame"></div>
+      <canvas id="scan-canvas" class="hidden"></canvas>
+      <div class="scan-hint" id="scan-hint">라벨의 QR을 사각형 안에 맞춰 주세요</div>
+      <button id="scan-close" class="scan-close" type="button" aria-label="닫기">✕ 닫기</button>
     </div>
   </div>
 
@@ -196,6 +243,72 @@ function showLanding() {
     const v = document.getElementById("code-input").value.trim().toUpperCase();
     if (v) location.href = "/" + encodeURIComponent(v);
   });
+  setupScanner();
+}
+
+// ── 카메라 QR 스캔 ──
+// 스캔된 QR은 라벨 URL(HTTPS://BNHD.PAGES.DEV/{KEY})이므로 KEY만 뽑아 이동한다.
+function keyFromScan(data) {
+  if (!data) return null;
+  let s = data.trim();
+  try { const u = new URL(s); s = new URLSearchParams(u.search).get("c") || u.pathname; } catch (e) { /* URL 아니면 원문 */ }
+  s = s.replace(/^\/+|\/+$/g, "").toUpperCase();
+  return KEY_RE.test(s) ? s : null;
+}
+
+function setupScanner() {
+  const btn = document.getElementById("scan-btn");
+  // 카메라(getUserMedia)를 쓸 수 있고 안전 컨텍스트일 때만 버튼 노출
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || typeof jsQR !== "function") return;
+  btn.classList.remove("hidden");
+
+  const scanner = document.getElementById("scanner");
+  const video = document.getElementById("scan-video");
+  const canvas = document.getElementById("scan-canvas");
+  const hint = document.getElementById("scan-hint");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let stream = null, raf = 0;
+
+  async function open() {
+    scanner.classList.remove("hidden");
+    hint.textContent = "카메라를 준비하는 중…";
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    } catch (e) {
+      hint.textContent = "카메라를 열 수 없습니다. 권한을 허용했는지 확인해 주세요.";
+      return;
+    }
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    hint.textContent = "라벨의 QR을 사각형 안에 맞춰 주세요";
+    raf = requestAnimationFrame(tick);
+  }
+  function close() {
+    cancelAnimationFrame(raf);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    scanner.classList.add("hidden");
+  }
+  function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+      const key = result && keyFromScan(result.data);
+      if (key) {
+        hint.textContent = `${key} 조회 중…`;
+        close();
+        location.href = "/" + encodeURIComponent(key);
+        return;
+      }
+      if (result) hint.textContent = "이 QR은 Bean-Hoarder 라벨이 아닙니다.";
+    }
+    raf = requestAnimationFrame(tick);
+  }
+  btn.addEventListener("click", open);
+  document.getElementById("scan-close").addEventListener("click", close);
 }
 
 function parseDot(d) {
@@ -216,6 +329,10 @@ function render(row, isPreview) {
   document.getElementById("f-key").textContent = g("KEY");
   document.getElementById("f-roastery").textContent = g("ROASTERY");
   document.getElementById("f-origin").textContent = g("ORIGIN");
+
+  // 산지별 색상 코딩: 상단 스트립을 산지 해시 색으로 (라벨 물리 인쇄 색과는 무관, 조회 화면 전용)
+  const originColor = typeof bhOriginColor === "function" ? bhOriginColor(g("ORIGIN")) : null;
+  document.getElementById("bean").style.borderTopColor = originColor || "";
 
   const subParts = [g("REGION"), g("PRODUCER")].filter(Boolean);
   const sub = document.getElementById("f-subline");

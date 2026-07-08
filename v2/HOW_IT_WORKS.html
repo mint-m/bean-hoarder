@@ -106,20 +106,20 @@
       <div class="arch-inner">
         <div class="arch-box">
           <strong>정적 페이지</strong>
-          <span>index.html<br>admin.html<br>label.js (렌더러)</span>
+          <span>index.html (조회)<br>admin.html + lab.js (랩)<br>deck.html (덱)<br>label.js (렌더러)</span>
         </div>
         <div class="arch-col">
           <div class="arch-hstep">
             <span class="arch-arrow">→</span>
             <div class="arch-box" style="flex:1">
               <strong>Functions API</strong>
-              <span>/api/signup<br>/api/beans<br>/api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv</span>
+              <span>/api/signup · /api/recover<br>/api/beans<br>/api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch</span>
             </div>
           </div>
           <div class="arch-arrow" style="margin-left:34px">↓</div>
           <div class="arch-box" style="margin-left:34px">
             <strong>D1 데이터베이스</strong>
-            <span>users (usercode, pass_hash)<br>beans (key, roastery, …)</span>
+            <span>users (usercode, pass_hash, recovery_hash)<br>beans (key, roastery, …)<br>logos (usercode, roastery, data_url)</span>
           </div>
         </div>
       </div>
@@ -207,11 +207,13 @@
   <h2>06 · 보안 모델</h2>
   <h3>무료 범위 안에서 최소한으로 충분하게</h3>
   <ul class="plain">
-    <li><b>가입</b>: 초대코드(운영자가 공유) + 숫자 4자리 암호만으로 계정 생성. 초대코드는 환경변수라 언제든 교체 가능.</li>
-    <li><b>암호</b>: 탈취돼도 무방한 편의용 — 무단 등록·수정을 막는 수준. 서버는 SHA-256(유저코드:암호) 해시만 저장.</li>
+    <li><b>가입</b>: 초대코드(운영자가 공유) + 숫자 4자리 암호만으로 계정 생성. 초대코드는 Cloudflare secret으로 관리 — 저장소에 없고 언제든 교체 가능.</li>
+    <li><b>암호</b>: 탈취돼도 무방한 편의용 — 무단 등록·수정을 막는 수준. 서버는 PBKDF2(유저코드:암호) 해시만 저장.</li>
+    <li><b>복구키</b>: 가입 시 1회 표시되는 고엔트로피 키. 유저코드·암호를 모두 잊었을 때의 유일한 복구 수단이며 사용하면 회전된다.</li>
     <li><b>쓰기</b>: 등록·수정·삭제·백업에 <code style="font-family:var(--mono)">Authorization: Bearer 유저코드:암호</code> 필요. 브라우저에 저장돼 재방문 시 자동 로그인.</li>
     <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
     <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
+    <li><b>데이터 회복</b>: CSV 백업을 언제든 내려받고, 같은 파일로 복원(같은 KEY 덮어쓰기) — 실수·악의적 변조를 백업 시점으로 되돌린다.</li>
     <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
   </ul>
 </section>
@@ -232,9 +234,11 @@
   <h2>08 · 관련 파일</h2>
   <div class="filelist">
     <div><b>public/index.html</b> — 조회 페이지, /api/bean/{KEY} 호출</div>
-    <div><b>public/admin.html</b> — 스튜디오: 가입, 입력, 미리보기, 등록, 백업</div>
-    <div><b>public/label.js</b> — 라벨 SVG 렌더러 + QR 검증 (미리보기·다운로드 공용)</div>
-    <div><b>functions/api/[[path]].js</b> — signup · beans · bean/{KEY} · export.csv</div>
+    <div><b>public/admin.html + lab.css + lab.js</b> — 랩(스튜디오): 가입, 입력, 미리보기, 등록, 백업·복원, 로고 관리</div>
+    <div><b>public/deck.html</b> — 내 원두 월렛 덱</div>
+    <div><b>public/label.js</b> — 라벨 SVG 렌더러 + QR 검증, 3개 사이즈(40×20·50×30·50×60) 지원</div>
+    <div><b>public/autofill.js</b> — 붙여넣은 텍스트에서 원두 정보 추출 (휴리스틱)</div>
+    <div><b>functions/api/[[path]].js + _lib.js</b> — signup · recover · beans · bean/{KEY} · export.csv · import · logos · fetch</div>
     <div><b>schema.sql / seed.sql</b> — D1 테이블 정의, 데모 데이터</div>
     <div><b>DESIGN.md</b> — 설계 근거 전문</div>
   </div>

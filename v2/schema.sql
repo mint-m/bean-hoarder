@@ -29,3 +29,12 @@ CREATE TABLE IF NOT EXISTS beans (
 );
 
 CREATE INDEX IF NOT EXISTS idx_beans_user ON beans(usercode);
+
+-- 로스터리별 로고 (기기 간 재사용). roastery는 대문자 정규화 저장, data_url ≤ 100KB.
+CREATE TABLE IF NOT EXISTS logos (
+  usercode   TEXT NOT NULL REFERENCES users(usercode),
+  roastery   TEXT NOT NULL,
+  data_url   TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (usercode, roastery)
+);

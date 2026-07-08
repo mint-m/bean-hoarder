@@ -2,10 +2,10 @@
 
 > **이 문서는 v1(구글시트 기반) 기록용입니다.** 현재 라이브 서비스는 v2(Cloudflare D1 + Functions)이며
 > [README.md](README.md)와 [v2/DESIGN.md](v2/DESIGN.md)를 참고하세요. v1 웹 파일은 `legacy/`에 보존.
-> 라벨 사양(§4)과 `tools/make_label.py`(§5)는 v2에서도 그대로 유효합니다.
+> 라벨 사양(§4)과 `legacy/make_label.py`(§5)는 v2에서도 그대로 유효합니다.
 
 QR 코드 기반 트레이서빌리티를 갖춘 개인/테스트용 원두 소분 라벨 시스템.
-40×20mm 라벨을 님봇(NIIMBOT) 라벨 프린터로 인쇄하고, QR을 스캔하면 구글시트에 등록된 원두 상세 정보를 조회한다.
+40×20mm 라벨을 감열 라벨 프린터로 인쇄하고, QR을 스캔하면 구글시트에 등록된 원두 상세 정보를 조회한다.
 **총 운영 비용: 0원** (Cloudflare Pages + Google Sheets 무료 티어).
 
 ## 1. 시스템 구성
@@ -45,7 +45,7 @@ HTTPS://BNHD.PAGES.DEV/BXNQ26-001
 ## 4. 라벨 사양
 
 - **크기**: 40×20mm 벡터 SVG (mm 단위), 1도 흑백
-- **프린터**: 님봇 라벨 프린터. B/D 시리즈 인쇄 해상도 203dpi 기준 — 생성기가 **203dpi(인쇄용)와 320dpi(미리보기)** PNG를 둘 다 렌더링하고 각각 QR 실디코드 검증
+- **프린터**: 감열 라벨 프린터 (인쇄 해상도 203dpi 기준) — 생성기가 **203dpi(인쇄용)와 320dpi(미리보기)** PNG를 둘 다 렌더링하고 각각 QR 실디코드 검증
 - **QR**: 우측 9mm (203dpi에서 모듈당 약 2.9px 확보), 25×25 모듈, 콰이엇존 1.3mm, 코드 텍스트 병기
 - **폰트 위계**: 스펙 그리드에서 라벨(RSTD 등)은 소형 레귤러, 값은 대형 볼드 모노스페이스로 분리해 가독성 확보
 - **넘침 방지**: 모든 텍스트 `textLength` 고정
@@ -65,13 +65,13 @@ HTTPS://BNHD.PAGES.DEV/BXNQ26-001
 ## 5. 라벨 생성 도구
 
 ```
-py tools/make_label.py --key BXNQ26-001    # 한 장
-py tools/make_label.py --all               # CSV 전체 배치 생성
+py legacy/make_label.py --key BXNQ26-001    # 한 장
+py legacy/make_label.py --all               # CSV 전체 배치 생성
 ```
 
 - 입력: `bean_sheet_template.csv` (또는 `--csv`로 구글시트 내보내기 파일 지정)
-- 출력: `labels/{KEY}.svg` + `labels/{KEY}_203dpi.png`(님봇 인쇄용) + `labels/{KEY}_320dpi.png`(미리보기)
-- 님봇 앱에서 이미지 인쇄 모드로 203dpi PNG를 사용
+- 출력: `labels/{KEY}.svg` + `labels/{KEY}_203dpi.png`(인쇄용) + `labels/{KEY}_320dpi.png`(미리보기)
+- 프린터 전용 앱에서 이미지 인쇄 모드로 203dpi PNG를 사용
 - 의존성: `py -m pip install segno zxing-cpp pillow resvg-py` (설치 완료)
 
 ## 6. 시트 스키마
@@ -100,9 +100,9 @@ py tools/make_label.py --all               # CSV 전체 배치 생성
 
 - **내 설정 (localStorage 저장)**: 유저코드, 내 시트 발행 CSV URL, 업로드 URL(Apps Script)을 브라우저에 고정 저장 — 재방문 시 재입력 불필요. "새 코드 생성" 버튼으로 유저코드 발급.
 - **KEY 자동 채번**: 설정된 CSV(비우면 데모 템플릿)를 읽어 같은 연도의 최대 순번을 찾고 다음 번호를 제안.
-- **시트로 업로드**: 설정된 Apps Script 웹 앱 URL로 입력한 행을 POST → 시트에 자동 추가 (KEY 형식·중복·필수값은 스크립트가 검증). 스크립트 원본과 설치법은 `tools/apps_script.gs` 주석 참고 — 시트마다 1회, 약 2분 소요. URL 미설정 시 안내 메시지.
+- **시트로 업로드**: 설정된 Apps Script 웹 앱 URL로 입력한 행을 POST → 시트에 자동 추가 (KEY 형식·중복·필수값은 스크립트가 검증). 스크립트 원본과 설치법은 `legacy/apps_script.gs` 주석 참고 — 시트마다 1회, 약 2분 소요. URL 미설정 시 안내 메시지.
 - **CSV 다운로드**: 내 시트의 현재 데이터 + 지금 입력한 행을 병합해 `bean_sheet_{유저코드}.csv`로 저장 (백업·재임포트용, BOM 포함이라 엑셀에서도 한글 정상).
-- **QR 미리보기**: `qrcode-generator`(CDN)로 즉시 렌더링, 알파뉴메릭 모드 강제로 25×25 유지, 벗어나면 경고. 최종 인쇄용 전수 검증은 여전히 `tools/make_label.py`(zxing 디코드) 담당.
+- **QR 미리보기**: `qrcode-generator`(CDN)로 즉시 렌더링, 알파뉴메릭 모드 강제로 25×25 유지, 벗어나면 경고. 최종 인쇄용 전수 검증은 여전히 `legacy/make_label.py`(zxing 디코드) 담당.
 - **시각적 디자인 편집기**: 서브라인 항목(기본: 지역·가공 / 옵션: 품종·고도), 스펙 그리드(기본: RSTD·PKGD·NET / 옵션: AGT·ALT, 최대 4개 — HARV는 라벨 옵션에서 제외, 웹앱 상세 전용), 로고 표시. 사이즈 조정(헤드라인·스펙값·QR 크기)은 접힌 "펼치기" 안에 숨김.
 - **상세 페이지 초안 미리보기**: 입력 중인 데이터를 `index.html?preview=`로 새 탭에 열어 게시 전 확인. "실제 배포 링크 열기"는 게시 후 검증용.
 - **내보내기**: CSV 행 복사, SVG/PNG(203·320dpi) 다운로드, 로고 파일명 안내(`logos/{ROASTERY}.svg|png`).
@@ -117,7 +117,7 @@ py tools/make_label.py --all               # CSV 전체 배치 생성
 ```
 
 - **온보딩 절차 (사용자당 1회, 운영자 작업은 행 1개 추가)**
-  1. 사용자: admin.html에서 유저코드 생성 → 구글시트 새로 만들어 `bean_sheet_template.csv` 헤더 임포트 → 웹에 게시(CSV) → (선택) `tools/apps_script.gs` 배포
+  1. 사용자: admin.html에서 유저코드 생성 → 구글시트 새로 만들어 `bean_sheet_template.csv` 헤더 임포트 → 웹에 게시(CSV) → (선택) `legacy/apps_script.gs` 배포
   2. 운영자: 레지스트리 시트에 `USERCODE, CSV_URL` 행 추가
   3. 끝 — 웹앱·라벨 도구는 그대로, 재배포 불필요
 - **비용 구조**: Cloudflare Pages 정적 파일은 무료·무제한, Google Sheets 발행 CSV도 무료. 조회 1회 = 정적 페이지 1 + CSV fetch 2 — 서버 코드가 없어 100명이 아니라 수천 명이어도 0원.
@@ -135,7 +135,7 @@ py tools/make_label.py --all               # CSV 전체 배치 생성
 - 재배포: `powershell -File tools\deploy.ps1` 또는 인라인으로
   `npx wrangler pages deploy {스테이징폴더} --project-name bnhd --branch main`
 - GitHub push 자동 배포(git 연동)로 바꾸려면 Cloudflare 대시보드에서 프로젝트를 다시 만들어야 함 — 데모 단계에선 직접 업로드로 충분
-- **도메인 변경 시**: `tools/make_label.py`의 `BASE_URL` 한 줄 수정 후 `--all` 재생성 (알파뉴메릭 모드 이탈 시 스크립트가 에러로 알려줌)
+- **도메인 변경 시**: `legacy/make_label.py`의 `BASE_URL` 한 줄 수정 후 `--all` 재생성 (알파뉴메릭 모드 이탈 시 스크립트가 에러로 알려줌)
 
 ## 9. 운영 체크리스트
 
@@ -144,7 +144,7 @@ py tools/make_label.py --all               # CSV 전체 배치 생성
 - [x] GitHub 리포 생성·push (mint-m/Bean-Hoarder)
 - [x] Cloudflare Pages `bnhd` 생성·배포 → https://bnhd.pages.dev 라이브 (경로형/쿼리형 URL 200 확인)
 - [ ] 구글시트 생성·발행 → `index.html`의 `SHEET_CSV_URL` 입력 → 재배포
-- [ ] 님봇 실인쇄 → 폰 카메라 스캔 테스트
+- [ ] 라벨 실인쇄 → 폰 카메라 스캔 테스트
 - [ ] 로스터리 실제 로고 파일 교체 (`logos/DANCHE.svg`)
 
 ## 10. 확장 아이디어
