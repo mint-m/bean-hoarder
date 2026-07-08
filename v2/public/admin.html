@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
-<title>BEAN-HOARDER — 스튜디오</title>
+<title>BEAN-HOARDER — LAB</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%23f04e1c' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23ffffff' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -89,8 +89,9 @@
   .bean-row:last-child { border-bottom: 0; }
   .bean-row-main { min-width: 0; }
   .bean-row .bkey { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-  .bean-row .borigin { font-size: 13.5px; font-weight: 700; margin-left: 8px; }
-  .bean-row .bmeta { display: block; font-size: 12px; color: var(--sub); margin-top: 1px; }
+  /* 입력 대소문자가 제각각이어도 목록 표기는 대문자로 통일 (한글·날짜는 영향 없음) */
+  .bean-row .borigin { font-size: 13.5px; font-weight: 700; margin-left: 8px; text-transform: uppercase; }
+  .bean-row .bmeta { display: block; font-size: 12px; color: var(--sub); margin-top: 1px; text-transform: uppercase; }
   .bean-row .rowbtns { display: flex; gap: 4px; flex-shrink: 0; }
   .bean-row button { padding: 4px 9px; font-size: 11.5px; }
 
@@ -131,7 +132,7 @@
 <body>
 
 <header class="topbar">
-  <a class="wordmark" href="/">Bean-Hoarder<span>STUDIO</span></a>
+  <a class="wordmark" href="/">Bean-Hoarder<span>LAB</span></a>
   <div id="acct-signed-in" class="acct-chip hidden">
     <code id="acct-usercode"></code>
     <button id="btn-signout">로그아웃</button>
@@ -145,7 +146,7 @@
       <ellipse cx="24" cy="24" rx="14" ry="19" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
       <path d="M18 8C28 18 20 30 30 40" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(20 24 24)"/>
     </svg>
-    <h1>스튜디오</h1>
+    <h1>랩 (LAB)</h1>
     <p>원두를 등록하고 QR 라벨을 만드는 공간입니다.<br>QR 스캔 조회는 로그인 없이 누구나 가능합니다.</p>
   </div>
   <div class="card">
@@ -185,7 +186,7 @@
   </div>
 </div>
 
-<!-- ══════ 스튜디오 본 화면 (로그인 상태) ══════ -->
+<!-- ══════ 랩 본 화면 (로그인 상태) ══════ -->
 <div id="app-view" class="layout hidden">
 
   <div>
@@ -193,13 +194,17 @@
       <h2 id="form-title">원두 정보</h2>
       <p class="hint" id="form-hint" style="margin: -6px 0 14px">붉은 별표(<span class="req">*</span>)는 필수 입력 항목입니다. 저장하면 번호(KEY)가 자동으로 부여됩니다.</p>
       <details class="adv" id="autofill-box" open>
-        <summary>붙여넣기로 자동 채우기 — 상품 페이지 텍스트를 복사해 넣으면 빈 칸을 채워줍니다</summary>
-        <textarea id="f-autofill-text" style="min-height:76px" placeholder="예) 25-26 New Season Ethiopia Sidama Bura Keramo Gara Agena G1 Premium Washed 150g&#10;Process: Washed (36 hours wet fermentation + 21 days drying on raised beds)&#10;Altitude: 1900-2250m&#10;https://roastery.example.com/products/..."></textarea>
+        <summary>자동 채우기 — 상품 페이지 링크 또는 텍스트로 빈 칸을 채워줍니다</summary>
+        <div style="display:flex; gap:8px; margin-bottom:8px">
+          <input type="url" id="f-autofill-url" placeholder="상품 페이지 URL — https://...">
+          <button type="button" id="btn-autofill-url" style="white-space:nowrap; flex-shrink:0">링크에서 가져오기</button>
+        </div>
+        <textarea id="f-autofill-text" style="min-height:76px" placeholder="또는 페이지 텍스트를 직접 붙여넣기&#10;예) Process: Washed (36 hours wet fermentation + 21 days drying on raised beds)&#10;Altitude: 1900-2250m"></textarea>
         <div class="btnrow">
           <button type="button" id="btn-autofill">인식해서 빈 칸 채우기</button>
           <span class="status-line" id="autofill-status" style="margin:0"></span>
         </div>
-        <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다. 인식 결과는 반드시 검토 후 저장하세요 — 완벽한 인식을 보장하지 않습니다.</p>
+        <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다. 인식 결과는 반드시 검토 후 저장하세요 — 완벽한 인식을 보장하지 않습니다. 일부 사이트는 봇 차단·스크립트 렌더링 때문에 링크 가져오기가 실패할 수 있으니, 그 경우 텍스트를 직접 붙여넣으세요.</p>
       </details>
       <hr class="divider">
 
@@ -284,8 +289,12 @@
         <p class="hint">QR은 님봇 인쇄 도트 격자에 맞춘 고정 크기(9.4mm)로, 스캔 안정성을 위해 조절하지 않습니다.</p>
       </details>
       <div class="field" style="margin: 12px 0 0">
-        <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (업로드 시)</label>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink)"><input type="checkbox" id="f-show-logo" checked> 로고 표시 (파일 업로드 또는 이미지 링크)</label>
         <input type="file" id="f-logo-file" accept="image/png,image/svg+xml" style="margin-top:6px">
+        <div style="display:flex; gap:8px; margin-top:6px">
+          <input type="url" id="f-logo-url" placeholder="이미지 URL — https://.../logo.png">
+          <button type="button" id="btn-logo-url" style="white-space:nowrap; flex-shrink:0">불러오기</button>
+        </div>
       </div>
     </div>
 
@@ -295,6 +304,7 @@
       <div class="btnrow">
         <button id="btn-refresh-list">새로고침</button>
         <button id="btn-export">CSV 백업 다운로드</button>
+        <button id="btn-open-deck">덱으로 보기 ↗</button>
       </div>
     </div>
   </div>
@@ -509,12 +519,13 @@ async function renderAll() {
 
 // 서브라인 필드(지역/가공/품종/고도)에 값이 있으면 해당 표시 체크박스를 자동으로 켠다.
 // 사용자가 직접 끈 체크는 건드리지 않음(값이 있어도 강제로 다시 켜지 않음) — 단, 값이 막 채워진 시점엔 켠다.
+// 이미 스펙 칸에 표시 중인 항목은 중복 표시가 되므로 자동으로 켜지 않는다.
 function autoCheckSubline() {
   Object.entries(SUB_FIELD_INPUT_IDS).forEach(([key, inputId]) => {
     const inputEl = $(inputId);
     const checkbox = subToggleInputs[key];
     if (!inputEl || !checkbox) return;
-    if (inputEl.value.trim() && !checkbox.checked) {
+    if (inputEl.value.trim() && !checkbox.checked && !design.specFields.includes(key)) {
       checkbox.checked = true;
       if (!design.subFields.includes(key)) design.subFields.push(key);
     }
@@ -815,8 +826,27 @@ function buildToggles(containerId, pool, selected, max, refStore) {
     });
   });
 }
+const specToggleInputs = {};
 buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
-buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4);
+buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4, specToggleInputs);
+
+// 같은 정보(예: 고도)가 서브라인과 스펙 칸에 동시에 표시되지 않도록 상호 배타 처리:
+// 한쪽에서 체크하면 다른 쪽에 켜져 있던 같은 항목은 자동으로 꺼진다.
+function uncheckIn(inputs, arr, key) {
+  const other = inputs[key];
+  if (other && other.checked) {
+    other.checked = false;
+    const i = arr.indexOf(key);
+    if (i >= 0) arr.splice(i, 1);
+    renderAll();
+  }
+}
+Object.entries(subToggleInputs).forEach(([key, input]) => {
+  input.addEventListener("change", () => { if (input.checked) uncheckIn(specToggleInputs, design.specFields, key); });
+});
+Object.entries(specToggleInputs).forEach(([key, input]) => {
+  input.addEventListener("change", () => { if (input.checked) uncheckIn(subToggleInputs, design.subFields, key); });
+});
 
 // 인증 탭 전환
 document.querySelectorAll("#auth-tabs button").forEach(btn => {
@@ -863,6 +893,51 @@ $("f-logo-file").addEventListener("change", (e) => {
   reader.onload = () => { logoDataUrl = reader.result; renderAll(); };
   reader.readAsDataURL(file);
 });
+
+// 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우고, 곧바로 인식 실행
+$("btn-autofill-url").addEventListener("click", async () => {
+  const url = $("f-autofill-url").value.trim();
+  const status = $("autofill-status");
+  if (!url) { status.textContent = "상품 페이지 URL을 입력하세요."; status.className = "status-line error"; return; }
+  if (!signedIn()) { status.textContent = "로그인이 필요합니다."; status.className = "status-line error"; return; }
+  status.textContent = "페이지를 가져오는 중…"; status.className = "status-line";
+  const { body } = await api("/api/fetch", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+  });
+  if (!body || !body.ok || body.kind !== "text") {
+    status.textContent = (body && body.error) || "가져오기 실패 — 텍스트를 직접 붙여넣어 보세요.";
+    status.className = "status-line error";
+    return;
+  }
+  $("f-autofill-text").value = body.text;
+  if (!$("f-source").value.trim()) {
+    $("f-source").value = url;
+    $("f-source").dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  $("btn-autofill").click();
+});
+
+// 로고를 이미지 링크로 불러오기 (서버 프록시로 CORS 우회 → dataURL로 변환해 캔버스 오염 방지)
+$("btn-logo-url").addEventListener("click", async () => {
+  const url = $("f-logo-url").value.trim();
+  if (!url) { setStatus("로고 이미지 URL을 입력하세요.", false); return; }
+  if (!signedIn()) { setStatus("로그인이 필요합니다.", false); return; }
+  setStatus("로고 이미지를 가져오는 중…", true);
+  const { body } = await api("/api/fetch", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+  });
+  if (body && body.ok && body.kind === "image") {
+    logoDataUrl = body.dataUrl;
+    $("f-show-logo").checked = true;
+    design.showLogo = true;
+    renderAll();
+    setStatus("로고를 불러왔습니다.", true);
+  } else {
+    setStatus((body && body.error) || "이미지를 가져오지 못했습니다 — 이미지 파일 URL인지 확인하세요.", false);
+  }
+});
+
+$("btn-open-deck").addEventListener("click", () => window.open("/deck", "_blank"));
 
 $("btn-autofill").addEventListener("click", () => {
   const raw = $("f-autofill-text").value.trim();

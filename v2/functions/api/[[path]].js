@@ -194,6 +194,78 @@ async function listBeans(env, user) {
   return json({ ok: true, beans: results.map(beanToPublic) });
 }
 
+// ── 링크 가져오기 프록시 (로그인 사용자 전용) ──
+// 브라우저 CORS를 우회해 상품 페이지 텍스트/로고 이미지를 대신 가져온다.
+// SSRF 가드: http(s)만, 내부망·메타데이터 호스트 차단, 크기 2MB·8초 제한.
+function hostBlocked(host) {
+  if (/^(localhost|127\.|0\.|10\.|192\.168\.|169\.254\.)/i.test(host)) return true;
+  const m = /^172\.(\d+)\./.exec(host);
+  if (m && +m[1] >= 16 && +m[1] <= 31) return true;
+  if (/\.(local|internal)$/i.test(host)) return true;
+  if (host === "::1" || host.startsWith("[")) return true;
+  if (host === "metadata.google.internal") return true;
+  return false;
+}
+
+function htmlToText(html) {
+  const s = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    // 표/정의목록의 키-값 셀을 "라벨: 값" 줄로 변환해 autofill 파서가 읽을 수 있게 한다
+    .replace(/<\/(th|dt|td)>/gi, ": ")
+    .replace(/<\/(tr|p|div|li|h[1-6]|dd|section|article|header|footer)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#0?39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n));
+  return s.split("\n")
+    .map(l => l.replace(/[ \t]+/g, " ").trim().replace(/[:：]$/, ""))
+    .filter(Boolean).join("\n");
+}
+
+async function fetchExternal(request) {
+  const body = await request.json().catch(() => ({}));
+  let url;
+  try { url = new URL(String(body.url || "")); } catch (e) {
+    return json({ ok: false, error: "URL 형식이 올바르지 않습니다." }, 400);
+  }
+  if (!/^https?:$/.test(url.protocol)) return json({ ok: false, error: "http/https URL만 지원합니다." }, 400);
+  if (hostBlocked(url.hostname)) return json({ ok: false, error: "허용되지 않는 주소입니다." }, 400);
+
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (compatible; BeanHoarder/1.0)",
+        "Accept": "text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko,en;q=0.8",
+      },
+    });
+  } catch (e) {
+    return json({ ok: false, error: "대상 페이지를 가져오지 못했습니다 (차단 또는 시간 초과)." }, 502);
+  }
+  if (!res.ok) return json({ ok: false, error: `대상 응답 오류 (HTTP ${res.status})` }, 502);
+
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength > 2_000_000) return json({ ok: false, error: "응답이 너무 큽니다 (2MB 제한)." }, 413);
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+
+  if (ct.startsWith("image/")) {
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return json({ ok: true, kind: "image", dataUrl: `data:${ct.split(";")[0]};base64,${btoa(bin)}` });
+  }
+
+  const text = htmlToText(new TextDecoder("utf-8").decode(buf));
+  if (!text.trim()) return json({ ok: false, error: "텍스트를 추출하지 못했습니다." }, 422);
+  return json({ ok: true, kind: "text", text: text.slice(0, 20000) });
+}
+
 function csvField(v) {
   v = (v ?? "").toString();
   return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
@@ -238,12 +310,13 @@ export async function onRequest({ request, env, params }) {
     }
     if (method === "POST" && seg[0] === "signup") return signup(env, request);
     if (method === "POST" && seg[0] === "recover") return recoverAccount(env, request);
-    if (seg[0] === "beans" || seg[0] === "export.csv") {
+    if (seg[0] === "beans" || seg[0] === "export.csv" || seg[0] === "fetch") {
       const user = await auth(env, request);
       if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
       if (seg[0] === "beans" && method === "POST") return addBean(env, request, user);
       if (seg[0] === "beans" && method === "GET") return listBeans(env, user);
       if (seg[0] === "export.csv" && method === "GET") return exportCsv(env, user);
+      if (seg[0] === "fetch" && method === "POST") return fetchExternal(request);
     }
     return json({ ok: false, error: "not found" }, 404);
   } catch (e) {

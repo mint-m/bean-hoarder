@@ -34,6 +34,9 @@ export const DEFAULT_DESIGN = {
 const DOT = 0.125;
 const QR_MODULE_DOTS = 3;   // 모듈 = 3도트 = 0.375mm → 버전2(25모듈) QR = 9.375mm
 
+// 2도 써멀 인쇄(블랙+레드)용 레드 채널. QR·본문은 블랙만 사용.
+const RED = "#e8341c";
+
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -90,7 +93,7 @@ function wrapN(text, size, factor, maxW, maxLines) {
 
 function textEl(x, y, text, size, opts) {
   if (!text) return "";
-  const { factor, maxW, font = SANS, weight, style, spacing, anchor } = opts;
+  const { factor, maxW, font = SANS, weight, style, spacing, anchor, fill } = opts;
   const fitted = fitText(text, size, factor, maxW);
   const w = Math.min(textUnits(fitted) * size * factor, maxW);
   let attrs = `x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${font}" font-size="${size}" textLength="${w.toFixed(2)}" lengthAdjust="spacingAndGlyphs"`;
@@ -98,11 +101,12 @@ function textEl(x, y, text, size, opts) {
   if (style) attrs += ` font-style="${style}"`;
   if (spacing != null) attrs += ` letter-spacing="${spacing}"`;
   if (anchor) attrs += ` text-anchor="${anchor}"`;
+  if (fill) attrs += ` fill="${fill}"`;
   return `<text ${attrs}>${esc(fitted)}</text>`;
 }
 
-function specCell(x, y, label, value, valueMax, size) {
-  return textEl(x, y, label, 1.1, { factor: .55, maxW: 3.1, font: MONO })
+function specCell(x, y, label, value, valueMax, size, labelFill) {
+  return textEl(x, y, label, 1.1, { factor: .55, maxW: 3.1, font: MONO, fill: labelFill })
        + textEl(x + 3.5, y, value, size, { factor: .55, maxW: valueMax, font: MONO, weight: "bold" });
 }
 
@@ -131,9 +135,16 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     els.push(`<image x="${lx}" y="${ly}" width="${lw}" height="${lh}" preserveAspectRatio="xMaxYMin meet" href="${logoDataUrl}"/>`);
   }
 
-  // 1행 로스터리(소형 볼드) / 2행 국가 헤드라인
-  els.push(textEl(MARGIN, 2.6, g("ROASTERY").toUpperCase(), 1.5, { factor: .70, maxW: headMax, weight: "bold", spacing: 0.12 }));
-  els.push(textEl(MARGIN, 5.5, g("ORIGIN").toUpperCase(), design.headlineSize, { factor: .68, maxW: headMax, weight: "bold" }));
+  // ── 보딩패스 컨셉 (블랙 + 레드 2도 인쇄) ──
+  // 상단 레드 스트립 / 레드 도트 + 로스터리(레드) / 오리진 헤드라인(블랙) /
+  // 정보 블록 / 레드 점선 절취선 / 스펙 그리드(레드 라벨 + 블랙 값) / 노트
+  els.push(`<rect x="0" y="0" width="${W}" height="0.6" fill="${RED}"/>`);
+  const rst = g("ROASTERY").toUpperCase();
+  if (rst) {
+    els.push(`<circle cx="${(MARGIN + 0.38).toFixed(2)}" cy="2.42" r="0.38" fill="${RED}"/>`);
+    els.push(textEl(MARGIN + 1.25, 2.9, rst, 1.5, { factor: .70, maxW: headMax - 1.25, weight: "bold", spacing: 0.12, fill: RED }));
+  }
+  els.push(textEl(MARGIN, 5.7, g("ORIGIN").toUpperCase(), design.headlineSize, { factor: .68, maxW: headMax, weight: "bold" }));
 
   // 라벨 인쇄용 축약: 괄호 속 상세 설명("Washed (36 hours ...)" 등)은
   // QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
@@ -143,37 +154,53 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     return (f === "REGION" || f === "PROCESS" || f === "VARIETY") ? stripParen(v) : v;
   };
 
-  // ── 좌측 컬럼 플로우 레이아웃: 고정 좌표 대신 내용량에 따라 y를 흘려 배치 ──
-  // 서브라인 정보를 하나의 텍스트로 합쳐 최대 3줄까지 줄바꿈 (말줄임은 마지막 안전장치)
-  const INFO_LH = 1.6, SPEC_LH = 2.4, NOTE_LH = 1.7, NOTE_BOTTOM = 19.4;
+  // ── 좌측 컬럼 플로우 레이아웃: 내용량에 따라 y를 흘려 배치 ──
+  const INFO_LH = 1.6, SPEC_LH = 2.4, NOTE_LH = 1.7, BOTTOM = 19.4;
+  const INFO_START = 7.5;
   const subOrder = SUB_POOL.map(([k]) => k).filter(k => design.subFields.includes(k));
   const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
-  let yCur = 7.4;                      // 다음 텍스트 베이스라인
+
+  // 스펙 후보를 먼저 확정 (서브라인에 이미 표시되는 필드는 중복 인쇄 방지)
+  const labelOf = k => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
+  const specs = design.specFields.slice(0, 4)
+    .filter(f => !design.subFields.includes(f))
+    .map(f => [f, f === "AGTRON" ? g(f).split(/\s+/)[0] : g(f)])
+    .filter(([, v]) => v);
+  const specRows = Math.ceil(specs.length / 2);
+  const hasNote = !!g("TASTING_NOTE");
+
+  // 정보 블록에 허용되는 최대 줄 수(1~4): 절취선·스펙·노트 최소 1줄이 바닥 안에 들어가는 최댓값
+  let maxInfo = 1;
+  for (let n = 4; n >= 1; n--) {
+    const lastInfo = INFO_START + (n - 1) * INFO_LH;
+    const dY = lastInfo + 0.55;
+    const specLast = specRows ? dY + 1.95 + (specRows - 1) * SPEC_LH : dY;
+    const needed = hasNote ? specLast + 1.9 : specLast;
+    if (needed <= BOTTOM) { maxInfo = n; break; }
+  }
+
+  let yCur = INFO_START;
   if (infoText) {
-    for (const line of wrapN(infoText, 1.35, .52, LEFT_MAX, 3)) {
+    for (const line of wrapN(infoText, 1.35, .52, LEFT_MAX, maxInfo)) {
       els.push(textEl(MARGIN, yCur, line, 1.35, { factor: .52, maxW: LEFT_MAX }));
       yCur += INFO_LH;
     }
   }
 
-  const divY = Math.max(6.6, yCur - INFO_LH + 0.55);
-  els.push(`<line x1="${MARGIN}" y1="${divY.toFixed(2)}" x2="${(QR_X - QUIET).toFixed(2)}" y2="${divY.toFixed(2)}" stroke="#000" stroke-width="0.12"/>`);
+  // 절취선: 보딩패스의 퍼포레이션을 레드 점선으로
+  const divY = Math.max(6.8, yCur - INFO_LH + 0.55);
+  els.push(`<line x1="${MARGIN}" y1="${divY.toFixed(2)}" x2="${(QR_X - QUIET).toFixed(2)}" y2="${divY.toFixed(2)}" stroke="${RED}" stroke-width="0.14" stroke-dasharray="0.55 0.4"/>`);
 
-  // 스펙 그리드: 값이 있는 항목만 2열로 채움 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
-  const labelOf = k => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
-  const specs = design.specFields.slice(0, 4)
-    .map(f => [f, f === "AGTRON" ? g(f).split(/\s+/)[0] : g(f)])
-    .filter(([, v]) => v);
+  // 스펙 그리드: 레드 라벨 + 블랙 볼드 값 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
   const colX = [MARGIN, MARGIN + 13.2];
   specs.forEach(([f, val], i) => {
-    els.push(specCell(colX[i % 2], divY + 1.95 + Math.floor(i / 2) * SPEC_LH, labelOf(f), val, 9.6, design.specValueSize));
+    els.push(specCell(colX[i % 2], divY + 1.95 + Math.floor(i / 2) * SPEC_LH, labelOf(f), val, 9.6, design.specValueSize, RED));
   });
-  const specRows = Math.ceil(specs.length / 2);
   let noteY = specRows > 0 ? divY + 1.95 + (specRows - 1) * SPEC_LH + 1.9 : divY + 1.7;
 
   // 테이스팅 노트: 스펙 그리드 아래 남는 공간만큼 (최대 2줄)
-  if (g("TASTING_NOTE") && noteY <= NOTE_BOTTOM) {
-    const allowed = Math.min(2, Math.floor((NOTE_BOTTOM - noteY) / NOTE_LH) + 1);
+  if (hasNote && noteY <= BOTTOM) {
+    const allowed = Math.min(2, Math.floor((BOTTOM - noteY) / NOTE_LH) + 1);
     for (const line of wrapN(g("TASTING_NOTE"), 1.3, .50, LEFT_MAX, allowed)) {
       els.push(textEl(MARGIN, noteY, line, 1.3, { factor: .50, maxW: LEFT_MAX, style: "italic" }));
       noteY += NOTE_LH;
