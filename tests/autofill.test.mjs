@@ -83,3 +83,25 @@ test("라벨 한 줄 패턴도 이미 채워진 필드는 덮어쓰지 않는다
   const out = parseBeanText(["Region: Gedeb", "Region", "Yirgacheffe"].join("\n"));
   assert.equal(out.REGION, "Gedeb, Yirgacheffe");   // REGION은 계층 병합이 의도된 예외
 });
+
+test("PROCESS가 이미 짧게 채워진 뒤 별도 'PROCESSING' 상세 문단이 나오면 메모로 돌린다", () => {
+  const out = parseBeanText([
+    "Variety", "Chiroso",
+    "Process", "CHIROSO - WASHED",
+    "PROCESSING",
+    "Hand-picked at peak ripeness. Floated. De-pulped on the day of harvest. "
+      + "Fermented underwater for 6 days. Dried on raised beds until moisture content reaches ~10%.",
+  ].join("\n"));
+  assert.equal(out.PROCESS, "CHIROSO - WASHED");
+  assert.equal(out.MEMO, "Hand-picked at peak ripeness. Floated. De-pulped on the day of harvest. "
+    + "Fermented underwater for 6 days. Dried on raised beds until moisture content reaches ~10%.");
+});
+
+test("같은 줄(label: value) 패턴에서도 짧은 필드에 뒤늦게 붙는 상세 문단은 메모로 돌린다", () => {
+  const out = parseBeanText([
+    "Process: Washed",
+    "Processing: Hand-picked at peak ripeness. Floated and fermented underwater for six days before drying.",
+  ].join("\n"));
+  assert.equal(out.PROCESS, "Washed");
+  assert.equal(out.MEMO, "Hand-picked at peak ripeness. Floated and fermented underwater for six days before drying.");
+});

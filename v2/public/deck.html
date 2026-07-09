@@ -25,29 +25,61 @@
   .topbar a.btn { text-decoration: none; font-size: 12px; padding: 6px 12px; border-radius: 999px; }
   main { width: 100%; max-width: 460px; flex: 1; }
   #filter { margin-bottom: 14px; }
+  .note-toggle {
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--sub);
+    margin: -6px 2px 14px; cursor: pointer; user-select: none;
+  }
+  .note-toggle input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   footer { margin-top: 28px; font-size: 11px; letter-spacing: .08em; color: var(--sub); }
 
   .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px;
     background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
 
   /* ── 월렛 덱: 카드가 겹쳐 쌓이고, 탭하면 상세 페이지로 ── */
-  .deck { display: flex; flex-direction: column; padding-top: 4px; }
+  /* isolation: isolate — 숨긴(archived) 카드에 줄 음수 z-index가 덱 바깥(헤더·검색창 등)으로
+     새지 않고 이 컨테이너 안에서만 "맨 뒤"로 가라앉도록 자체 stacking context를 만든다. */
+  .deck { display: flex; flex-direction: column; padding-top: 4px; isolation: isolate; }
   .wcard {
-    display: block; text-decoration: none; color: var(--ink);
+    display: block; color: var(--ink); cursor: pointer;
     background: var(--surface); border-radius: 16px; box-shadow: var(--shadow);
     border-top: 5px solid var(--accent);
     padding: 13px 18px 16px; margin-top: -58px;
-    position: relative; z-index: 1;
-    transition: transform .16s ease, box-shadow .16s ease, z-index 0s .16s;
+    position: relative;
+    transition: transform .18s ease, box-shadow .18s ease;
   }
   .wcard:first-child { margin-top: 0; }
-  /* 호버·포커스: 카드를 크게 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록).
-     z-index는 진입 시 즉시, 이탈 시엔 transform 전환이 끝난 뒤에 내려가도록 지연시켜 아래 카드 뒤로
-     순간 숨었다가 나오는 깜빡임을 막는다. */
-  .wcard:hover, .wcard:focus-visible {
-    transform: translateY(-26px) scale(1.03); z-index: 10;
-    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 32px 60px -22px rgba(16,16,18,.46);
-    transition: transform .16s ease, box-shadow .16s ease, z-index 0s;
+  /* 애플 월렛처럼: 호버·포커스한 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로
+     밀려 내려가 시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가
+     기본적으로 앞 카드 위에 그려지므로, 뒤 카드들을 비켜주기만 해도 호버한 카드가 온전히 드러난다. */
+  .wcard:hover, .wcard:focus-within {
+    transform: translateY(-8px);
+    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 10px 20px -14px rgba(16,16,18,.32);
+  }
+  .wcard:hover ~ .wcard, .wcard:focus-within ~ .wcard {
+    transform: translateY(54px);
+  }
+  /* 숨긴 카드는 덱의 가장 뒤(음수 z-index)로 가라앉혀 다른 카드 뒤에 깔리게 하고, 불투명하게
+     채도만 낮춘다(투명하게 하면 겹친 뒤 카드가 비쳐 지저분해 보여서 opacity는 쓰지 않는다). */
+  .wcard.archived {
+    filter: grayscale(90%) brightness(.94);
+    z-index: -1;
+  }
+  .wcard.archived .w-origin .dday { display: none; }
+  /* 카드 자체는 클릭·엔터 시 바로 상세 이동 — 메뉴는 호버 시 나타나는 별도 버튼으로만 연다.
+     우측 하단(RSTD/NET 줄 옆)은 늘 여유 공간이라 절대 위치로 얹어도 본문 레이아웃을 밀어내지 않는다. */
+  .wcard-menu {
+    position: absolute; bottom: 10px; right: 14px;
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: rgba(120,120,128,.14); color: var(--sub);
+    font-size: 17px; line-height: 1; letter-spacing: 1px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .15s ease, background .15s ease;
+  }
+  .wcard:hover .wcard-menu, .wcard-menu:focus-visible { opacity: 1; }
+  .wcard-menu:hover { background: rgba(120,120,128,.24); }
+  /* 터치 기기는 호버가 없으므로 메뉴 버튼을 항상 보이게 둔다 */
+  @media (hover: none) {
+    .wcard-menu { opacity: 1; }
   }
   .w-top { display: flex; justify-content: space-between; align-items: baseline; }
   .w-roastery {
@@ -68,28 +100,36 @@
   }
   .w-meta { font-size: 12.5px; color: var(--sub); margin-top: 4px; text-transform: uppercase;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-note { font-size: 12.5px; font-style: italic; color: var(--ink); margin: 6px 0 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .w-foot { font-family: var(--mono); font-size: 11.5px; color: var(--sub); margin-top: 8px; }
 
-  /* 호버 시 펼쳐지는 상세 (품종·고도·수확·테이스팅 노트) */
-  .w-detail {
-    max-height: 0; opacity: 0; overflow: hidden;
-    transition: max-height .2s ease, opacity .2s ease, margin-top .2s ease;
-    border-top: 1px dashed transparent; margin-top: 0;
+  /* ── 카드 탭 시 상세 이동 전 확인 메뉴 (상세보기·숨기기·삭제) ── */
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(16,16,18,.4);
+    opacity: 0; pointer-events: none; transition: opacity .15s ease; z-index: 100;
   }
-  .wcard:hover .w-detail, .wcard:focus-visible .w-detail {
-    max-height: 320px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line);
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet-panel {
+    position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px;
+    transform: translate(-50%, 100%); transition: transform .18s ease;
+    background: var(--surface); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(16,16,18,.25);
+    padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 101;
   }
-  .w-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; padding: 0; }
-  .w-chips li {
-    font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
-    border: 1px solid var(--line); color: var(--sub);
+  .sheet-backdrop.open .sheet-panel { transform: translate(-50%, 0); }
+  .sheet-title {
+    font-size: 12px; color: var(--sub); text-align: center; padding: 10px 8px 12px;
+    border-bottom: 1px solid var(--line); margin-bottom: 6px;
   }
-  .w-note { font-size: 12.5px; font-style: italic; color: var(--ink); margin: 0; }
-  .w-hint-tap { display: none; }
-  /* 터치 기기: 호버가 없으므로 상세를 항상 펼쳐 보여준다 */
-  @media (hover: none) {
-    .w-detail { max-height: 320px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top-color: var(--line); }
+  .sheet-title b { color: var(--ink); }
+  .sheet-btn {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    font: inherit; font-size: 15px; color: var(--ink); padding: 13px 8px; cursor: pointer;
+    border-radius: 10px;
   }
+  .sheet-btn:hover, .sheet-btn:focus-visible { background: var(--hover, rgba(120,120,128,.12)); }
+  .sheet-btn.danger { color: #d0442c; }
+  .sheet-btn.cancel { color: var(--sub); margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0; }
 </style>
 </head>
 <body>
@@ -99,10 +139,23 @@
 </header>
 <main>
   <input type="search" id="filter" placeholder="검색 — 산지, 로스터리, 키, 노트…" autocomplete="off" class="hidden">
+  <label id="note-toggle-row" class="note-toggle hidden">
+    <input type="checkbox" id="note-toggle" checked> 카드에 노트 표시
+  </label>
   <div id="deck-status" class="status">불러오는 중…</div>
   <div id="deck" class="deck"></div>
 </main>
 <footer>BEAN-HOARDER — 원두 소분 라벨 아카이브</footer>
+
+<div id="sheet-backdrop" class="sheet-backdrop">
+  <div class="sheet-panel" role="menu" aria-label="원두 카드 메뉴">
+    <div class="sheet-title" id="sheet-title"></div>
+    <button class="sheet-btn" data-act="detail">상세보기 →</button>
+    <button class="sheet-btn" data-act="archive">숨기기</button>
+    <button class="sheet-btn danger" data-act="delete">삭제</button>
+    <button class="sheet-btn cancel" data-act="cancel">취소</button>
+  </div>
+</div>
 
 <script>
 const account = {
@@ -110,6 +163,8 @@ const account = {
   pin: localStorage.getItem("bh_pin") || "",
 };
 let allBeans = [];
+// 카드에 테이스팅 노트 미리보기를 표시할지 — 기본 켜짐, 사용자가 끄면 기억
+let notesEnabled = localStorage.getItem("bh_deck_notes") !== "0";
 
 function escapeHtml(s) {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -129,40 +184,35 @@ function cardHTML(b) {
   const d = parseDot(g("ROAST_DATE"));
   const n = d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null;
   const dday = n != null && n >= 0 ? `<span class="dday">D+${n}</span>` : "";
-  const meta = [g("REGION"), g("PROCESS")].filter(Boolean).join(" · ");
+  const meta = [g("REGION"), g("VARIETY"), g("PROCESS")].filter(Boolean).join(" · ");
   const foot = [
     g("ROAST_DATE") && `RSTD ${g("ROAST_DATE")}`,
     g("NET_WEIGHT") && `NET ${g("NET_WEIGHT")}`,
     g("AGTRON") && g("AGTRON").split(/\s+/)[0],
   ].filter(Boolean).join(" · ");
-
-  // 호버 시 펼쳐지는 상세: 품종·고도·수확·생산자·랏을 칩으로, 테이스팅 노트를 이탤릭으로
-  const chips = [
-    g("VARIETY") && `품종 ${g("VARIETY")}`,
-    g("ALTITUDE") && `고도 ${g("ALTITUDE")}`,
-    g("HARVEST") && `수확 ${g("HARVEST")}`,
-    g("PRODUCER"),
-    g("LOT") && `랏 ${g("LOT")}`,
-    g("WASHING_STATION"),
-    g("PACKAGE_DATE") && `PKGD ${g("PACKAGE_DATE")}`,
-  ].filter(Boolean);
-  const chipsHtml = chips.length
-    ? `<ul class="w-chips">${chips.map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>` : "";
-  const note = g("TASTING_NOTE");
-  const noteHtml = note ? `<p class="w-note">${escapeHtml(note)}</p>` : "";
-  const detail = (chipsHtml || noteHtml)
-    ? `<div class="w-detail">${chipsHtml}${noteHtml}</div>` : "";
+  const note = notesEnabled && g("TASTING_NOTE");
 
   const originColor = bhOriginColor(g("ORIGIN"));
   const borderStyle = originColor ? ` style="border-top-color:${originColor}"` : "";
   const dot = originColor ? `<span class="w-origin-dot" style="background:${originColor}"></span>` : "";
-  return `<a class="wcard"${borderStyle} href="/${g("KEY")}">
+  const archivedClass = b.ARCHIVED ? " archived" : "";
+  return `<div class="wcard${archivedClass}"${borderStyle} tabindex="0" role="link"
+      aria-label="${escapeHtml(g("ORIGIN") || g("KEY"))} 상세보기" data-key="${g("KEY")}">
+    <button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>
     <div class="w-top"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
     <div class="w-origin"><span class="w-origin-label">${dot}${escapeHtml(g("ORIGIN"))}</span>${dday}</div>
     ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
+    ${note ? `<p class="w-note">${escapeHtml(note)}</p>` : ""}
     ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
-    ${detail}
-  </a>`;
+  </div>`;
+}
+
+// 보관(archived) 카드는 덱 최하단으로, 나머지는 최신 KEY 먼저
+function sortBeans(beans) {
+  return beans.slice().sort((a, b) => {
+    if (!!a.ARCHIVED !== !!b.ARCHIVED) return a.ARCHIVED ? 1 : -1;
+    return (b.KEY || "").localeCompare(a.KEY || "");
+  });
 }
 
 function renderDeck(beans) {
@@ -175,8 +225,94 @@ function renderDeck(beans) {
     return;
   }
   document.getElementById("deck-status").classList.add("hidden");
-  deck.innerHTML = beans.map(cardHTML).join("");
+  deck.innerHTML = sortBeans(beans).map(cardHTML).join("");
+  // 카드 본문 클릭·엔터 = 바로 상세 이동. 메뉴 버튼(⋯)만 상세 이동을 막고 액션시트를 연다.
+  deck.querySelectorAll(".wcard").forEach(el => {
+    const key = el.dataset.key;
+    el.addEventListener("click", () => { location.href = `/${key}`; });
+    el.addEventListener("keydown", e => {
+      if (e.target !== el) return;  // 메뉴 버튼에 포커스 중이면 카드 자체의 엔터 동작을 건너뜀
+      if (e.key === "Enter") { e.preventDefault(); location.href = `/${key}`; }
+    });
+    const menuBtn = el.querySelector(".wcard-menu");
+    menuBtn.addEventListener("click", e => { e.stopPropagation(); openSheet(key); });
+  });
 }
+
+// ── 카드 탭 시 뜨는 메뉴: 상세보기 · 숨기기(보관) · 삭제 ──
+const sheetBackdrop = document.getElementById("sheet-backdrop");
+const sheetTitle = document.getElementById("sheet-title");
+let sheetKey = null;
+
+function openSheet(key) {
+  const bean = allBeans.find(b => b.KEY === key);
+  if (!bean) return;
+  sheetKey = key;
+  sheetTitle.innerHTML = `<b>${escapeHtml(bean.ORIGIN || key)}</b> · ${escapeHtml(key)}`;
+  sheetBackdrop.querySelector('[data-act="archive"]').textContent = bean.ARCHIVED ? "숨기기 해제" : "숨기기";
+  sheetBackdrop.classList.add("open");
+}
+function closeSheet() {
+  sheetBackdrop.classList.remove("open");
+  sheetKey = null;
+}
+
+async function apiCall(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${account.usercode}:${account.pin}`,
+      ...(opts.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => null);
+  return { res, body };
+}
+
+async function toggleArchive(key) {
+  const bean = allBeans.find(b => b.KEY === key);
+  if (!bean) return;
+  const nextArchived = !bean.ARCHIVED;
+  const { body } = await apiCall(`/api/bean/${key}/archive`, {
+    method: "PATCH", body: JSON.stringify({ archived: nextArchived }),
+  });
+  if (body && body.ok) {
+    bean.ARCHIVED = nextArchived;
+    applyFilter();
+  } else {
+    alert((body && body.error) || "처리하지 못했습니다.");
+  }
+}
+
+async function deleteBeanFromDeck(key) {
+  if (!confirm(`${key} 를 삭제할까요? 인쇄된 라벨의 QR은 더 이상 조회되지 않습니다.`)) return;
+  const { body } = await apiCall(`/api/bean/${key}`, { method: "DELETE" });
+  if (body && body.ok) {
+    allBeans = allBeans.filter(b => b.KEY !== key);
+    document.getElementById("filter").classList.toggle("hidden", allBeans.length < 2);
+    applyFilter();
+  } else {
+    alert((body && body.error) || "삭제하지 못했습니다.");
+  }
+}
+
+sheetBackdrop.addEventListener("click", e => {
+  if (e.target === sheetBackdrop) closeSheet();
+});
+sheetBackdrop.querySelectorAll(".sheet-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const key = sheetKey, act = btn.dataset.act;
+    closeSheet();
+    if (!key) return;
+    if (act === "detail") location.href = `/${key}`;
+    if (act === "archive") toggleArchive(key);
+    if (act === "delete") deleteBeanFromDeck(key);
+  });
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeSheet();
+});
 
 function applyFilter() {
   const q = document.getElementById("filter").value.trim().toLowerCase();
@@ -191,9 +327,9 @@ async function main() {
     showStatus('내 원두 덱은 로그인 후 볼 수 있습니다.<br><br><a href="/admin">랩에서 로그인 →</a>');
     return;
   }
-  let res;
+  let res, body;
   try {
-    res = await fetch("/api/beans", { headers: { "Authorization": `Bearer ${account.usercode}:${account.pin}` } });
+    ({ res, body } = await apiCall("/api/beans"));
   } catch (e) {
     showStatus("목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
     return;
@@ -202,11 +338,18 @@ async function main() {
     showStatus('로그인이 만료되었습니다.<br><br><a href="/admin">랩에서 다시 로그인 →</a>');
     return;
   }
-  const body = await res.json().catch(() => null);
   if (!body || !body.ok) { showStatus("목록을 불러오지 못했습니다."); return; }
   allBeans = body.beans.sort((a, b) => (b.KEY || "").localeCompare(a.KEY || ""));  // 최신 KEY 먼저
   document.getElementById("filter").classList.toggle("hidden", allBeans.length < 2);
   document.getElementById("filter").addEventListener("input", applyFilter);
+  document.getElementById("note-toggle-row").classList.toggle("hidden", allBeans.length === 0);
+  const noteToggle = document.getElementById("note-toggle");
+  noteToggle.checked = notesEnabled;
+  noteToggle.addEventListener("change", () => {
+    notesEnabled = noteToggle.checked;
+    localStorage.setItem("bh_deck_notes", notesEnabled ? "1" : "0");
+    applyFilter();
+  });
   renderDeck(allBeans);
 }
 main();

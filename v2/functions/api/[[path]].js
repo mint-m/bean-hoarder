@@ -7,6 +7,7 @@
 //   GET    /api/beans         내 원두 목록
 //   GET    /api/bean/{KEY}    공개 조회
 //   PUT    /api/bean/{KEY}    수정 (소유자만)
+//   PATCH  /api/bean/{KEY}/archive  숨기기(보관) 토글 { archived: bool } (소유자만)
 //   DELETE /api/bean/{KEY}    삭제 (소유자만)
 //   GET    /api/export.csv    내 데이터 CSV 백업
 //   POST   /api/import        CSV 백업 복원 (내 유저코드 KEY만, 같은 KEY는 덮어쓰기)
@@ -135,6 +136,18 @@ async function updateBean(env, request, user, key) {
     " WHERE key = ? AND usercode = ?"
   ).bind(roastery, ...FIELDS.map(f => vals[f]), key, user.usercode).run();
   return json({ ok: true, key });
+}
+
+// 숨기기(보관) 토글 — 원두 소비가 끝나 기록만 남기고 싶을 때, 삭제 대신 목록 최하단에
+// 채도를 낮춰 접어두는 용도. 전체 필드 재전송 없이 archived 플래그만 갱신한다.
+async function setArchived(env, request, user, key) {
+  const existing = await ownedBean(env, user, key);
+  if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
+  const body = await request.json().catch(() => ({}));
+  const archived = body.archived ? 1 : 0;
+  await env.DB.prepare("UPDATE beans SET archived = ? WHERE key = ? AND usercode = ?")
+    .bind(archived, key, user.usercode).run();
+  return json({ ok: true, key, archived: !!archived });
 }
 
 async function deleteBean(env, user, key) {
@@ -361,6 +374,11 @@ export async function onRequest({ request, env, params }) {
         const row = await env.DB.prepare("SELECT * FROM beans WHERE key = ?").bind(key).first();
         if (!row) return json({ ok: false, error: "미등록 KEY" }, 404);
         return json({ ok: true, bean: beanToPublic(row) });
+      }
+      if (seg[2] === "archive" && method === "PATCH") {
+        const user = await auth(env, request);
+        if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
+        return setArchived(env, request, user, key);
       }
       if (method === "PUT" || method === "DELETE") {
         const user = await auth(env, request);
