@@ -3,7 +3,9 @@
 // 전역 의존: qrcode-generator(qrcode), jsQR — admin.html에서 <script>로 선로드.
 //
 // 사이즈 3종을 지원한다. 40×20·50×30은 가로형 보딩패스, 50×60은 세로 카드형 레이아웃.
-// QR은 사이즈별로 도트 격자에 스냅된 고정 크기(스캔 안정성) — 사용자 조절 대상이 아니다.
+// QR은 3사이즈 모두 동일한 물리 크기(약 9.4mm, 도트 격자 스냅)로 고정한다 — 스캔에
+// 필요한 크기는 라벨이 커진다고 늘어나지 않으므로, 커진 여백은 QR 확대가 아니라
+// 정보 표시량 차이(부제목·스펙 항목 수)로 반영한다. 사용자 조절 대상이 아니다.
 
 export const BASE_URL = "HTTPS://BNHD.PAGES.DEV";
 
@@ -47,7 +49,7 @@ export const SIZE_SPECS = {
   "50x30": {
     W: 50, H: 30, orient: "landscape", label: "50×30 (여유형)",
     margin: 2.0, strip: 0.8, quiet: 2.0,
-    qrDots: 4, qrRightGap: 1.6, qrY: 14.875, keySize: 1.5, keyGap: 2.0,
+    qrDots: 3, qrRightGap: 1.6, qrY: 18.0, keySize: 1.5, keyGap: 2.0,
     headline: { def: 3.6, min: 2.8, max: 4.6 }, specVal: { def: 2.1, min: 1.7, max: 2.6 },
     roasterySize: 1.9, roasteryY: 3.6, dotR: 0.48, dotCy: 3.0, headY: 7.2,
     infoStart: 9.6, infoLH: 2.05, infoSize: 1.7, maxInfoLines: 5,
@@ -59,7 +61,7 @@ export const SIZE_SPECS = {
   "50x60": {
     W: 50, H: 60, orient: "portrait", label: "50×60 (카드형)",
     margin: 2.4, strip: 1.0, quiet: 1.8,
-    qrDots: 5, qrY: 40.5, keySize: 1.8, keyGap: 2.2,
+    qrDots: 3, qrY: 46.75, keySize: 1.8, keyGap: 2.2,
     headline: { def: 4.4, min: 3.4, max: 5.4 }, specVal: { def: 2.3, min: 1.8, max: 3.0 },
     roasterySize: 2.3, roasteryY: 5.0, dotR: 0.58, dotCy: 4.25, headY: 9.4, headMaxLines: 2,
     infoLH: 2.6, infoSize: 2.0, maxInfoLines: 4,

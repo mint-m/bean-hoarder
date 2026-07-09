@@ -41,12 +41,12 @@
     transition: transform .16s ease, box-shadow .16s ease, z-index 0s .16s;
   }
   .wcard:first-child { margin-top: 0; }
-  /* 호버·포커스: 카드를 크게 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록).
+  /* 호버·포커스: 카드를 살짝 띄우고 z-index를 올려 겹친 아래 카드 위로 올린다 (확장 정보가 가려지지 않도록).
      z-index는 진입 시 즉시, 이탈 시엔 transform 전환이 끝난 뒤에 내려가도록 지연시켜 아래 카드 뒤로
      순간 숨었다가 나오는 깜빡임을 막는다. */
   .wcard:hover, .wcard:focus-visible {
-    transform: translateY(-26px) scale(1.03); z-index: 10;
-    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 32px 60px -22px rgba(16,16,18,.46);
+    transform: translateY(-12px); z-index: 10;
+    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 20px 34px -18px rgba(16,16,18,.4);
     transition: transform .16s ease, box-shadow .16s ease, z-index 0s;
   }
   .w-top { display: flex; justify-content: space-between; align-items: baseline; }

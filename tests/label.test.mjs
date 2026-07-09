@@ -64,8 +64,11 @@ for (const size of Object.keys(SIZE_SPECS)) {
 test("50x60(세로형): QR이 가로 중앙·하단에 배치", () => {
   const { svg } = buildLabelSVG(ROW, designFor("50x60"));
   const S = SIZE_SPECS["50x60"];
-  const qrSize = S.qrDots * 0.125 * 25;
-  const xs = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="0\.6250"/g)].map(m => [+m[1], +m[2]]);
+  const module = S.qrDots * 0.125;
+  const qrSize = module * 25;
+  const moduleAttr = module.toFixed(4).replace(".", "\\.");
+  const xs = [...svg.matchAll(new RegExp(`<rect x="([\\d.]+)" y="([\\d.]+)" width="${moduleAttr}"`, "g"))]
+    .map(m => [+m[1], +m[2]]);
   assert.ok(xs.length > 0, "QR 렉트 존재");
   const minX = Math.min(...xs.map(p => p[0]));
   const minY = Math.min(...xs.map(p => p[1]));
