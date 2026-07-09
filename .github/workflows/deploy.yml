@@ -1,14 +1,15 @@
 name: deploy
 
-# 배포는 main이 아니라 별도 deploy 브랜치 전용 — main에 머지된다고 자동으로 라이브에 반영되지 않는다.
-# 배포하려면 main → deploy 로 병합(PR 권장)하거나 workflow_dispatch로 수동 실행.
+# main 푸시 → 프리뷰(preview.bnhd.pages.dev), deploy 푸시 → 프로덕션(bnhd.pages.dev).
+# Cloudflare Pages는 배포에 붙는 "브랜치명"으로 production/preview를 가르므로,
+# GitHub 브랜치명과 무관하게 아래에서 명시적으로 매핑한다.
 on:
   push:
-    branches: [deploy]
+    branches: [main, deploy]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-production
+  group: deploy-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -27,13 +28,20 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      # --branch=main 고정: 실제 체크아웃 브랜치는 'deploy'지만, 이걸 안 주면 wrangler가
-      # 그 브랜치명을 그대로 Cloudflare Pages 브랜치로 써서 deploy.bnhd.pages.dev라는
-      # 프리뷰 별칭에만 올라가고 프로덕션 루트 도메인은 갱신되지 않는다.
+      # deploy 브랜치 → Cloudflare Pages 'main'(프로덕션, bnhd.pages.dev)
+      # main 브랜치    → Cloudflare Pages 'preview'(프리뷰, preview.bnhd.pages.dev)
+      - name: Determine Cloudflare Pages branch
+        id: cf
+        run: |
+          if [ "${{ github.ref_name }}" = "deploy" ]; then
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=preview" >> "$GITHUB_OUTPUT"
+          fi
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: v2
-          command: pages deploy public --project-name=bnhd --branch=main
+          command: pages deploy public --project-name=bnhd --branch=${{ steps.cf.outputs.branch }}

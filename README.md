@@ -50,7 +50,10 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 
 ## 운영
 
-- **배포(자동)**: 라이브 반영은 `main`이 아니라 **`deploy` 브랜치 전용**. `main`에 머지돼도 자동 배포되지 않으며, `main → deploy` PR을 병합(또는 fast-forward)해야 GitHub Actions(`.github/workflows/deploy.yml`)가 `node --test` 통과 후 `wrangler pages deploy`를 실행한다. 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
+- **배포(자동)**: `main`과 `deploy` 푸시 모두 GitHub Actions(`.github/workflows/deploy.yml`)가 `node --test` 통과 후 `wrangler pages deploy`를 실행하되, 도착지가 다르다.
+  - `main` 푸시 → **프리뷰** `preview.bnhd.pages.dev` (개발 중 확인용)
+  - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR 병합 또는 fast-forward로 승격)
+  - 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
   - 최초 1회 리포 secret 등록 필요: `CLOUDFLARE_API_TOKEN`(Pages 편집 권한), `CLOUDFLARE_ACCOUNT_ID` — 둘 중 하나라도 누락되면 배포 잡이 실패한다(테스트 잡은 별개로 통과).
 - **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
