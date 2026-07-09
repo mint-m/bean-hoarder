@@ -52,9 +52,12 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 
 - **배포(자동)**: `main`과 `deploy` 푸시 모두 GitHub Actions(`.github/workflows/deploy.yml`)가 `node --test` 통과 후 `wrangler pages deploy`를 실행하되, 도착지가 다르다.
   - `main` 푸시 → **프리뷰** `preview.bnhd.pages.dev` (개발 중 확인용)
-  - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR 병합 또는 fast-forward로 승격)
+  - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR을 **Squash and merge**로 승격)
   - 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
   - 최초 1회 리포 secret 등록 필요: `CLOUDFLARE_API_TOKEN`(Pages 편집 권한), `CLOUDFLARE_ACCOUNT_ID` — 둘 중 하나라도 누락되면 배포 잡이 실패한다(테스트 잡은 별개로 통과).
+- **브랜치 보호 규칙** (GitHub Settings > Rules > Rulesets):
+  - `main` — PR 없이 직접 push 허용, 삭제만 방지(Restrict deletions).
+  - `deploy` — PR 필수(Require a pull request before merging) + Require linear history + 삭제 방지. Linear history 요구 때문에 `main → deploy` 승격 PR은 반드시 **Squash and merge**(또는 Rebase)로 병합한다 — 일반 merge commit은 거부된다.
 - **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화(선택)**: 4자리 암호 특성상 Cloudflare 대시보드의 무료 Rate Limiting 룰 1개를 `/api/*`에 걸어두면 좋다. 미적용 시에도 데이터 손실은 CSV 백업·복원으로 회복 가능.
@@ -95,7 +98,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8
 
 - [ ] 실제 인쇄(3개 사이즈) → 폰 카메라 스캔 테스트
 - [ ] 운영 배포 절차: `wrangler pages secret put INVITE_CODE` 실행 + 기존 초대코드 폐기, `migrate_logos.sql` 적용, `seed.sql` 재실행(데모 갱신)
-- [ ] 배포 자동화 활성화: 리포 Settings > Secrets and variables > Actions에 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 등록 (미등록 시 `deploy` 브랜치 푸시해도 배포 잡 실패)
+- [x] 배포 자동화 활성화: 리포 Settings > Secrets and variables > Actions에 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 등록 완료 — `main`/`deploy` 푸시 모두 실제 배포 확인됨
+- [ ] 브랜치 보호 규칙 설정: GitHub Settings > Rules > Rulesets에서 `main`(직접 push 허용, 삭제 방지)·`deploy`(PR 필수 + Require linear history + 삭제 방지) 규칙 생성 — API로는 설정 불가, 대시보드에서 직접 등록 필요
 - [ ] Cloudflare 대시보드에서 `/api/*` Rate Limiting 룰 1개 적용(선택)
 - [ ] 첫 실사용자 초대 (초대코드 전달)
 - [ ] 링크 가져오기 파서 품질을 실제 봇 차단·JS 렌더링 사이트 대상으로 계속 검증(현재 개발 환경은 외부망 접근이 막혀 있어 실사이트로 직접 재현 검증하지 못함 — 안 되는 사례 재현되면 이슈로 남겨줄 것)
