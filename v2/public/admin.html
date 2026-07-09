@@ -93,16 +93,10 @@
           <button type="button" id="btn-autofill-ai">AI로 인식 (Gemini)</button>
           <span class="status-line" id="autofill-status" style="margin:0"></span>
         </div>
-        <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다. 인식 결과는 반드시 검토 후 저장하세요 — 완벽한 인식을 보장하지 않습니다. 일부 사이트는 봇 차단·스크립트 렌더링 때문에 링크 가져오기가 실패할 수 있으니, 그 경우 텍스트를 직접 붙여넣으세요.</p>
+        <p class="hint">이미 값이 입력된 항목은 덮어쓰지 않습니다 — 인식 결과는 검토 후 저장하세요.</p>
         <details class="adv" id="ai-settings">
           <summary>AI 인식 설정 — 본인 Google AI API 키 사용 (무료 등급으로 충분)</summary>
-          <div class="row2">
-            <div class="field"><label>Gemini API 키</label><input type="password" id="f-gemini-key" placeholder="AIza..." autocomplete="off"></div>
-            <div class="field"><label>모델</label><input type="text" id="f-gemini-model" list="dl-gemini-model" placeholder="gemini-2.5-flash-lite"></div>
-          </div>
-          <datalist id="dl-gemini-model">
-            <option value="gemini-2.5-flash-lite"><option value="gemini-3-flash-preview"><option value="gemini-2.5-flash">
-          </datalist>
+          <div class="field"><label>Gemini API 키</label><input type="password" id="f-gemini-key" placeholder="AIza..." autocomplete="off"></div>
           <p class="hint">키는 이 브라우저(localStorage)에만 저장됩니다. 인식 시 붙여넣은 텍스트가 <b>내 키로 Google API에 직접 전송</b>되며 이 서비스의 서버를 거치지 않습니다. 키 발급: aistudio.google.com (무료)</p>
         </details>
       </details>

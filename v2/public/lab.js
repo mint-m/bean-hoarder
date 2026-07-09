@@ -740,9 +740,11 @@ const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에서 추�
 허용 키: ${AI_FIELD_KEYS.join(", ")}
 JSON 객체만 출력하라.`;
 
-async function geminiExtract(apiKey, model, text) {
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
+
+async function geminiExtract(apiKey, text) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
@@ -935,7 +937,9 @@ $("f-logo-file").addEventListener("change", (e) => {
 $("btn-logo-del").addEventListener("click", deleteSavedLogo);
 $("btn-logo-clear").addEventListener("click", clearCurrentLogo);
 
-// 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우고, 곧바로 인식 실행
+// 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우기만 한다.
+// 인식(휴리스틱/AI)은 사용자가 직접 선택 — 자동 실행하면 휴리스틱 결과가 먼저 필드를
+// 채워버려 "이미 값이 있으면 덮어쓰지 않는" 정책 때문에 AI 인식을 사실상 못 쓰게 된다.
 $("btn-autofill-url").addEventListener("click", async () => {
   const url = $("f-autofill-url").value.trim();
   if (!url) { setAutofillStatus("상품 페이지 URL을 입력하세요.", "error"); return; }
@@ -945,7 +949,7 @@ $("btn-autofill-url").addEventListener("click", async () => {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
   });
   if (!body || !body.ok || body.kind !== "text") {
-    setAutofillStatus((body && body.error) || "가져오기 실패 — 텍스트를 직접 붙여넣어 보세요.", "error");
+    setAutofillStatus((body && body.error) || "가져오기 실패 — 봇 차단·스크립트 렌더링 사이트일 수 있습니다. 텍스트를 직접 붙여넣어 보세요.", "error");
     return;
   }
   $("f-autofill-text").value = body.text;
@@ -953,7 +957,7 @@ $("btn-autofill-url").addEventListener("click", async () => {
     $("f-source").value = url;
     $("f-source").dispatchEvent(new Event("input", { bubbles: true }));
   }
-  $("btn-autofill").click();
+  setAutofillStatus("텍스트를 가져왔습니다 — 아래 버튼으로 인식하세요.", "ok");
 });
 
 // 로고를 이미지 링크로 불러오기 (서버 프록시로 CORS 우회 → dataURL로 변환해 캔버스 오염 방지)
@@ -989,17 +993,14 @@ $("btn-autofill").addEventListener("click", () => {
   fillParsed(parseBeanText(raw), "");
 });
 
-// Gemini 설정: 브라우저에만 저장
+// Gemini 설정: 브라우저에만 저장 (모델은 GEMINI_MODEL로 고정 — 사용자가 고를 필요 없음)
 $("f-gemini-key").value = localStorage.getItem("bh_gemini_key") || "";
-$("f-gemini-model").value = localStorage.getItem("bh_gemini_model") || "gemini-2.5-flash-lite";
 $("f-gemini-key").addEventListener("input", e => localStorage.setItem("bh_gemini_key", e.target.value.trim()));
-$("f-gemini-model").addEventListener("input", e => localStorage.setItem("bh_gemini_model", e.target.value.trim()));
 
 $("btn-autofill-ai").addEventListener("click", async () => {
   const raw = $("f-autofill-text").value.trim();
   if (!raw) { setAutofillStatus("붙여넣을 텍스트가 없습니다.", "error"); return; }
   const apiKey = $("f-gemini-key").value.trim();
-  const model = $("f-gemini-model").value.trim() || "gemini-2.5-flash-lite";
   if (!apiKey) {
     $("ai-settings").open = true;
     setAutofillStatus("Gemini API 키를 먼저 설정하세요 (aistudio.google.com에서 무료 발급).", "error");
@@ -1007,10 +1008,10 @@ $("btn-autofill-ai").addEventListener("click", async () => {
   }
   setAutofillStatus("AI 인식 중…", "");
   try {
-    const parsed = await geminiExtract(apiKey, model, raw);
+    const parsed = await geminiExtract(apiKey, raw);
     fillParsed(parsed, "AI ");
   } catch (e) {
-    setAutofillStatus(`AI 인식 실패 — ${e.message}. 키·모델명을 확인하거나 휴리스틱 인식을 사용하세요.`, "error");
+    setAutofillStatus(`AI 인식 실패 — ${e.message}. 키를 확인하거나 휴리스틱 인식을 사용하세요.`, "error");
   }
 });
 
