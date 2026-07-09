@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS beans (
   tasting_note TEXT DEFAULT '',
   memo         TEXT DEFAULT '',
   source_url   TEXT DEFAULT '',
+  archived     INTEGER NOT NULL DEFAULT 0,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

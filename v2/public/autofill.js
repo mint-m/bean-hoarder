@@ -24,7 +24,8 @@ const LABEL_SYNONYMS = {
   ALTITUDE: ["altitude", "elevation", "고도"],
   HARVEST: ["harvest", "crop year", "수확시기", "수확"],
   NET_WEIGHT: ["net weight", "weight", "용량", "중량"],
-  TASTING_NOTE: ["tasting notes", "tasting note", "notes", "flavor", "cup", "테이스팅 노트", "노트"],
+  TASTING_NOTE: ["tasting notes", "tasting note", "flavor notes", "flavour notes", "notes", "flavor", "cup",
+    "테이스팅 노트", "플레이버 노트", "노트"],
   MEMO: ["memo", "비고", "메모", "about", "about beans", "about this coffee", "about the coffee",
     "our story", "the story", "story", "description", "배경", "소개"],
 };
@@ -260,5 +261,5 @@ export function parseBeanText(text) {
 export const FIELD_LABELS_KO = {
   ROASTERY: "로스터리", ORIGIN: "국가(산지)", REGION: "세부 지역", PRODUCER: "생산자",
   LOT: "랏", WASHING_STATION: "워싱스테이션", VARIETY: "품종", PROCESS: "가공방식", ALTITUDE: "고도", HARVEST: "수확시기",
-  NET_WEIGHT: "용량", TASTING_NOTE: "테이스팅 노트", SOURCE_URL: "원본 URL", MEMO: "메모",
+  NET_WEIGHT: "용량", AGTRON: "로스팅 포인트", TASTING_NOTE: "플레이버 노트", SOURCE_URL: "원본 URL", MEMO: "기타 정보",
 };

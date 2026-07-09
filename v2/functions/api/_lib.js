@@ -7,7 +7,8 @@ export const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const FIELDS = ["origin","region","producer","lot","washing_station","variety","process","altitude","harvest",
   "roast_date","package_date","net_weight","agtron","tasting_note","memo","source_url"];
 export const REQUIRED_LABELS = {
-  origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일",
+  origin: "국가(산지)", variety: "품종", process: "가공방식",
+  roast_date: "로스팅일", package_date: "패키징일",
 };
 export const CSV_HEADERS = ["KEY","ROASTERY","ORIGIN","REGION","PRODUCER","LOT","WASHING_STATION","VARIETY","PROCESS","ALTITUDE",
   "HARVEST","ROAST_DATE","PACKAGE_DATE","NET_WEIGHT","AGTRON","TASTING_NOTE","MEMO","SOURCE_URL"];
@@ -95,7 +96,7 @@ export function beanToPublic(row) {
     VARIETY: row.variety, PROCESS: row.process, ALTITUDE: row.altitude,
     HARVEST: row.harvest, ROAST_DATE: row.roast_date, PACKAGE_DATE: row.package_date,
     NET_WEIGHT: row.net_weight, AGTRON: row.agtron, TASTING_NOTE: row.tasting_note,
-    MEMO: row.memo, SOURCE_URL: row.source_url,
+    MEMO: row.memo, SOURCE_URL: row.source_url, ARCHIVED: !!row.archived,
   };
 }
 

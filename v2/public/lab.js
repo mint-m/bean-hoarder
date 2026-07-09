@@ -28,9 +28,10 @@ function loadDesign() {
     else d.headlineSize = S.headline.def;
     if (typeof saved.specValueSize === "number") d.specValueSize = Math.min(S.specVal.max, Math.max(S.specVal.min, saved.specValueSize));
     else d.specValueSize = S.specVal.def;
+    if (saved.colorMode === "mono" || saved.colorMode === "color") d.colorMode = saved.colorMode;
     const subKeys = SUB_POOL.map(([k]) => k), specKeys = SPEC_POOL.map(([k]) => k);
-    if (Array.isArray(saved.subFields)) d.subFields = saved.subFields.filter(k => subKeys.includes(k));
-    if (Array.isArray(saved.specFields)) d.specFields = saved.specFields.filter(k => specKeys.includes(k)).slice(0, 4);
+    if (Array.isArray(saved.subFields)) d.subFields = saved.subFields.filter(k => subKeys.includes(k)).slice(0, 3);
+    if (Array.isArray(saved.specFields)) d.specFields = saved.specFields.filter(k => specKeys.includes(k)).slice(0, 8);
     if (typeof saved.showLogo === "boolean") d.showLogo = saved.showLogo;
   } catch (e) { /* 손상된 저장값은 기본값으로 */ }
   return d;
@@ -51,11 +52,13 @@ const specToggleInputs = {};
 
 const FORM_IDS = ["f-roastery","f-origin","f-region","f-producer","f-lot","f-washingstation","f-variety","f-process",
   "f-altitude","f-harvest","f-roastdate","f-packagedate","f-netweight","f-agtron","f-note","f-memo","f-source"];
-const SUB_FIELD_INPUT_IDS = { REGION: "f-region", PROCESS: "f-process", VARIETY: "f-variety", ALTITUDE: "f-altitude" };
+const SUB_FIELD_INPUT_IDS = { REGION: "f-region", LOT: "f-lot", WASHING_STATION: "f-washingstation", PRODUCER: "f-producer" };
+const SPEC_FIELD_INPUT_IDS = { NET_WEIGHT: "f-netweight", AGTRON: "f-agtron", PROCESS: "f-process", VARIETY: "f-variety",
+  ALTITUDE: "f-altitude", HARVEST: "f-harvest" };
 const AUTOFILL_INPUT_IDS = {
   ROASTERY: "f-roastery", ORIGIN: "f-origin", REGION: "f-region", PRODUCER: "f-producer",
   LOT: "f-lot", WASHING_STATION: "f-washingstation", VARIETY: "f-variety", PROCESS: "f-process", ALTITUDE: "f-altitude",
-  HARVEST: "f-harvest", NET_WEIGHT: "f-netweight", TASTING_NOTE: "f-note",
+  HARVEST: "f-harvest", NET_WEIGHT: "f-netweight", AGTRON: "f-agtron", TASTING_NOTE: "f-note",
   SOURCE_URL: "f-source", MEMO: "f-memo",
 };
 
@@ -91,6 +94,12 @@ function withUnit(v, unit) {
   const s = v.trim();
   if (!s) return "";
   return /^[\d\s.~\-–]+$/.test(s) && /\d/.test(s) ? s.replace(/\s+/g, "") + unit : s;
+}
+
+// Flavor Notes: 콤마로 구분된 각 항목의 첫 영문자만 대문자로 보정 (예: "apricot, black tea" → "Apricot, Black tea")
+// 한글·숫자로 시작하는 항목이나 이미 대문자인 항목은 건드리지 않는다.
+function capitalizeNoteSegments(text) {
+  return text.replace(/(^|,\s*)([a-z])/g, (_, sep, ch) => sep + ch.toUpperCase());
 }
 
 function setStatus(msg, ok) {
@@ -196,20 +205,64 @@ async function renderAll() {
     v.ok ? "ok" : "bad");
 }
 
-// 서브라인 필드(지역/가공/품종/고도)에 값이 있으면 해당 표시 체크박스를 자동으로 켠다.
-// 사용자가 직접 끈 체크는 건드리지 않음(값이 있어도 강제로 다시 켜지 않음) — 단, 값이 막 채워진 시점엔 켠다.
-// 이미 스펙 칸에 표시 중인 항목은 중복 표시가 되므로 자동으로 켜지 않는다.
-function autoCheckSubline() {
-  Object.entries(SUB_FIELD_INPUT_IDS).forEach(([key, inputId]) => {
-    const inputEl = $(inputId);
-    const checkbox = subToggleInputs[key];
-    if (!inputEl || !checkbox) return;
-    if (inputEl.value.trim() && !checkbox.checked && !design.specFields.includes(key)) {
-      checkbox.checked = true;
-      if (!design.subFields.includes(key)) design.subFields.push(key);
-      saveDesign();
+// 값이 없는 필드는 표시 옵션 체크박스를 비활성화한다(체크해도 라벨에 아무것도 안 찍히므로) —
+// renderSubToggles/renderSpecToggles가 매번 이 상태를 값 유무에서 다시 계산해 그린다.
+// design.specFields 우선순위(SPEC_POOL 순서) 자리에 새 항목을 끼워 넣는다 — 단순 append와 달리
+// 나중에 채운 필드라도 기본 우선순위가 높으면 이미 선택된 항목들 사이 제자리에 들어간다.
+function insertByPriority(key) {
+  const order = SPEC_POOL.map(([k]) => k);
+  const rank = k => order.indexOf(k);
+  const idx = design.specFields.findIndex(k => rank(k) > rank(key));
+  if (idx === -1) design.specFields.push(key); else design.specFields.splice(idx, 0, key);
+}
+
+// 부제목/스펙 토글 공통 규칙: 값이 없으면 선택 해제, 방금 값이 채워진 시점(직전엔 비활성화
+// 상태였음)이면 자동으로 켠다. 그 뒤 사용자가 직접 끈 체크는 유지된다. 부제목(push, 최대 3개)과
+// 스펙(우선순위 자리에 끼워 넣기, 개수 제한 없음)은 insertFn/maxCount로만 다르다.
+function refreshToggle(key, { inputIds, toggleInputs, stateArr, maxCount, insertFn, render }) {
+  const inputEl = $(inputIds[key]);
+  const checkbox = toggleInputs[key];
+  if (!inputEl) return;
+  const hasVal = !!inputEl.value.trim();
+  const wasEmpty = !checkbox || checkbox.disabled;
+  if (!hasVal) {
+    const i = stateArr.indexOf(key);
+    if (i >= 0) stateArr.splice(i, 1);
+  } else if (wasEmpty && !stateArr.includes(key) && (maxCount == null || stateArr.length < maxCount)) {
+    insertFn(key);
+  }
+  saveDesign();
+  render();
+}
+function refreshSubToggle(key) {
+  refreshToggle(key, {
+    inputIds: SUB_FIELD_INPUT_IDS, toggleInputs: subToggleInputs, stateArr: design.subFields,
+    maxCount: 3, insertFn: k => design.subFields.push(k), render: renderSubToggles,
+  });
+}
+function refreshSpecToggle(key) {
+  refreshToggle(key, {
+    inputIds: SPEC_FIELD_INPUT_IDS, toggleInputs: specToggleInputs, stateArr: design.specFields,
+    maxCount: null, insertFn: insertByPriority, render: renderSpecToggles,
+  });
+}
+
+// 값 유무만 체크박스 가용성에 반영(자동 체크는 하지 않음) — 다른 원두 편집 진입, 사이즈 변경,
+// 새 원두 초기화처럼 여러 필드가 한번에 바뀌는 시점에 쓴다. 값이 없어진 선택은 정리(prune)한다.
+function pruneEmptySelections(inputIds, stateArr) {
+  Object.keys(inputIds).forEach(key => {
+    if (!$(inputIds[key]).value.trim()) {
+      const i = stateArr.indexOf(key);
+      if (i >= 0) stateArr.splice(i, 1);
     }
   });
+}
+function syncToggleAvailability() {
+  pruneEmptySelections(SUB_FIELD_INPUT_IDS, design.subFields);
+  pruneEmptySelections(SPEC_FIELD_INPUT_IDS, design.specFields);
+  saveDesign();
+  renderSubToggles();
+  renderSpecToggles();
 }
 
 async function api(path, opts = {}) {
@@ -413,7 +466,7 @@ async function refreshList() {
     btn.addEventListener("click", () => {
       const key = btn.closest(".bean-row").dataset.key;
       const act = btn.dataset.act;
-      if (act === "url") { copyText(`${SITE}/${key}`); setStatus(`${key} 상세 URL 복사됨`, true); }
+      if (act === "url") window.open(`${SITE}/${key}`, "_blank");
       if (act === "edit") loadBeanForEdit(key, beans);
       if (act === "del") deleteBean(key);
     });
@@ -444,7 +497,7 @@ function loadBeanForEdit(key, beans) {
   applySavedLogo();
   setMode("edit", key);
   setStatus(`${key} 를 수정 중입니다.`, true);
-  autoCheckSubline();
+  syncToggleAvailability();
   renderAll();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -465,6 +518,8 @@ function missingRequiredFields(row) {
   const missing = [];
   if (!row.ROASTERY) missing.push("로스터리");
   if (!row.ORIGIN) missing.push("국가(산지)");
+  if (!row.VARIETY) missing.push("품종");
+  if (!row.PROCESS) missing.push("가공방식");
   if (!row.ROAST_DATE) missing.push("로스팅일");
   if (!row.PACKAGE_DATE) missing.push("패키징일");
   return missing;
@@ -685,25 +740,27 @@ function download(filename, blob) {
 const SHORT_FIELDS = ["PROCESS", "VARIETY", "WASHING_STATION", "LOT"];
 const isParagraphLike = v => v.length > 50 || /[.!?]\s+[A-Z]/.test(v) || v.includes("\n");
 
-// 인식 결과를 폼에 반영. 이미 값이 있는 항목은 덮어쓰지 않는다 (파서·AI 공용).
-function fillParsed(parsed, sourceLabel) {
+// 인식 결과를 폼에 반영. overwrite=false(휴리스틱 폴백)면 이미 값이 있는 항목은 건드리지 않고,
+// overwrite=true(AI 인식)면 기존 값도 덮어쓴다 — AI 결과가 더 정확하므로 검토 후 저장을 전제로 신뢰한다.
+function fillParsed(parsed, sourceLabel, overwrite) {
   const filled = [];
   let memoOverflow = null;
   for (const [field, inputId] of Object.entries(AUTOFILL_INPUT_IDS)) {
     const v = parsed[field];
     const el = $(inputId);
-    if (!v || !el || el.value.trim()) continue;
+    if (!v || !el) continue;
+    if (!overwrite && el.value.trim()) continue;
     if (SHORT_FIELDS.includes(field) && isParagraphLike(v)) {
       if (!memoOverflow) memoOverflow = v;
       continue;
     }
-    el.value = v;
+    el.value = field === "TASTING_NOTE" ? capitalizeNoteSegments(v) : v;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     filled.push(FIELD_LABELS_KO[field] || field);
   }
   if (memoOverflow) {
     const memoEl = $(AUTOFILL_INPUT_IDS.MEMO);
-    if (memoEl && !memoEl.value.trim()) {
+    if (memoEl && (overwrite || !memoEl.value.trim())) {
       memoEl.value = memoOverflow;
       memoEl.dispatchEvent(new Event("input", { bubbles: true }));
       if (!filled.includes(FIELD_LABELS_KO.MEMO)) filled.push(FIELD_LABELS_KO.MEMO);
@@ -713,14 +770,14 @@ function fillParsed(parsed, sourceLabel) {
     setAutofillStatus(`${sourceLabel} 채움: ${filled.join(", ")} — 검토 후 저장하세요.`, "ok");
     $("autofill-box").open = false;
   } else {
-    setAutofillStatus("인식된 새 항목이 없습니다. 이미 채워진 필드는 덮어쓰지 않습니다.", "error");
+    setAutofillStatus(overwrite ? "인식된 항목이 없습니다." : "인식된 새 항목이 없습니다. 이미 채워진 필드는 덮어쓰지 않습니다.", "error");
   }
 }
 
 // Gemini 호출: 사용자 본인의 API 키로 브라우저에서 Google API에 직접 요청한다.
 // 서비스 서버를 거치지 않으므로 서버 비용·키 보관 부담이 없다.
 const AI_FIELD_KEYS = ["ROASTERY","ORIGIN","REGION","PRODUCER","LOT","WASHING_STATION","VARIETY","PROCESS",
-  "ALTITUDE","HARVEST","NET_WEIGHT","TASTING_NOTE","MEMO","SOURCE_URL"];
+  "ALTITUDE","HARVEST","NET_WEIGHT","AGTRON","TASTING_NOTE","MEMO","SOURCE_URL"];
 const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에서 추출한 것이다. 원두 정보를 JSON 객체로 추출하라.
 규칙:
 - 값을 찾지 못한 키는 생략한다. 절대 추측하지 않는다.
@@ -733,9 +790,13 @@ const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에서 추�
 - ALTITUDE: 미터 숫자 또는 범위만, 단위 없이 (예: "1900-2100").
 - NET_WEIGHT: 그램 숫자만 (예: "200").
 - HARVEST: 수확시기 (예: "25/26", "25.12-26.01").
+- AGTRON: 로스팅 포인트. 라이트~다크 표현(Light/Medium/City/Full City/Vienna/French roast 등)이나 숫자
+  (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 "#숫자 (한글표현)" 형식으로 변환한다:
+  #120(울트라라이트), #95(라이트), #75(미디움라이트), #65(미디움), #55(미디움다크), #45(다크).
+  아무 단서도 없으면 생략한다.
 - TASTING_NOTE: 콤마로 구분한 짧은 노트.
-- MEMO: 산지·농장의 배경 스토리, 또는 PROCESS에 넣지 않은 상세 가공 공정 설명이 있으면
-  2~3문장으로 한국어 요약, 없으면 생략.
+- MEMO: 산지·농장의 배경 스토리, 또는 PROCESS·VARIETY 등 다른 필드에 넣기엔 너무 긴 상세 설명
+  (발효 시간, 건조 방식, 컵핑 히스토리 등 문단형 서술)이 있으면 2~3문장으로 한국어 요약, 없으면 생략.
 - ROAST_DATE, PACKAGE_DATE는 추출하지 않는다.
 허용 키: ${AI_FIELD_KEYS.join(", ")}
 JSON 객체만 출력하라.`;
@@ -776,18 +837,15 @@ function syncSliders() {
   v.min = S.specVal.min; v.max = S.specVal.max; v.value = design.specValueSize;
 }
 
-// 사이즈 라디오는 "라벨 디자인" 카드와 미리보기 카드 두 곳에 둔다(빠른 전환 접근성) —
-// 두 그룹 모두 같은 design.size를 가리키므로 한쪽에서 바꾸면 다른 쪽도 함께 갱신한다.
-const sizeRadioGroups = [];
+// 라벨 사이즈는 미리보기 카드(size-radios-quick) 한 곳에서만 바꾼다.
+let sizeRadioInputs = {};
 
 function sameFieldSet(a, b) {
   return !!a && !!b && a.length === b.length && a.every(k => b.includes(k));
 }
 
 function syncSizeRadiosUi() {
-  sizeRadioGroups.forEach(inputs => {
-    Object.entries(inputs).forEach(([key, input]) => { input.checked = design.size === key; });
-  });
+  Object.entries(sizeRadioInputs).forEach(([key, input]) => { input.checked = design.size === key; });
 }
 
 // 사용자가 직접 커스터마이즈하지 않은(=현재 사이즈의 기본값 그대로인) 표시 항목만
@@ -802,16 +860,14 @@ function selectSize(key) {
   design.headlineSize = S.headline.def;
   design.specValueSize = S.specVal.def;
   const nextDefaults = SIZE_DEFAULT_FIELDS[key];
-  // 배열을 통째로 교체하지 않고 내용만 바꾼다 — buildToggles()의 체크박스 change 핸들러가
-  // design.subFields/specFields의 "원래 배열 참조"를 클로저로 들고 있어, 참조를 바꾸면
-  // 이후 체크박스 조작이 낡은 배열에 반영되는 버그가 생긴다.
+  // 배열을 통째로 교체하지 않고 내용만 바꾼다 — design 객체를 그대로 참조하는 다른 코드와의 일관성 유지.
   if (nextDefaults) {
     if (!subCustomized) { design.subFields.length = 0; design.subFields.push(...nextDefaults.subFields); }
     if (!specCustomized) { design.specFields.length = 0; design.specFields.push(...nextDefaults.specFields); }
   }
   syncSliders();
   syncSizeRadiosUi();
-  syncFieldTogglesUi();
+  syncToggleAvailability();
   saveDesign();
   renderAll();
 }
@@ -828,62 +884,89 @@ function buildSizeRadios(containerId, groupName) {
     inputs[key] = input;
     input.addEventListener("change", () => selectSize(key));
   });
-  sizeRadioGroups.push(inputs);
+  sizeRadioInputs = inputs;
 }
 
-function buildToggles(containerId, pool, selected, max, refStore) {
-  const el = $(containerId);
-  pool.forEach(entry => {
-    const key = entry[0];
-    const label = entry[entry.length - 1];
+// 부제목 토글: 값이 없는 항목은 선택할 수 없도록 비활성화한다(최대 3개, SUB_POOL 전체가 3개라 사실상 전부 선택 가능).
+function renderSubToggles() {
+  const el = $("toggle-sub");
+  el.innerHTML = "";
+  SUB_POOL.forEach(([key, label]) => {
+    const hasVal = !!$(SUB_FIELD_INPUT_IDS[key]).value.trim();
+    const checked = design.subFields.includes(key);
     const wrap = document.createElement("label");
-    wrap.innerHTML = `<input type="checkbox" ${selected.includes(key) ? "checked" : ""}> ${label}`;
-    el.appendChild(wrap);
+    wrap.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} ${!hasVal ? "disabled" : ""}> ${label}`;
     const input = wrap.querySelector("input");
-    if (refStore) refStore[key] = input;
-    input.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        if (max && selected.length >= max) { e.target.checked = false; return; }
-        if (!selected.includes(key)) selected.push(key);
+    subToggleInputs[key] = input;
+    input.addEventListener("change", () => {
+      if (input.checked) {
+        if (design.subFields.length >= 3) { input.checked = false; return; }
+        if (!design.subFields.includes(key)) design.subFields.push(key);
       } else {
-        const i = selected.indexOf(key);
-        if (i >= 0) selected.splice(i, 1);
+        const i = design.subFields.indexOf(key);
+        if (i >= 0) design.subFields.splice(i, 1);
       }
       saveDesign();
       renderAll();
     });
+    el.appendChild(wrap);
   });
 }
-buildSizeRadios("size-radios", "lbl-size");
+
+// 스펙 토글: 선택된 항목을 우선순위(design.specFields) 순서대로 위에, 미선택 항목을 아래에 나열하고
+// ↑↓ 버튼으로 선택된 항목끼리 순서를 바꿀 수 있게 한다 — 목록 순서 = 실제 표시·드롭 우선순위.
+function moveSpecPriority(key, dir) {
+  const arr = design.specFields;
+  const i = arr.indexOf(key);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  saveDesign();
+  renderSpecToggles();
+  renderAll();
+}
+function renderSpecToggles() {
+  const el = $("toggle-spec");
+  el.innerHTML = "";
+  const order = [...design.specFields, ...SPEC_POOL.map(([k]) => k).filter(k => !design.specFields.includes(k))];
+  order.forEach(key => {
+    const pool = SPEC_POOL.find(([k]) => k === key);
+    if (!pool) return;
+    const label = pool[2];
+    const hasVal = !!$(SPEC_FIELD_INPUT_IDS[key]).value.trim();
+    const checked = design.specFields.includes(key);
+    const row = document.createElement("div");
+    row.className = "spec-row";
+    row.innerHTML = `
+      <label><input type="checkbox" ${checked ? "checked" : ""} ${!hasVal ? "disabled" : ""}> ${label}</label>
+      <span class="reorder-btns${checked ? "" : " hidden"}">
+        <button type="button" data-dir="-1" aria-label="우선순위 올리기">↑</button>
+        <button type="button" data-dir="1" aria-label="우선순위 내리기">↓</button>
+      </span>`;
+    const input = row.querySelector("input");
+    specToggleInputs[key] = input;
+    input.addEventListener("change", () => {
+      if (input.checked) insertByPriority(key);
+      else { const i = design.specFields.indexOf(key); if (i >= 0) design.specFields.splice(i, 1); }
+      saveDesign();
+      renderSpecToggles();
+      renderAll();
+    });
+    const idx = design.specFields.indexOf(key);
+    const [upBtn, downBtn] = row.querySelectorAll(".reorder-btns button");
+    upBtn.disabled = idx <= 0;
+    downBtn.disabled = idx < 0 || idx >= design.specFields.length - 1;
+    upBtn.addEventListener("click", () => moveSpecPriority(key, -1));
+    downBtn.addEventListener("click", () => moveSpecPriority(key, 1));
+    el.appendChild(row);
+  });
+}
+
+// 라벨 사이즈는 미리보기 카드(size-radios-quick)에서만 바꿀 수 있다 — 편집 위치를 한 곳으로 고정.
 buildSizeRadios("size-radios-quick", "lbl-size-quick");
 syncSliders();
-buildToggles("toggle-sub", SUB_POOL, design.subFields, null, subToggleInputs);
-buildToggles("toggle-spec", SPEC_POOL, design.specFields, 4, specToggleInputs);
-
-// selectSize()가 프로그램적으로 subFields/specFields를 바꿨을 때 체크박스 UI를 맞춘다.
-function syncFieldTogglesUi() {
-  Object.entries(subToggleInputs).forEach(([key, input]) => { input.checked = design.subFields.includes(key); });
-  Object.entries(specToggleInputs).forEach(([key, input]) => { input.checked = design.specFields.includes(key); });
-}
-
-// 같은 정보(예: 고도)가 서브라인과 스펙 칸에 동시에 표시되지 않도록 상호 배타 처리:
-// 한쪽에서 체크하면 다른 쪽에 켜져 있던 같은 항목은 자동으로 꺼진다.
-function uncheckIn(inputs, arr, key) {
-  const other = inputs[key];
-  if (other && other.checked) {
-    other.checked = false;
-    const i = arr.indexOf(key);
-    if (i >= 0) arr.splice(i, 1);
-    saveDesign();
-    renderAll();
-  }
-}
-Object.entries(subToggleInputs).forEach(([key, input]) => {
-  input.addEventListener("change", () => { if (input.checked) uncheckIn(specToggleInputs, design.specFields, key); });
-});
-Object.entries(specToggleInputs).forEach(([key, input]) => {
-  input.addEventListener("change", () => { if (input.checked) uncheckIn(subToggleInputs, design.subFields, key); });
-});
+renderSubToggles();
+renderSpecToggles();
 
 // ── 이벤트 배선 ──────────────────────────────────────────────
 
@@ -916,13 +999,30 @@ $("btn-signout").addEventListener("click", () => {
   location.reload();
 });
 
-FORM_IDS.forEach(id => $(id).addEventListener("input", () => { autoCheckSubline(); renderAll(); }));
+// 필드별 input 이벤트: 해당 필드가 부제목/스펙 토글에 속하면 그 항목의 가용성만 갱신한다
+// (모든 토글을 매번 재점검하지 않음 — 이래야 사용자가 직접 끈 체크가 다른 필드 입력으로 되살아나지 않는다).
+const SUB_FIELD_BY_INPUT = Object.fromEntries(Object.entries(SUB_FIELD_INPUT_IDS).map(([k, v]) => [v, k]));
+const SPEC_FIELD_BY_INPUT = Object.fromEntries(Object.entries(SPEC_FIELD_INPUT_IDS).map(([k, v]) => [v, k]));
+FORM_IDS.forEach(id => $(id).addEventListener("input", () => {
+  if (SUB_FIELD_BY_INPUT[id]) refreshSubToggle(SUB_FIELD_BY_INPUT[id]);
+  if (SPEC_FIELD_BY_INPUT[id]) refreshSpecToggle(SPEC_FIELD_BY_INPUT[id]);
+  renderAll();
+}));
 // 로스터리 입력 시 저장된 로고 자동 적용 + 로고 상태 UI 갱신
 $("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); renderAll(); });
 // 로스팅 포인트: 숫자로 시작하면 # 자동 부착
 $("f-agtron").addEventListener("input", (e) => {
   const v = e.target.value;
   if (/^\d/.test(v)) e.target.value = "#" + v;
+});
+// Flavor Notes: 입력을 마치고 필드를 벗어날 때 영문 항목 첫 글자를 대문자로 보정
+$("f-note").addEventListener("blur", (e) => {
+  const v = capitalizeNoteSegments(e.target.value);
+  if (v !== e.target.value) { e.target.value = v; renderAll(); }
+});
+document.querySelectorAll('input[name="color-mode"]').forEach(input => {
+  input.checked = design.colorMode === input.value;
+  input.addEventListener("change", () => { if (input.checked) { design.colorMode = input.value; saveDesign(); renderAll(); } });
 });
 $("f-headline-size").addEventListener("input", e => { design.headlineSize = parseFloat(e.target.value); saveDesign(); renderAll(); });
 $("f-specval-size").addEventListener("input", e => { design.specValueSize = parseFloat(e.target.value); saveDesign(); renderAll(); });
@@ -937,9 +1037,8 @@ $("f-logo-file").addEventListener("change", (e) => {
 $("btn-logo-del").addEventListener("click", deleteSavedLogo);
 $("btn-logo-clear").addEventListener("click", clearCurrentLogo);
 
-// 상품 페이지 URL → 서버 프록시가 텍스트를 추출해 붙여넣기 상자에 채우기만 한다.
-// 인식(휴리스틱/AI)은 사용자가 직접 선택 — 자동 실행하면 휴리스틱 결과가 먼저 필드를
-// 채워버려 "이미 값이 있으면 덮어쓰지 않는" 정책 때문에 AI 인식을 사실상 못 쓰게 된다.
+// 상품 페이지 URL → 서버 프록시가 텍스트를 추출한 뒤 곧바로 인식까지 자동 실행한다.
+// Gemini 키가 있으면 AI 인식(기존 값도 덮어씀), 없으면 휴리스틱으로 폴백하고 키 설정을 유도한다.
 $("btn-autofill-url").addEventListener("click", async () => {
   const url = $("f-autofill-url").value.trim();
   if (!url) { setAutofillStatus("상품 페이지 URL을 입력하세요.", "error"); return; }
@@ -957,7 +1056,7 @@ $("btn-autofill-url").addEventListener("click", async () => {
     $("f-source").value = url;
     $("f-source").dispatchEvent(new Event("input", { bubbles: true }));
   }
-  setAutofillStatus("텍스트를 가져왔습니다 — 아래 버튼으로 인식하세요.", "ok");
+  await recognizeAfterFetch(body.text);
 });
 
 // 로고를 이미지 링크로 불러오기 (서버 프록시로 CORS 우회 → dataURL로 변환해 캔버스 오염 방지)
@@ -987,17 +1086,34 @@ $("btn-logo-url").addEventListener("click", async () => {
 
 $("btn-open-deck").addEventListener("click", () => window.open("/deck", "_blank"));
 
-$("btn-autofill").addEventListener("click", () => {
-  const raw = $("f-autofill-text").value.trim();
-  if (!raw) { setAutofillStatus("붙여넣을 텍스트가 없습니다.", "error"); return; }
-  fillParsed(parseBeanText(raw), "");
-});
-
 // Gemini 설정: 브라우저에만 저장 (모델은 GEMINI_MODEL로 고정 — 사용자가 고를 필요 없음)
 $("f-gemini-key").value = localStorage.getItem("bh_gemini_key") || "";
+if (!$("f-gemini-key").value) $("ai-settings").open = true;   // 키 미설정 시 설정 패널을 펼쳐 바로 유도
 $("f-gemini-key").addEventListener("input", e => localStorage.setItem("bh_gemini_key", e.target.value.trim()));
 
-$("btn-autofill-ai").addEventListener("click", async () => {
+async function runAiRecognition(raw) {
+  const apiKey = $("f-gemini-key").value.trim();
+  setAutofillStatus("AI 인식 중…", "");
+  try {
+    const parsed = await geminiExtract(apiKey, raw);
+    fillParsed(parsed, "AI ", true);
+  } catch (e) {
+    setAutofillStatus(`AI 인식 실패 — ${e.message}. 키를 확인하거나 잠시 후 다시 시도하세요.`, "error");
+  }
+}
+
+// 링크에서 텍스트를 가져온 직후 자동 실행: 키가 있으면 AI로, 없으면 휴리스틱으로 폴백하고 키 설정을 유도한다.
+async function recognizeAfterFetch(raw) {
+  const apiKey = $("f-gemini-key").value.trim();
+  if (!apiKey) {
+    fillParsed(parseBeanText(raw), "", false);
+    $("ai-settings").open = true;
+    return;
+  }
+  await runAiRecognition(raw);
+}
+
+$("btn-autofill-ai").addEventListener("click", () => {
   const raw = $("f-autofill-text").value.trim();
   if (!raw) { setAutofillStatus("붙여넣을 텍스트가 없습니다.", "error"); return; }
   const apiKey = $("f-gemini-key").value.trim();
@@ -1006,13 +1122,7 @@ $("btn-autofill-ai").addEventListener("click", async () => {
     setAutofillStatus("Gemini API 키를 먼저 설정하세요 (aistudio.google.com에서 무료 발급).", "error");
     return;
   }
-  setAutofillStatus("AI 인식 중…", "");
-  try {
-    const parsed = await geminiExtract(apiKey, raw);
-    fillParsed(parsed, "AI ");
-  } catch (e) {
-    setAutofillStatus(`AI 인식 실패 — ${e.message}. 키를 확인하거나 휴리스틱 인식을 사용하세요.`, "error");
-  }
+  runAiRecognition(raw);
 });
 
 $("btn-save").addEventListener("click", save);
@@ -1028,6 +1138,7 @@ $("btn-new").addEventListener("click", () => {
   renderLogoUi();
   setMode("new", null);
   setStatus("", true);
+  syncToggleAvailability();
   refreshList();
   renderAll();
 });

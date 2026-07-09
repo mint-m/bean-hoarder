@@ -102,3 +102,15 @@ test("missingRequired: 로스터리·산지·날짜 필수", () => {
   assert.ok(missing.includes("패키징일"));
   assert.ok(!missing.includes("로스팅일"));
 });
+
+test("missingRequired: 품종·가공방식도 필수 — 블렌드 선택 시엔 값이 채워진 것으로 통과", () => {
+  const missingVals = pickFields({ VARIETY: "", PROCESS: "" });
+  const missing = missingRequired("ROASTERY", missingVals);
+  assert.ok(missing.includes("품종"));
+  assert.ok(missing.includes("가공방식"));
+
+  const blendVals = pickFields({ VARIETY: "블렌드 (여러 품종 혼합)", PROCESS: "블렌드 (여러 가공방식 혼합)" });
+  const blendMissing = missingRequired("ROASTERY", blendVals);
+  assert.ok(!blendMissing.includes("품종"));
+  assert.ok(!blendMissing.includes("가공방식"));
+});
