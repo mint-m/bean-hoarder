@@ -40,6 +40,12 @@ function findFieldForLabelExact(raw) {
   return null;
 }
 
+// 품종·가공방식처럼 원래 짧아야 하는 필드에 두 번째로 매칭되는 값이 문장형 문단이면
+// (예: "PROCESS: Washed" 뒤에 별도로 "PROCESSING" 섹션의 상세 공정 설명이 또 있는 경우)
+// 그 필드를 덮어쓰는 대신 메모 후보로 돌린다 — 라벨 렌더링은 짧은 값을 전제로 한다.
+const SHORT_FIELDS = ["PROCESS", "VARIETY", "WASHING_STATION", "LOT"];
+const isLongText = v => v.length > 50 || /[.!?]\s+[A-Z]/.test(v) || v.includes("\n");
+
 const MONTHS = {
   jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
   jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
@@ -94,6 +100,8 @@ export function parseBeanText(text) {
       out.REGION = out.REGION ? `${out.REGION}, ${value}` : value;
     } else if (!out[field]) {
       out[field] = value;
+    } else if (SHORT_FIELDS.includes(field) && isLongText(value) && !out.MEMO) {
+      out.MEMO = value;
     }
   }
 
@@ -103,7 +111,15 @@ export function parseBeanText(text) {
   for (let i = 0; i < lines.length; i++) {
     const field = findFieldForLabelExact(lines[i]);
     if (!field) continue;
-    if (out[field] && field !== "REGION" && field !== "MEMO") continue;
+    if (out[field] && field !== "REGION" && field !== "MEMO") {
+      // 이미 채운 짧은 필드에 또 매칭됐고 그 값이 문단이면(상세 설명 섹션), 메모로 돌린다.
+      const next = lines[i + 1];
+      if (SHORT_FIELDS.includes(field) && next && !findFieldForLabelExact(next) && isLongText(next) && !out.MEMO) {
+        out.MEMO = next;
+        i++;
+      }
+      continue;
+    }
     if (field === "MEMO") {
       const parts = [];
       let chars = 0;

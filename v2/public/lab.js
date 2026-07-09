@@ -679,16 +679,35 @@ function download(filename, blob) {
 
 // ── 자동 채우기 (휴리스틱 파서 / Gemini) ─────────────────────
 
+// 품종·가공방식처럼 원래 짧아야 하는 필드에 문장형 문단이 들어오면(상품 페이지의
+// "PROCESSING" 상세 설명 섹션 등) 그 필드엔 채우지 않고 메모 후보로 돌린다 — 라벨
+// 렌더링은 짧은 값을 전제로 하므로, 문단이 그대로 들어가면 스펙 칸이 잘려 보기 나빠진다.
+const SHORT_FIELDS = ["PROCESS", "VARIETY", "WASHING_STATION", "LOT"];
+const isParagraphLike = v => v.length > 50 || /[.!?]\s+[A-Z]/.test(v) || v.includes("\n");
+
 // 인식 결과를 폼에 반영. 이미 값이 있는 항목은 덮어쓰지 않는다 (파서·AI 공용).
 function fillParsed(parsed, sourceLabel) {
   const filled = [];
+  let memoOverflow = null;
   for (const [field, inputId] of Object.entries(AUTOFILL_INPUT_IDS)) {
     const v = parsed[field];
     const el = $(inputId);
     if (!v || !el || el.value.trim()) continue;
+    if (SHORT_FIELDS.includes(field) && isParagraphLike(v)) {
+      if (!memoOverflow) memoOverflow = v;
+      continue;
+    }
     el.value = v;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     filled.push(FIELD_LABELS_KO[field] || field);
+  }
+  if (memoOverflow) {
+    const memoEl = $(AUTOFILL_INPUT_IDS.MEMO);
+    if (memoEl && !memoEl.value.trim()) {
+      memoEl.value = memoOverflow;
+      memoEl.dispatchEvent(new Event("input", { bubbles: true }));
+      if (!filled.includes(FIELD_LABELS_KO.MEMO)) filled.push(FIELD_LABELS_KO.MEMO);
+    }
   }
   if (filled.length) {
     setAutofillStatus(`${sourceLabel} 채움: ${filled.join(", ")} — 검토 후 저장하세요.`, "ok");
@@ -707,11 +726,16 @@ const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에서 추�
 - 값을 찾지 못한 키는 생략한다. 절대 추측하지 않는다.
 - ORIGIN: 생산 국가명, 영문 대문자 (예: "ETHIOPIA"). 블렌드면 "블렌드".
 - REGION: 국가 아래 세부 지역 계층을 콤마로 이어 한 줄로 (예: "Yirgacheffe, Gedeb").
+- VARIETY: 품종명만 짧게 (예: "Chiroso", "Gesha"). 재배·선별 과정 설명은 넣지 않는다.
+- PROCESS: 가공방식 핵심 명칭만 짧게 (예: "Washed", "Natural", "Honey"). 페이지에 "PROCESSING"
+  같은 제목으로 별도의 상세 공정 설명 문단(예: "Hand-picked... Fermented... Dried...")이 있어도
+  그 문단 전체를 넣지 말 것 — 핵심 명칭만 PROCESS에, 상세 설명은 MEMO로 돌린다.
 - ALTITUDE: 미터 숫자 또는 범위만, 단위 없이 (예: "1900-2100").
 - NET_WEIGHT: 그램 숫자만 (예: "200").
 - HARVEST: 수확시기 (예: "25/26", "25.12-26.01").
 - TASTING_NOTE: 콤마로 구분한 짧은 노트.
-- MEMO: 산지·농장·가공의 배경 스토리가 있으면 2~3문장으로 한국어 요약, 없으면 생략.
+- MEMO: 산지·농장의 배경 스토리, 또는 PROCESS에 넣지 않은 상세 가공 공정 설명이 있으면
+  2~3문장으로 한국어 요약, 없으면 생략.
 - ROAST_DATE, PACKAGE_DATE는 추출하지 않는다.
 허용 키: ${AI_FIELD_KEYS.join(", ")}
 JSON 객체만 출력하라.`;
