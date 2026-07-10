@@ -7,6 +7,7 @@
 //   GET    /api/beans         내 원두 목록
 //   GET    /api/bean/{KEY}    공개 조회
 //   PUT    /api/bean/{KEY}    수정 (소유자만)
+//   PATCH  /api/bean/{KEY}/archive  숨기기(보관) 토글 { archived: bool } (소유자만)
 //   DELETE /api/bean/{KEY}    삭제 (소유자만)
 //   GET    /api/export.csv    내 데이터 CSV 백업
 //   POST   /api/import        CSV 백업 복원 (내 유저코드 KEY만, 같은 KEY는 덮어쓰기)
@@ -20,7 +21,7 @@ import {
   KEY_RE, PIN_RE, FIELDS, CSV_HEADERS, json,
   sha256hex, hashPassword, verifyPassword,
   randomUsercode, randomRecoveryKey, normalizeRecoveryKey,
-  beanToPublic, pickFields, missingRequired,
+  beanToPublic, pickFields, missingRequired, IMPORT_REQUIRED_LABELS,
   csvField, unguardCsvCell, parseCsv,
   hostBlocked, isPrivateIp, htmlToText,
   LOGO_DATAURL_RE, LOGO_MAX_LEN,
@@ -137,6 +138,18 @@ async function updateBean(env, request, user, key) {
   return json({ ok: true, key });
 }
 
+// 숨기기(보관) 토글 — 원두 소비가 끝나 기록만 남기고 싶을 때, 삭제 대신 목록 최하단에
+// 채도를 낮춰 접어두는 용도. 전체 필드 재전송 없이 archived 플래그만 갱신한다.
+async function setArchived(env, request, user, key) {
+  const existing = await ownedBean(env, user, key);
+  if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
+  const body = await request.json().catch(() => ({}));
+  const archived = body.archived ? 1 : 0;
+  await env.DB.prepare("UPDATE beans SET archived = ? WHERE key = ? AND usercode = ?")
+    .bind(archived, key, user.usercode).run();
+  return json({ ok: true, key, archived: !!archived });
+}
+
 async function deleteBean(env, user, key) {
   const existing = await ownedBean(env, user, key);
   if (!existing) return json({ ok: false, error: "내 소유의 등록된 KEY가 아닙니다." }, 404);
@@ -214,7 +227,8 @@ async function importCsv(env, request, user) {
     const body = {};
     CSV_HEADERS.forEach(h => body[h] = col(row, h));
     const vals = pickFields(body);
-    const missing = missingRequired(roastery, vals);
+    // 품종·가공방식이 필수가 되기 전에 만든 백업도 복원할 수 있어야 하므로 완화된 집합으로 검사
+    const missing = missingRequired(roastery, vals, IMPORT_REQUIRED_LABELS);
     if (missing.length) { skipped.push({ key, reason: `필수 항목 누락: ${missing.join(", ")}` }); continue; }
     stmts.push(upsert.bind(key, user.usercode, roastery, ...FIELDS.map(f => vals[f])));
     if (existing.has(key)) updated++; else added++;
@@ -362,7 +376,12 @@ export async function onRequest({ request, env, params }) {
         if (!row) return json({ ok: false, error: "미등록 KEY" }, 404);
         return json({ ok: true, bean: beanToPublic(row) });
       }
-      if (method === "PUT" || method === "DELETE") {
+      if (seg[2] === "archive" && method === "PATCH") {
+        const user = await auth(env, request);
+        if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
+        return setArchived(env, request, user, key);
+      }
+      if ((method === "PUT" || method === "DELETE") && !seg[2]) {
         const user = await auth(env, request);
         if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
         return method === "PUT" ? updateBean(env, request, user, key) : deleteBean(env, user, key);

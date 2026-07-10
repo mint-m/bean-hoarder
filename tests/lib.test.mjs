@@ -6,7 +6,7 @@ import {
   isPrivateIp, hostBlocked,
   hashPassword, verifyPassword, sha256hex,
   randomUsercode, randomRecoveryKey, normalizeRecoveryKey,
-  pickFields, missingRequired, MAX_FIELD_LEN,
+  pickFields, missingRequired, MAX_FIELD_LEN, IMPORT_REQUIRED_LABELS,
 } from "../v2/functions/api/_lib.js";
 
 test("CSV 수식 인젝션 가드: 위험 셀에 ' 접두, 라운드트립 보존", () => {
@@ -101,4 +101,25 @@ test("missingRequired: 로스터리·산지·날짜 필수", () => {
   assert.ok(missing.includes("국가(산지)"));
   assert.ok(missing.includes("패키징일"));
   assert.ok(!missing.includes("로스팅일"));
+});
+
+test("missingRequired: 품종·가공방식도 필수 — 블렌드 선택 시엔 값이 채워진 것으로 통과", () => {
+  const missingVals = pickFields({ VARIETY: "", PROCESS: "" });
+  const missing = missingRequired("ROASTERY", missingVals);
+  assert.ok(missing.includes("품종"));
+  assert.ok(missing.includes("가공방식"));
+
+  const blendVals = pickFields({ VARIETY: "블렌드 (여러 품종 혼합)", PROCESS: "블렌드 (여러 가공방식 혼합)" });
+  const blendMissing = missingRequired("ROASTERY", blendVals);
+  assert.ok(!blendMissing.includes("품종"));
+  assert.ok(!blendMissing.includes("가공방식"));
+});
+
+test("missingRequired: CSV 복원(IMPORT_REQUIRED_LABELS)은 품종·가공방식이 비어 있어도 통과 — 필수화 이전 백업 호환", () => {
+  const vals = pickFields({ ORIGIN: "ETHIOPIA", VARIETY: "", PROCESS: "", ROAST_DATE: "26.07.01", PACKAGE_DATE: "26.07.05" });
+  const missing = missingRequired("ROASTERY", vals, IMPORT_REQUIRED_LABELS);
+  assert.deepEqual(missing, []);
+
+  const missingOrigin = missingRequired("ROASTERY", pickFields({ VARIETY: "", PROCESS: "" }), IMPORT_REQUIRED_LABELS);
+  assert.ok(missingOrigin.includes("국가(산지)"), "품종·가공방식과 무관한 필수 항목은 여전히 검사됨");
 });

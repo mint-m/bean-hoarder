@@ -18,7 +18,7 @@ v1을 운영하며 드러난 마찰을 근거로 삼았다.
 | 시트가 공개 발행됨 | published CSV 구조 | 조회 API는 공개, 쓰기는 토큰 — 데이터 원본은 비공개 |
 
 유지한 것: 키 체계(`{유저코드4}{연도2}-{순번3}`), 대문자 경로형 QR(25×25 유지), 40×20mm 라벨 사양(감열 203dpi), 라벨 정보 계층, 빈 필드 자동 숨김.
-이후 라벨 사이즈는 50×30(여유형)·50×60(세로 카드형)이 추가되었다 — 사이즈별 맞춤 레이아웃, QR은 도트 격자 스냅 고정 크기(9.4/12.5/15.6mm).
+이후 라벨 사이즈는 50×30(여유형)·50×60(세로 카드형)이 추가되었다 — 사이즈별 맞춤 레이아웃, QR은 3사이즈 모두 동일한 스캔 안정 크기(약 9.4mm)로 고정하고 커진 여백은 표시 정보량 차이로 반영한다.
 
 ## 서비스 정의 (확정)
 
@@ -39,12 +39,13 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
 │     GET    /api/beans         내 원두 목록
 │     GET    /api/bean/{KEY}    공개 조회
 │     PUT    /api/bean/{KEY}    수정 (소유자만)
+│     PATCH  /api/bean/{KEY}/archive  숨기기(보관) 토글 (소유자만)
 │     DELETE /api/bean/{KEY}    삭제 (소유자만)
 │     GET    /api/export.csv    내 데이터 CSV 백업 (수식 인젝션 가드)
 │     POST   /api/import        CSV 백업 복원 (내 KEY만, 같은 KEY 덮어쓰기)
 │     GET/PUT/DELETE /api/logos 로스터리 로고 저장·재사용 (100KB 제한)
 │     POST   /api/fetch         상품 페이지 프록시 (SSRF 가드: DoH 검사 + 리다이렉트 홉별 재검사)
-└── D1: users(usercode, pass_hash, recovery_hash) / beans(key, usercode, roastery, …) / logos(usercode, roastery, data_url)
+└── D1: users(usercode, pass_hash, recovery_hash) / beans(key, usercode, roastery, …, archived) / logos(usercode, roastery, data_url)
 ```
 
 ## 비용 (100명 기준, 전액 무료)

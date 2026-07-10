@@ -3,7 +3,9 @@
 // 전역 의존: qrcode-generator(qrcode), jsQR — admin.html에서 <script>로 선로드.
 //
 // 사이즈 3종을 지원한다. 40×20·50×30은 가로형 보딩패스, 50×60은 세로 카드형 레이아웃.
-// QR은 사이즈별로 도트 격자에 스냅된 고정 크기(스캔 안정성) — 사용자 조절 대상이 아니다.
+// QR은 3사이즈 모두 동일한 물리 크기(약 9.4mm, 도트 격자 스냅)로 고정한다 — 스캔에
+// 필요한 크기는 라벨이 커진다고 늘어나지 않으므로, 커진 여백은 QR 확대가 아니라
+// 정보 표시량 차이(부제목·스펙 항목 수)로 반영한다. 사용자 조절 대상이 아니다.
 
 export const BASE_URL = "HTTPS://BNHD.PAGES.DEV";
 
@@ -20,14 +22,18 @@ const DOT = 0.125;
 const RED = "#e8341c";
 
 // [필드키, 라벨 인쇄 약어, 관리자 화면 표시명]
+// 로스팅일·패키징일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
+// 배열 순서 = 기본 표시 우선순위(공간이 부족할 때 뒤쪽부터 자동으로 숨겨짐) — lab.js에서 사용자가 직접 재정렬 가능.
 export const SPEC_POOL = [
-  ["ROAST_DATE", "RSTD", "로스팅일"],
-  ["PACKAGE_DATE", "PKGD", "패키징일"],
   ["NET_WEIGHT", "NET", "용량"],
   ["AGTRON", "RSTP", "로스팅 포인트"],
+  ["PROCESS", "PROC", "가공"],
+  ["VARIETY", "VAR", "품종"],
   ["ALTITUDE", "ALT", "고도"],
+  ["HARVEST", "CROP", "수확시기"],
 ];
-export const SUB_POOL = [["REGION", "지역"], ["PROCESS", "가공"], ["VARIETY", "품종"], ["ALTITUDE", "고도"]];
+// 부제목 줄(헤드라인 바로 아래 한 줄) — 지역·랏·워싱스테이션·생산자 중 최대 3개 선택.
+export const SUB_POOL = [["REGION", "지역"], ["LOT", "랏"], ["WASHING_STATION", "워싱스테이션"], ["PRODUCER", "생산자"]];
 
 // ── 사이즈별 지오메트리 (mm) ─────────────────────────────────
 // headline/specVal의 def는 기본값, min/max는 스튜디오 슬라이더 범위.
@@ -36,36 +42,38 @@ export const SIZE_SPECS = {
     W: 40, H: 20, orient: "landscape", label: "40×20 (기본)",
     margin: 1.8, strip: 0.6, quiet: 1.3,
     qrDots: 3, qrRightGap: 1.3, qrY: 8.4, keySize: 1.2, keyGap: 1.7,
-    headline: { def: 2.8, min: 2.4, max: 3.4 }, specVal: { def: 1.7, min: 1.4, max: 2.0 },
-    roasterySize: 1.5, roasteryY: 2.9, dotR: 0.38, dotCy: 2.42, headY: 5.7,
-    infoStart: 7.5, infoLH: 1.6, infoSize: 1.35, maxInfoLines: 4,
-    divOffset: 0.55, divMin: 6.8, specTopOff: 1.95, specLH: 2.4,
-    specLabelSize: 1.1, specLabelW: 3.1, specGapX: 3.5, specValueMax: 9.6, col2: 13.2,
-    noteSize: 1.3, noteLH: 1.7, noteGapSpec: 1.9, noteGapDiv: 1.7, maxNoteLines: 2, bottom: 19.4,
+    // 40×20은 물리적으로 가장 작아 감열(203dpi) 인쇄 시 가독성이 관건 — 표시 정보량을 줄이더라도
+    // 글자를 키운다. 자세한 정보는 QR로 확인하고, 라벨엔 핵심(산지·부제목·날짜)만 크게 싣는다.
+    headline: { def: 3.1, min: 2.6, max: 3.8 }, specVal: { def: 1.8, min: 1.5, max: 2.2 },
+    roasterySize: 1.6, roasteryY: 3.0, dotR: 0.4, dotCy: 2.5, headY: 6.0,
+    infoStart: 8.4, infoLH: 1.9, infoSize: 1.55,
+    divOffset: 0.55, divMin: 7.4, specTopOff: 1.95, specLH: 2.4,
+    specLabelSize: 1.3, specLabelW: 3.4, specGapX: 3.8, specValueMax: 9.0, col2: 12.8,
+    noteSize: 1.45, noteGapSpec: 1.9, noteGapDiv: 1.7, bottom: 19.4,
     logoBox: [32.7, 1.3, 6.0, 5.0],
   },
   "50x30": {
     W: 50, H: 30, orient: "landscape", label: "50×30 (여유형)",
     margin: 2.0, strip: 0.8, quiet: 2.0,
-    qrDots: 4, qrRightGap: 1.6, qrY: 14.875, keySize: 1.5, keyGap: 2.0,
+    qrDots: 3, qrRightGap: 1.6, qrY: 18.0, keySize: 1.5, keyGap: 2.0,
     headline: { def: 3.6, min: 2.8, max: 4.6 }, specVal: { def: 2.1, min: 1.7, max: 2.6 },
     roasterySize: 1.9, roasteryY: 3.6, dotR: 0.48, dotCy: 3.0, headY: 7.2,
-    infoStart: 9.6, infoLH: 2.05, infoSize: 1.7, maxInfoLines: 5,
+    infoStart: 9.6, infoLH: 2.05, infoSize: 1.7,
     divOffset: 0.7, divMin: 8.8, specTopOff: 2.5, specLH: 3.0,
     specLabelSize: 1.35, specLabelW: 4.2, specGapX: 4.6, specValueMax: 12.0, col2: 16.5,
-    noteSize: 1.65, noteLH: 2.15, noteGapSpec: 2.3, noteGapDiv: 2.1, maxNoteLines: 3, bottom: 29.0,
+    noteSize: 1.65, noteGapSpec: 2.3, noteGapDiv: 2.1, bottom: 29.0,
     logoBox: [40.5, 1.8, 7.5, 6.0],
   },
   "50x60": {
     W: 50, H: 60, orient: "portrait", label: "50×60 (카드형)",
     margin: 2.4, strip: 1.0, quiet: 1.8,
-    qrDots: 5, qrY: 40.5, keySize: 1.8, keyGap: 2.2,
+    qrDots: 3, qrY: 46.75, keySize: 1.8, keyGap: 2.2,
     headline: { def: 4.4, min: 3.4, max: 5.4 }, specVal: { def: 2.3, min: 1.8, max: 3.0 },
     roasterySize: 2.3, roasteryY: 5.0, dotR: 0.58, dotCy: 4.25, headY: 9.4, headMaxLines: 2,
-    infoLH: 2.6, infoSize: 2.0, maxInfoLines: 4,
+    infoLH: 2.6, infoSize: 2.0,
     divOffset: 0.8, specTopOff: 3.0, specLH: 3.8,
     specLabelSize: 1.5, specLabelW: 5.0, specGapX: 5.6, specValueMax: 15.5,
-    noteSize: 2.0, noteLH: 2.6, noteGapSpec: 2.8, noteGapDiv: 2.4, maxNoteLines: 4,
+    noteSize: 2.0, noteGapSpec: 2.8, noteGapDiv: 2.4,
     logoBox: [39.6, 2.0, 8.0, 6.5],
   },
 };
@@ -73,13 +81,14 @@ export const SIZE_SPECS = {
 // 사이즈가 커질수록 물리적 여유가 생기므로 기본으로 표시하는 항목 수도 늘린다.
 // (사용자가 직접 토글을 바꾼 뒤에는 사이즈를 바꿔도 이 기본값으로 되돌리지 않는다 — lab.js 참고)
 export const SIZE_DEFAULT_FIELDS = {
-  "40x20": { subFields: ["REGION", "PROCESS"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT"] },
-  "50x30": { subFields: ["REGION", "PROCESS", "VARIETY"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT", "AGTRON"] },
-  "50x60": { subFields: ["REGION", "PROCESS", "VARIETY", "ALTITUDE"], specFields: ["ROAST_DATE", "PACKAGE_DATE", "NET_WEIGHT", "AGTRON"] },
+  "40x20": { subFields: ["REGION"], specFields: ["NET_WEIGHT"] },
+  "50x30": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "AGTRON"] },
+  "50x60": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "AGTRON", "ALTITUDE"] },
 };
 
 export const DEFAULT_DESIGN = {
   size: "40x20",
+  colorMode: "mono",   // "color"(레드+블랙 2도 인쇄) | "mono"(블랙만) — 흑백만 지원하는 감열 프린터가 많아 기본값으로 둔다
   headlineSize: SIZE_SPECS["40x20"].headline.def,
   specValueSize: SIZE_SPECS["40x20"].specVal.def,
   subFields: SIZE_DEFAULT_FIELDS["40x20"].subFields.slice(),
@@ -141,6 +150,29 @@ function wrapN(text, size, factor, maxW, maxLines) {
   return lines;
 }
 
+// 토큰을 구분자로 이어붙이며 폭 예산 안에서 최대한 채운다 — 넘치는 토큰은 통째로 생략(말줄임 없이).
+function fitJoin(tokens, sep, size, factor, maxW) {
+  let out = "";
+  for (const t of tokens) {
+    const candidate = out ? `${out}${sep}${t}` : t;
+    if (textUnits(candidate) * size * factor <= maxW) out = candidate;
+    else break;
+  }
+  return out;
+}
+
+// 테이스팅 노트는 한 줄만 인쇄한다. 콤마로 구분된 항목(예: "Grape, Cherry Cordial, Tropical Citrus")을
+// 통째로 넣어보고 안 들어가면 다 들어가는 항목까지만 남긴다 — 말줄임(…)으로 단어 중간을 자르는 대신
+// "NET 250g ALT 1850-1910m Grape, Cherry Cordial"처럼 완전한 항목만 보여준다.
+function fitNoteLine(text, size, factor, maxW) {
+  const segments = text.split(",").map(s => s.trim()).filter(Boolean);
+  if (!segments.length) return "";
+  const out = fitJoin(segments, ", ", size, factor, maxW);
+  if (out) return out;
+  // 첫 항목조차 안 들어가면 단어 경계까지만(말줄임 없이) 줄인다.
+  return fitJoin(segments[0].split(/\s+/), " ", size, factor, maxW);
+}
+
 function textEl(x, y, text, size, opts) {
   if (!text) return "";
   const { factor, maxW, font = SANS, weight, style, spacing, anchor, fill } = opts;
@@ -155,8 +187,8 @@ function textEl(x, y, text, size, opts) {
   return `<text ${attrs}>${esc(fitted)}</text>`;
 }
 
-function specCell(S, x, y, label, value, size) {
-  return textEl(x, y, label, S.specLabelSize, { factor: .55, maxW: S.specLabelW, font: MONO, fill: RED })
+function specCell(S, x, y, label, value, size, ink) {
+  return textEl(x, y, label, S.specLabelSize, { factor: .55, maxW: S.specLabelW, font: MONO, fill: ink })
        + textEl(x + S.specGapX, y, value, size, { factor: .55, maxW: S.specValueMax, font: MONO, weight: "bold" });
 }
 
@@ -164,16 +196,24 @@ function specCell(S, x, y, label, value, size) {
 // QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
 const stripParen = s => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
 
-// 정보 블록에 허용되는 최대 줄 수: 절취선·스펙·노트 최소 1줄이 바닥 안에 들어가는 최댓값
-function computeMaxInfoLines(S, infoStart, specRows, hasNote, bottom) {
-  for (let n = S.maxInfoLines; n >= 1; n--) {
-    const lastInfo = infoStart + (n - 1) * S.infoLH;
-    const dY = lastInfo + S.divOffset;
-    const specLast = specRows ? dY + S.specTopOff + (specRows - 1) * S.specLH : dY;
-    const needed = hasNote ? specLast + S.noteGapSpec : specLast;
-    if (needed <= bottom) return n;
+// 스펙 그리드를 줄 단위로 배치: 값이 칸 절반 폭에 들어가면 2열 한 줄, 넘치면 그 항목만
+// 전체 폭으로 단독 줄(최대 2줄 랩)을 차지한다 — 말줄임(…)으로 잘리는 대신 줄바꿈으로 전문을 보존한다.
+function layoutSpecRows(list, specValueSize, S, fullMaxW) {
+  const fitsHalf = v => textUnits(v) * specValueSize * .55 <= S.specValueMax;
+  const rows = [];
+  let pending = null;
+  for (const item of list) {
+    if (fitsHalf(item[1])) {
+      if (pending) { rows.push({ items: [pending, item] }); pending = null; }
+      else pending = item;
+    } else {
+      if (pending) { rows.push({ items: [pending] }); pending = null; }
+      rows.push({ items: [item], lines: wrapN(item[1], specValueSize, .55, fullMaxW, 2) });
+    }
   }
-  return 1;
+  if (pending) rows.push({ items: [pending] });
+  const totalLines = rows.reduce((n, r) => n + (r.lines ? r.lines.length : 1), 0);
+  return { rows, totalLines };
 }
 
 export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) {
@@ -193,8 +233,10 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const module = S.qrDots * DOT;
   const QR_SIZE = module * n;
   const portrait = S.orient === "portrait";
+  // 세로형(카드형)은 QR을 우측에 붙이고, 로스팅일·패키징일을 좌측에 두 줄로 쌓아 배치한다
+  // (보딩패스 스텁의 바코드 옆 항공편 정보 컨셉 — buildLabelSVG 하단 참고).
   const QR_X = portrait
-    ? Math.round((W - QR_SIZE) / 2 / DOT) * DOT
+    ? Math.round((W - S.margin - QR_SIZE) / DOT) * DOT
     : Math.round((W - S.qrRightGap - QR_SIZE) / DOT) * DOT;
   const QR_Y = Math.round(S.qrY / DOT) * DOT;
   const FULL_MAX = W - S.margin * 2;
@@ -203,6 +245,8 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const BOTTOM = portrait ? QR_Y - S.quiet : S.bottom;
   const hasLogo = design.showLogo && logoDataUrl;
   const headMax = hasLogo ? S.logoBox[0] - 0.8 - S.margin : (portrait ? FULL_MAX : FULL_MAX);
+  // 흑백 프린터용 옵션: 레드 채널을 전부 블랙으로 대체한다 (2도 인쇄가 불가능한 감열 프린터가 많음).
+  const INK = design.colorMode === "mono" ? "#000" : RED;
 
   const els = [];
   if (hasLogo) {
@@ -210,15 +254,15 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     els.push(`<image x="${lx}" y="${ly}" width="${lw}" height="${lh}" preserveAspectRatio="xMaxYMin meet" href="${logoDataUrl}"/>`);
   }
 
-  // ── 보딩패스 컨셉 (블랙 + 레드 2도 인쇄) ──
-  // 상단 레드 스트립 / 레드 도트 + 로스터리(레드) / 오리진 헤드라인(블랙) /
-  // 정보 블록 / 레드 점선 절취선 / 스펙 그리드(레드 라벨 + 블랙 값) / 노트 / QR
-  els.push(`<rect x="0" y="0" width="${W}" height="${S.strip}" fill="${RED}"/>`);
+  // ── 보딩패스 컨셉 (블랙 + 레드 2도 인쇄, 흑백 옵션 시 전부 블랙) ──
+  // 상단 스트립 / 도트 + 로스터리 / 오리진 헤드라인(블랙) /
+  // 정보 블록 / 점선 절취선 / 스펙 그리드(라벨+값) / 노트 / QR
+  els.push(`<rect x="0" y="0" width="${W}" height="${S.strip}" fill="${INK}"/>`);
   const rst = g("ROASTERY").toUpperCase();
   if (rst) {
-    els.push(`<circle cx="${(S.margin + S.dotR).toFixed(2)}" cy="${S.dotCy}" r="${S.dotR}" fill="${RED}"/>`);
+    els.push(`<circle cx="${(S.margin + S.dotR).toFixed(2)}" cy="${S.dotCy}" r="${S.dotR}" fill="${INK}"/>`);
     els.push(textEl(S.margin + S.dotR * 2 + 0.5, S.roasteryY, rst, S.roasterySize,
-      { factor: .70, maxW: headMax - (S.dotR * 2 + 0.5), weight: "bold", spacing: 0.12, fill: RED }));
+      { factor: .70, maxW: headMax - (S.dotR * 2 + 0.5), weight: "bold", spacing: 0.12, fill: INK }));
   }
 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
@@ -239,57 +283,112 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
 
   const labelVal = f => {
     const v = g(f);
-    return (f === "REGION" || f === "PROCESS" || f === "VARIETY") ? stripParen(v) : v;
+    return f === "REGION" ? stripParen(v) : v;
   };
 
   // ── 플로우 레이아웃: 내용량에 따라 y를 흘려 배치 ──
   const subOrder = SUB_POOL.map(([k]) => k).filter(k => design.subFields.includes(k));
   const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
 
-  // 스펙 후보를 먼저 확정 (서브라인에 이미 표시되는 필드는 중복 인쇄 방지)
+  // 로스팅일·패키징일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
+  // 가로형은 라벨 최하단에 한 줄(2열)로, 세로형(카드형)은 QR 좌측에 두 줄로 타이트하게 고정한다 —
+  // 가로형만 그 한 줄만큼 아래 flow 레이아웃의 바닥 예산을 당긴다(세로형은 QR 옆 여백을 쓰므로 본문 예산을 그대로 쓴다).
+  const CONTENT_BOTTOM = portrait ? BOTTOM : BOTTOM - S.specLH;
+
+  // 스펙 후보 확정 (서브라인에 이미 표시되는 필드는 중복 인쇄 방지) — 최대 8개, 선택 순서가 우선순위
   const labelOf = k => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
-  const specs = design.specFields.slice(0, 4)
+  const specVal = f => {
+    if (f === "AGTRON") return g(f).split(/\s+/)[0];
+    if (f === "PROCESS" || f === "VARIETY") return stripParen(g(f));
+    return g(f);
+  };
+  const allSpecs = design.specFields.slice(0, 8)
     .filter(f => !design.subFields.includes(f))
-    .map(f => [f, f === "AGTRON" ? g(f).split(/\s+/)[0] : g(f)])
+    .map(f => [f, specVal(f)])
     .filter(([, v]) => v);
-  const specRows = Math.ceil(specs.length / 2);
+  const specFullMaxW = TEXT_MAX - S.specGapX;
   const hasNote = !!g("TASTING_NOTE");
-
   const infoStart = yCur;
-  const maxInfo = computeMaxInfoLines(S, infoStart, specRows, hasNote, BOTTOM);
 
+  // 부제목(지역·가공·품종)은 절대 잘리면 안 되는 핵심 정보 — 본문 세로 예산 안에서 필요한 만큼
+  // 줄바꿈해 전문을 모두 싣는다(현실적으로 1~2줄). 남는 공간에만 스펙·노트를 채운다.
+  const maxSubLines = Math.max(1, Math.floor((CONTENT_BOTTOM - infoStart) / S.infoLH) + 1);
   if (infoText) {
-    for (const line of wrapN(infoText, S.infoSize, .52, TEXT_MAX, maxInfo)) {
+    for (const line of wrapN(infoText, S.infoSize, .52, TEXT_MAX, maxSubLines)) {
       els.push(textEl(S.margin, yCur, line, S.infoSize, { factor: .52, maxW: TEXT_MAX }));
       yCur += S.infoLH;
     }
   }
 
-  // 절취선: 보딩패스의 퍼포레이션을 레드 점선으로
+  // 절취선: 보딩패스의 퍼포레이션 — 부제목 바로 아래
   const divMin = portrait ? infoStart - S.infoLH + S.divOffset : S.divMin;
   const divY = Math.max(divMin, yCur - S.infoLH + S.divOffset);
   const divX2 = portrait ? W - S.margin : QR_X - S.quiet;
-  els.push(`<line x1="${S.margin}" y1="${divY.toFixed(2)}" x2="${divX2.toFixed(2)}" y2="${divY.toFixed(2)}" stroke="${RED}" stroke-width="0.14" stroke-dasharray="0.55 0.4"/>`);
+  els.push(`<line x1="${S.margin}" y1="${divY.toFixed(2)}" x2="${divX2.toFixed(2)}" y2="${divY.toFixed(2)}" stroke="${INK}" stroke-width="0.14" stroke-dasharray="0.55 0.4"/>`);
 
-  // 스펙 그리드: 레드 라벨 + 블랙 볼드 값 — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만 인쇄
+  // 스펙 그리드: 절취선 아래 남는 공간에 채우되, 넘치면 우선순위 낮은(나중 선택) 항목부터 드롭한다.
+  // 값이 칸 절반 폭을 넘으면 그 항목만 전체 폭 단독 줄(최대 2줄 랩) — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만.
+  // 사용자가 고른 스펙이 자동 표시되는 테이스팅 노트보다 우선 — 노트 공간을 미리 잡지 않고 스펙을 먼저 채운다.
+  // (노트는 아래에서 남는 공간에만 표시되며, 자리가 없으면 생략된다. 자세한 노트는 QR 조회로 확인.)
+  const specTop = divY + S.specTopOff;
+  const specFits = lines => specTop + (Math.max(lines, 1) - 1) * S.specLH <= CONTENT_BOTTOM;
+  let specList = allSpecs.slice();
+  let specLayout = layoutSpecRows(specList, specValueSize, S, specFullMaxW);
+  while (specList.length > 0 && !specFits(specLayout.totalLines)) {
+    specList.pop();
+    specLayout = layoutSpecRows(specList, specValueSize, S, specFullMaxW);
+  }
+
   const colX = portrait ? [S.margin, W / 2 + 0.6] : [S.margin, S.margin + S.col2];
-  specs.forEach(([f, val], i) => {
-    els.push(specCell(S, colX[i % 2], divY + S.specTopOff + Math.floor(i / 2) * S.specLH, labelOf(f), val, specValueSize));
-  });
-  let noteY = specRows > 0 ? divY + S.specTopOff + (specRows - 1) * S.specLH + S.noteGapSpec : divY + S.noteGapDiv;
-
-  // 테이스팅 노트: 스펙 그리드 아래 남는 공간만큼
-  if (hasNote && noteY <= BOTTOM) {
-    const allowed = Math.min(S.maxNoteLines, Math.floor((BOTTOM - noteY) / S.noteLH) + 1);
-    for (const line of wrapN(g("TASTING_NOTE"), S.noteSize, .50, TEXT_MAX, allowed)) {
-      els.push(textEl(S.margin, noteY, line, S.noteSize, { factor: .50, maxW: TEXT_MAX, style: "italic" }));
-      noteY += S.noteLH;
+  let rowY = specTop;
+  specLayout.rows.forEach(row => {
+    if (row.items.length === 2) {
+      row.items.forEach(([f, val], i) => els.push(specCell(S, colX[i], rowY, labelOf(f), val, specValueSize, INK)));
+      rowY += S.specLH;
+    } else if (row.lines) {
+      const [f] = row.items[0];
+      row.lines.forEach((line, i) => {
+        if (i === 0) els.push(textEl(colX[0], rowY, labelOf(f), S.specLabelSize, { factor: .55, maxW: S.specLabelW, font: MONO, fill: INK }));
+        els.push(textEl(colX[0] + S.specGapX, rowY + i * S.specLH, line, specValueSize, { factor: .55, maxW: specFullMaxW, font: MONO, weight: "bold" }));
+      });
+      rowY += row.lines.length * S.specLH;
+    } else {
+      const [f, val] = row.items[0];
+      els.push(specCell(S, colX[0], rowY, labelOf(f), val, specValueSize, INK));
+      rowY += S.specLH;
     }
+  });
+  // 테이스팅 노트: 항상 한 줄만, 스펙 그리드 바로 아래가 아니라 본문 최하단(고정 푸터 바로 위)에 고정 —
+  // 스펙이 짧게 끝나도 노트가 붕 뜨지 않고 날짜 바로 위에 자리잡는다. 스펙 그리드와 겹칠 자리가 없으면 생략.
+  const noteMinY = specLayout.rows.length > 0 ? rowY - S.specLH + S.noteGapSpec : divY + S.noteGapDiv;
+  if (hasNote && noteMinY <= CONTENT_BOTTOM) {
+    const line = fitNoteLine(g("TASTING_NOTE"), S.noteSize, .50, TEXT_MAX);
+    if (line) els.push(textEl(S.margin, CONTENT_BOTTOM, line, S.noteSize, { factor: .50, maxW: TEXT_MAX, style: "italic" }));
   }
 
   // 세로형: QR 스텁 구획을 절취선으로 표시 (보딩패스의 티켓 스텁)
   if (portrait) {
-    els.push(`<line x1="${S.margin}" y1="${(QR_Y - 1.2).toFixed(2)}" x2="${(W - S.margin).toFixed(2)}" y2="${(QR_Y - 1.2).toFixed(2)}" stroke="${RED}" stroke-width="0.14" stroke-dasharray="0.55 0.4"/>`);
+    els.push(`<line x1="${S.margin}" y1="${(QR_Y - 1.2).toFixed(2)}" x2="${(W - S.margin).toFixed(2)}" y2="${(QR_Y - 1.2).toFixed(2)}" stroke="${INK}" stroke-width="0.14" stroke-dasharray="0.55 0.4"/>`);
+  }
+
+  // 고정 푸터: 로스팅일·패키징일 — 필수 정보이므로 토글 여부와 무관하게 항상 인쇄
+  if (portrait) {
+    // 카드형: QR 왼쪽 옆에 "RSTD26.06.29 PKGD26.07.09" 한 줄로 촘촘하게 배치, QR 하단에 맞춰 정렬.
+    // 라벨·값 사이 간격을 specGapX보다 훨씬 좁게 둬 좁은 QR 옆 공간에 한 줄로 들어가게 한다.
+    const dateY = QR_Y + QR_SIZE;
+    const tightGap = 0.3, pairGap = 2.2;
+    let dx = S.margin;
+    [["RSTD", g("ROAST_DATE")], ["PKGD", g("PACKAGE_DATE")]].forEach(([label, value], i) => {
+      if (i > 0) dx += pairGap;
+      els.push(textEl(dx, dateY, label, S.specLabelSize, { factor: .55, maxW: 12, font: MONO, fill: INK }));
+      dx += textUnits(label) * S.specLabelSize * .55 + tightGap;
+      els.push(textEl(dx, dateY, value, specValueSize, { factor: .55, maxW: 14, font: MONO, weight: "bold" }));
+      dx += textUnits(value) * specValueSize * .55;
+    });
+  } else {
+    // 가로형: 라벨 최하단에 한 줄(2열)로 — 기존 레이아웃
+    els.push(specCell(S, colX[0], BOTTOM, "RSTD", g("ROAST_DATE"), specValueSize, INK));
+    els.push(specCell(S, colX[1], BOTTOM, "PKGD", g("PACKAGE_DATE"), specValueSize, INK));
   }
 
   // QR 렌더: 도트 격자 스냅 좌표 (소수 4자리 유지로 누적 오차 방지)

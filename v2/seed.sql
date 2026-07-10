@@ -11,5 +11,5 @@ INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, producer,
   ('DEMO26-001', 'DEMO', 'DANCHE', 'ETHIOPIA', 'Yirgacheffe, Gedeb', 'Smallholder farmers', 'Worka Sakaro',
    'Gedeb CWS', '74158', 'Washed', '2100m', '25/26', '26.06.28', '26.07.03', '60g', '#95 (라이트)',
    'Jasmine, bergamot, white peach',
-   '게뎁 지역 소농들의 체리를 워카 사카로 워싱스테이션에서 함께 가공한 커뮤니티 랏. 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열로, 표준 항목만으로는 설명이 어려운 이런 배경 이야기를 메모에 적어두면 QR 조회 페이지에 함께 표시된다.',
+   '게뎁 지역 소농들의 체리를 워카 사카로 워싱스테이션에서 함께 가공한 커뮤니티 랏. 원산지 방문 중 진행한 블라인드 커핑에서 선정된 랏으로, 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열이다. 자스민과 베르가못의 화사한 향에 잘 익은 백도를 닮은 단맛과 무게감이 더해지고, 정제된 산미와 깔끔한 클린컵, 은은하게 이어지는 단맛의 여운이 특징이다.',
    'https://example.com/beans/yirgacheffe-gedeb');
