@@ -39,12 +39,13 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
 │     GET    /api/beans         내 원두 목록
 │     GET    /api/bean/{KEY}    공개 조회
 │     PUT    /api/bean/{KEY}    수정 (소유자만)
+│     PATCH  /api/bean/{KEY}/archive  숨기기(보관) 토글 (소유자만)
 │     DELETE /api/bean/{KEY}    삭제 (소유자만)
 │     GET    /api/export.csv    내 데이터 CSV 백업 (수식 인젝션 가드)
 │     POST   /api/import        CSV 백업 복원 (내 KEY만, 같은 KEY 덮어쓰기)
 │     GET/PUT/DELETE /api/logos 로스터리 로고 저장·재사용 (100KB 제한)
 │     POST   /api/fetch         상품 페이지 프록시 (SSRF 가드: DoH 검사 + 리다이렉트 홉별 재검사)
-└── D1: users(usercode, pass_hash, recovery_hash) / beans(key, usercode, roastery, …) / logos(usercode, roastery, data_url)
+└── D1: users(usercode, pass_hash, recovery_hash) / beans(key, usercode, roastery, …, archived) / logos(usercode, roastery, data_url)
 ```
 
 ## 비용 (100명 기준, 전액 무료)
