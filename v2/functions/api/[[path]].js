@@ -21,7 +21,7 @@ import {
   KEY_RE, PIN_RE, FIELDS, CSV_HEADERS, json,
   sha256hex, hashPassword, verifyPassword,
   randomUsercode, randomRecoveryKey, normalizeRecoveryKey,
-  beanToPublic, pickFields, missingRequired,
+  beanToPublic, pickFields, missingRequired, IMPORT_REQUIRED_LABELS,
   csvField, unguardCsvCell, parseCsv,
   hostBlocked, isPrivateIp, htmlToText,
   LOGO_DATAURL_RE, LOGO_MAX_LEN,
@@ -227,7 +227,8 @@ async function importCsv(env, request, user) {
     const body = {};
     CSV_HEADERS.forEach(h => body[h] = col(row, h));
     const vals = pickFields(body);
-    const missing = missingRequired(roastery, vals);
+    // 품종·가공방식이 필수가 되기 전에 만든 백업도 복원할 수 있어야 하므로 완화된 집합으로 검사
+    const missing = missingRequired(roastery, vals, IMPORT_REQUIRED_LABELS);
     if (missing.length) { skipped.push({ key, reason: `필수 항목 누락: ${missing.join(", ")}` }); continue; }
     stmts.push(upsert.bind(key, user.usercode, roastery, ...FIELDS.map(f => vals[f])));
     if (existing.has(key)) updated++; else added++;

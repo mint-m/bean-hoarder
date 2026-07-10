@@ -10,6 +10,11 @@ export const REQUIRED_LABELS = {
   origin: "국가(산지)", variety: "품종", process: "가공방식",
   roast_date: "로스팅일", package_date: "패키징일",
 };
+// CSV 복원(import) 전용: 품종·가공방식이 필수가 되기 전에 만든 백업도 되살릴 수 있어야 하므로,
+// 그 이전부터 항상 필수였던 최소 집합만 검사한다(등록·수정 폼은 REQUIRED_LABELS 그대로 적용).
+export const IMPORT_REQUIRED_LABELS = {
+  origin: "국가(산지)", roast_date: "로스팅일", package_date: "패키징일",
+};
 export const CSV_HEADERS = ["KEY","ROASTERY","ORIGIN","REGION","PRODUCER","LOT","WASHING_STATION","VARIETY","PROCESS","ALTITUDE",
   "HARVEST","ROAST_DATE","PACKAGE_DATE","NET_WEIGHT","AGTRON","TASTING_NOTE","MEMO","SOURCE_URL"];
 
@@ -106,10 +111,10 @@ export function pickFields(body) {
   return vals;
 }
 
-export function missingRequired(roastery, vals) {
+export function missingRequired(roastery, vals, labels = REQUIRED_LABELS) {
   const missing = [];
   if (!roastery) missing.push("로스터리");
-  for (const [field, label] of Object.entries(REQUIRED_LABELS)) {
+  for (const [field, label] of Object.entries(labels)) {
     if (!vals[field]) missing.push(label);
   }
   return missing;

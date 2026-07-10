@@ -1009,7 +1009,9 @@ FORM_IDS.forEach(id => $(id).addEventListener("input", () => {
   renderAll();
 }));
 // 로스터리 입력 시 저장된 로고 자동 적용 + 로고 상태 UI 갱신
-$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); renderAll(); });
+// (renderAll()은 위 FORM_IDS 루프가 이미 호출하므로 여기서 또 부르지 않는다 — 안 그러면 키 입력마다
+// QR 검증·SVG 렌더링이 두 번씩 실행된다)
+$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); });
 // 로스팅 포인트: 숫자로 시작하면 # 자동 부착
 $("f-agtron").addEventListener("input", (e) => {
   const v = e.target.value;
