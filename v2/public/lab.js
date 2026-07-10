@@ -1003,15 +1003,17 @@ $("btn-signout").addEventListener("click", () => {
 // (모든 토글을 매번 재점검하지 않음 — 이래야 사용자가 직접 끈 체크가 다른 필드 입력으로 되살아나지 않는다).
 const SUB_FIELD_BY_INPUT = Object.fromEntries(Object.entries(SUB_FIELD_INPUT_IDS).map(([k, v]) => [v, k]));
 const SPEC_FIELD_BY_INPUT = Object.fromEntries(Object.entries(SPEC_FIELD_INPUT_IDS).map(([k, v]) => [v, k]));
-FORM_IDS.forEach(id => $(id).addEventListener("input", () => {
-  if (SUB_FIELD_BY_INPUT[id]) refreshSubToggle(SUB_FIELD_BY_INPUT[id]);
-  if (SPEC_FIELD_BY_INPUT[id]) refreshSpecToggle(SPEC_FIELD_BY_INPUT[id]);
-  renderAll();
-}));
-// 로스터리 입력 시 저장된 로고 자동 적용 + 로고 상태 UI 갱신
-// (renderAll()은 위 FORM_IDS 루프가 이미 호출하므로 여기서 또 부르지 않는다 — 안 그러면 키 입력마다
-// QR 검증·SVG 렌더링이 두 번씩 실행된다)
-$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); });
+FORM_IDS.forEach(id => {
+  if (id === "f-roastery") return;  // 아래에서 로고 적용 뒤 렌더링하는 전용 리스너로 처리
+  $(id).addEventListener("input", () => {
+    if (SUB_FIELD_BY_INPUT[id]) refreshSubToggle(SUB_FIELD_BY_INPUT[id]);
+    if (SPEC_FIELD_BY_INPUT[id]) refreshSpecToggle(SPEC_FIELD_BY_INPUT[id]);
+    renderAll();
+  });
+});
+// 로스터리 입력 시 저장된 로고 자동 적용 + 로고 상태 UI 갱신을 renderAll()보다 먼저 끝내야
+// 미리보기가 최신 로고 상태로 그려진다(순서가 바뀌면 한 키 입력만큼 로고 반영이 늦어짐).
+$("f-roastery").addEventListener("input", () => { applySavedLogo(); renderLogoUi(); renderAll(); });
 // 로스팅 포인트: 숫자로 시작하면 # 자동 부착
 $("f-agtron").addEventListener("input", (e) => {
   const v = e.target.value;

@@ -338,7 +338,7 @@ async function main() {
     showStatus('로그인이 만료되었습니다.<br><br><a href="/admin">랩에서 다시 로그인 →</a>');
     return;
   }
-  if (!body || !body.ok) { showStatus("목록을 불러오지 못했습니다."); return; }
+  if (!body || !body.ok) { showStatus((body && body.error) || "목록을 불러오지 못했습니다."); return; }
   allBeans = body.beans.sort((a, b) => (b.KEY || "").localeCompare(a.KEY || ""));  // 최신 KEY 먼저
   document.getElementById("filter").classList.toggle("hidden", allBeans.length < 2);
   document.getElementById("filter").addEventListener("input", applyFilter);
