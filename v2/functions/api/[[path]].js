@@ -380,7 +380,7 @@ export async function onRequest({ request, env, params }) {
         if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
         return setArchived(env, request, user, key);
       }
-      if (method === "PUT" || method === "DELETE") {
+      if ((method === "PUT" || method === "DELETE") && !seg[2]) {
         const user = await auth(env, request);
         if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
         return method === "PUT" ? updateBean(env, request, user, key) : deleteBean(env, user, key);

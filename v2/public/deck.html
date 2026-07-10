@@ -258,16 +258,22 @@ function closeSheet() {
 }
 
 async function apiCall(path, opts = {}) {
-  const res = await fetch(path, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${account.usercode}:${account.pin}`,
-      ...(opts.headers || {}),
-    },
-  });
-  const body = await res.json().catch(() => null);
-  return { res, body };
+  try {
+    const res = await fetch(path, {
+      ...opts,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${account.usercode}:${account.pin}`,
+        ...(opts.headers || {}),
+      },
+    });
+    const body = await res.json().catch(() => null);
+    return { res, body };
+  } catch (e) {
+    // 오프라인·DNS 실패 등 fetch 자체가 던지는 예외 — 호출부는 res.status/body.ok로만 결과를
+    // 확인하므로 같은 모양으로 돌려준다(lab.js의 api() 네트워크 오류 처리와 동일한 패턴).
+    return { res: { status: 0 }, body: { ok: false, error: "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해 주세요." } };
+  }
 }
 
 async function toggleArchive(key) {
@@ -327,13 +333,7 @@ async function main() {
     showStatus('내 원두 덱은 로그인 후 볼 수 있습니다.<br><br><a href="/admin">랩에서 로그인 →</a>');
     return;
   }
-  let res, body;
-  try {
-    ({ res, body } = await apiCall("/api/beans"));
-  } catch (e) {
-    showStatus("목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
-    return;
-  }
+  const { res, body } = await apiCall("/api/beans");
   if (res.status === 401) {
     showStatus('로그인이 만료되었습니다.<br><br><a href="/admin">랩에서 다시 로그인 →</a>');
     return;
