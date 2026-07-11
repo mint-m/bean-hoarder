@@ -7,16 +7,19 @@
 
 ```bash
 npm ci                 # 의존성 설치 (루트, npm workspaces)
-npm test               # Vitest 전체 실행 (tests/ + packages/ + apps/)
-npm run lint           # Biome 체크 (tests/, packages/, apps/ 만 대상)
+npm test               # Vitest 전체 (unit: node 환경 / workers: workerd+D1 통합)
+npm run lint           # Biome 체크 (tests/, packages/, apps/, v2 TS만 대상)
 npm run lint:fix       # Biome 자동 수정
-npm run check          # lint + test
+npm run typecheck      # tsc (워크스페이스 + v2/functions)
+npm run check          # lint + typecheck + test — 커밋 전 필수
 
 # 로컬 개발 서버 (v2/)
 cd v2
 npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
 npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
-npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8788
+npx wrangler pages dev public --binding INVITE_CODE=test \
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409              # http://localhost:8788
+# --d1 플래그 필수: wrangler 4.8x pages dev가 wrangler.toml의 d1_databases를 무시함
 ```
 
 데모 계정: 유저코드 `DEMO` / 암호 `0000`.
@@ -24,12 +27,15 @@ npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8
 ## 아키텍처 지도
 
 - `v2/public/` — 라이브 정적 페이지 (index=QR 조회, admin=랩, deck=덱). 브라우저 ES 모듈, 빌드 없음.
-- `v2/functions/api/[[path]].js` — Pages Functions 라우터 (Phase 1에서 Hono로 교체 예정).
-- `v2/functions/api/_lib.js` — env/request 의존 없는 순수 헬퍼. 테스트 대상.
+- `v2/functions/api/[[path]].ts` — Pages Functions 어댑터 (5줄) → `@bnhd/api`에 위임.
+- `packages/schema/` — `@bnhd/schema`: 원두 필드 단일 소스(BEAN_FIELDS). CSV 헤더·필수 규칙·Zod
+  스키마·타입이 전부 여기서 파생. **필드 추가 = 이 배열 한 줄 + D1 마이그레이션 SQL.**
+- `packages/api/` — `@bnhd/api`: Hono 라우터·인증·Drizzle(D1)·SSRF 가드.
+  `test/app.test.ts`가 **API 계약 문서** — 상태 코드·메시지를 바꾸는 변경은 계약 파괴.
 - `v2/public/label.js` — 라벨 SVG 렌더러 (3사이즈). 순수 모듈, 테스트 대상.
 - `v2/public/autofill.js` — 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
-- `tests/` — Vitest 단위 테스트 (v2 소스를 직접 import).
-- `packages/`, `apps/` — 마이그레이션으로 생기는 새 TS 코드 (npm workspaces).
+- `tests/` — 레거시 프론트 모듈(label/autofill) 단위 테스트 (v2 소스를 직접 import).
+- `apps/` — Phase 3에서 React 랩 앱이 들어올 자리 (npm workspaces).
 - 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml`).
   `main → deploy` 승격 PR은 **Squash and merge** (linear history 규칙).
 

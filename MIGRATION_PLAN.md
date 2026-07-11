@@ -56,12 +56,16 @@ Next.js(App Router) + Neon/Supabase + Vercel은 국내 채용공고 키워드 �
 
 ## 3. 단계별 로드맵
 
-### Phase 0 — 기반
+> **진행 상황** (2026-07-12): Phase 0 ✅ / Phase 1 ✅ (배포 타깃은 "Pages 유지 + Hono를 Pages
+> Functions에 마운트"로 확정 — bnhd.pages.dev 도메인·QR·CI 보존, Hono 앱은 런타임 중립이라
+> 추후 Workers 이전은 설정 변경만으로 가능) / Phase 2~4 예정.
+
+### Phase 0 — 기반 ✅
 
 - 모노레포 구조: `apps/worker`(API) · `apps/lab`(React) · `packages/schema`(Zod 필드 정의) · `packages/label`(라벨 엔진, 이미 순수 모듈이라 거의 그대로 이동)
 - TypeScript + Biome + Vitest 셋업, 기존 테스트 3종(`tests/*.test.mjs`) 이식
 
-### Phase 1 — API 이식 (핵심 단계)
+### Phase 1 — API 이식 (핵심 단계) ✅
 
 - Hono로 기존 API 계약을 **그대로** 1:1 이식 — 기존 프론트가 수정 없이 계속 동작해야 함
 - `packages/schema`에 Zod 스키마 정의 → `FIELDS`/`CSV_HEADERS`/검증 로직 전부 여기서 파생
