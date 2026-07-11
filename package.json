@@ -1,0 +1,23 @@
+{
+  "name": "bean-hoarder",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check": "npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,12 +1,24 @@
-// 서버 순수 헬퍼(_lib.js) 단위 테스트 — node --test (Node 20+, Web Crypto 내장)
-import { test } from "node:test";
+// 서버 순수 헬퍼(_lib.js) 단위 테스트 — vitest (Node 20+, Web Crypto 내장)
+
 import assert from "node:assert/strict";
+import { test } from "vitest";
 import {
-  csvField, guardCsvCell, unguardCsvCell, parseCsv,
-  isPrivateIp, hostBlocked,
-  hashPassword, verifyPassword, sha256hex,
-  randomUsercode, randomRecoveryKey, normalizeRecoveryKey,
-  pickFields, missingRequired, MAX_FIELD_LEN, IMPORT_REQUIRED_LABELS,
+  csvField,
+  guardCsvCell,
+  hashPassword,
+  hostBlocked,
+  IMPORT_REQUIRED_LABELS,
+  isPrivateIp,
+  MAX_FIELD_LEN,
+  missingRequired,
+  normalizeRecoveryKey,
+  parseCsv,
+  pickFields,
+  randomRecoveryKey,
+  randomUsercode,
+  sha256hex,
+  unguardCsvCell,
+  verifyPassword,
 } from "../v2/functions/api/_lib.js";
 
 test("CSV 수식 인젝션 가드: 위험 셀에 ' 접두, 라운드트립 보존", () => {
@@ -29,7 +41,7 @@ test("csvField: 콤마/따옴표/개행 셀은 인용 처리", () => {
 });
 
 test("parseCsv: RFC4180 (따옴표 속 콤마·개행, CRLF, BOM)", () => {
-  const csv = "﻿KEY,NOTE\r\nA26-001,\"jasmine, peach\"\r\nB26-002,\"line1\nline2\"\r\n";
+  const csv = '﻿KEY,NOTE\r\nA26-001,"jasmine, peach"\r\nB26-002,"line1\nline2"\r\n';
   const rows = parseCsv(csv);
   assert.equal(rows.length, 3);
   assert.deepEqual(rows[0], ["KEY", "NOTE"]);
@@ -44,8 +56,21 @@ test("parseCsv: 빈 행 제거, 이스케이프된 따옴표", () => {
 });
 
 test("isPrivateIp: IPv4/IPv6 사설 대역", () => {
-  for (const ip of ["10.0.0.1", "127.0.0.1", "192.168.1.1", "172.16.0.1", "172.31.255.255",
-    "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fc00::1", "fd12::1", "fe80::1", "::ffff:10.0.0.1"]) {
+  for (const ip of [
+    "10.0.0.1",
+    "127.0.0.1",
+    "192.168.1.1",
+    "172.16.0.1",
+    "172.31.255.255",
+    "169.254.169.254",
+    "100.64.0.1",
+    "0.0.0.0",
+    "::1",
+    "fc00::1",
+    "fd12::1",
+    "fe80::1",
+    "::ffff:10.0.0.1",
+  ]) {
     assert.equal(isPrivateIp(ip), true, ip);
   }
   for (const ip of ["8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "2606:4700::1111", "::ffff:8.8.8.8"]) {
@@ -54,8 +79,15 @@ test("isPrivateIp: IPv4/IPv6 사설 대역", () => {
 });
 
 test("hostBlocked: 내부 호스트명·IP 리터럴 차단", () => {
-  for (const h of ["localhost", "foo.localhost", "db.internal", "printer.local",
-    "metadata.google.internal", "10.1.2.3", "[::1]"]) {
+  for (const h of [
+    "localhost",
+    "foo.localhost",
+    "db.internal",
+    "printer.local",
+    "metadata.google.internal",
+    "10.1.2.3",
+    "[::1]",
+  ]) {
     assert.equal(hostBlocked(h), true, h);
   }
   for (const h of ["example.com", "roastery.co.kr", "8.8.8.8".replace("8.8.8.8", "shop.example")]) {
@@ -109,17 +141,30 @@ test("missingRequired: 품종·가공방식도 필수 — 블렌드 선택 시�
   assert.ok(missing.includes("품종"));
   assert.ok(missing.includes("가공방식"));
 
-  const blendVals = pickFields({ VARIETY: "블렌드 (여러 품종 혼합)", PROCESS: "블렌드 (여러 가공방식 혼합)" });
+  const blendVals = pickFields({
+    VARIETY: "블렌드 (여러 품종 혼합)",
+    PROCESS: "블렌드 (여러 가공방식 혼합)",
+  });
   const blendMissing = missingRequired("ROASTERY", blendVals);
   assert.ok(!blendMissing.includes("품종"));
   assert.ok(!blendMissing.includes("가공방식"));
 });
 
 test("missingRequired: CSV 복원(IMPORT_REQUIRED_LABELS)은 품종·가공방식이 비어 있어도 통과 — 필수화 이전 백업 호환", () => {
-  const vals = pickFields({ ORIGIN: "ETHIOPIA", VARIETY: "", PROCESS: "", ROAST_DATE: "26.07.01", PACKAGE_DATE: "26.07.05" });
+  const vals = pickFields({
+    ORIGIN: "ETHIOPIA",
+    VARIETY: "",
+    PROCESS: "",
+    ROAST_DATE: "26.07.01",
+    PACKAGE_DATE: "26.07.05",
+  });
   const missing = missingRequired("ROASTERY", vals, IMPORT_REQUIRED_LABELS);
   assert.deepEqual(missing, []);
 
-  const missingOrigin = missingRequired("ROASTERY", pickFields({ VARIETY: "", PROCESS: "" }), IMPORT_REQUIRED_LABELS);
+  const missingOrigin = missingRequired(
+    "ROASTERY",
+    pickFields({ VARIETY: "", PROCESS: "" }),
+    IMPORT_REQUIRED_LABELS,
+  );
   assert.ok(missingOrigin.includes("국가(산지)"), "품종·가공방식과 무관한 필수 항목은 여전히 검사됨");
 });

@@ -78,7 +78,7 @@ npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8
 ```
 
 - 데모 계정: 유저코드 `DEMO` / 암호 `0000`
-- 테스트: 저장소 루트에서 `node --test` (서버 헬퍼·라벨 엔진·파서 단위 테스트, Node 20+)
+- 테스트: 저장소 루트에서 `npm ci` 후 `npm test` (Vitest — 서버 헬퍼·라벨 엔진·파서 단위 테스트, Node 20+), 린트는 `npm run lint` (Biome)
 
 ## 진행 기록
 
