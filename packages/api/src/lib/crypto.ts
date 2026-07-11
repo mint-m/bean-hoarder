@@ -42,6 +42,12 @@ export async function hashPassword(usercode: string, pin: string): Promise<strin
 }
 
 /**
+ * 존재하지 않는 유저코드에도 동일한 PBKDF2 비용을 치르게 하는 더미 해시 —
+ * 응답 시간 차이로 유효 유저코드를 열거하는 타이밍 공격을 막는다 (어떤 입력과도 일치하지 않음).
+ */
+export const DUMMY_PASS_HASH = `pbkdf2$${PBKDF2_ITER}$${"0".repeat(32)}$${"f".repeat(64)}`;
+
+/**
  * 저장된 해시 검증. 구형(단일 SHA-256 hex 64자) 해시도 인식해 legacy=true로 알려주면
  * 호출부가 로그인 성공 시점에 PBKDF2로 무중단 재해시한다.
  */

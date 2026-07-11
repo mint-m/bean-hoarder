@@ -1,7 +1,7 @@
 // D1 기반 고정 윈도우 rate limit — 인증 실패 시도에만 사용한다.
 // Workers Rate Limiting binding은 Pages Functions에서 지원되지 않아 D1 카운터로 구현.
 // 정확한 슬라이딩 윈도우가 아니어도 무차별 대입(4자리 PIN 전수 시도) 차단 목적엔 충분하다.
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { schema } from "../db";
 
@@ -13,19 +13,16 @@ export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") || "unknown";
 }
 
-/** 윈도우 내 실패 횟수가 한도를 넘었는지 (읽기 전용) */
+/** 윈도우 내 실패 횟수가 한도를 넘었는지 (읽기 전용, 단일 쿼리 — 만료 판정은 SQL에서) */
 export async function isRateLimited(db: Db, bucket: string, limit: number): Promise<boolean> {
   const row = await db
-    .select({ count: schema.authAttempts.count, reset_at: schema.authAttempts.reset_at })
+    .select({ count: schema.authAttempts.count })
     .from(schema.authAttempts)
-    .where(eq(schema.authAttempts.bucket, bucket))
+    .where(
+      and(eq(schema.authAttempts.bucket, bucket), gt(schema.authAttempts.reset_at, sql`datetime('now')`)),
+    )
     .get();
-  if (!row) return false;
-  const expired = await db.get<{ expired: number }>(
-    sql`SELECT (${row.reset_at} <= datetime('now')) AS expired`,
-  );
-  if (expired?.expired) return false;
-  return row.count >= limit;
+  return !!row && row.count >= limit;
 }
 
 /** 실패 1회 기록 — 윈도우가 지났으면 카운터를 리셋하며 시작 */

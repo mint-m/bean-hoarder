@@ -5,7 +5,7 @@
 import { and, eq } from "drizzle-orm";
 import { createDb, schema } from "./db";
 import type { AuthedUser, Env } from "./env";
-import { hashPassword, verifyPassword } from "./lib/crypto";
+import { DUMMY_PASS_HASH, hashPassword, verifyPassword } from "./lib/crypto";
 import { clientIp, IP_BUCKET_LIMIT, isRateLimited, PW_BUCKET_LIMIT, recordFailure } from "./lib/ratelimit";
 import { lookupSession, SESSION_TOKEN_RE } from "./lib/session";
 
@@ -40,7 +40,8 @@ export async function verifyCredentials(
     .from(schema.users)
     .where(eq(schema.users.usercode, usercode))
     .get();
-  const v = row ? await verifyPassword(row.pass_hash, usercode, pin) : { ok: false, legacy: false };
+  // 미존재 유저코드도 더미 해시로 같은 PBKDF2 비용을 치른다 — 타이밍 기반 유저코드 열거 방지
+  const v = await verifyPassword(row?.pass_hash ?? DUMMY_PASS_HASH, usercode, pin);
   if (!row || !v.ok) {
     await recordFailure(db, pwBucket);
     await recordFailure(db, ipBucket);

@@ -26,7 +26,8 @@
   }
 
   // 구버전(bh_pin 저장)에서 넘어온 브라우저: 저장된 자격으로 세션을 발급받는다.
-  // 성공/실패와 무관하게 PIN은 제거 — 실패면 로그인 화면으로 자연 유도.
+  // 자격이 확실히 거부된 경우(4xx)에만 PIN을 제거 — 일시 오류(429/5xx/네트워크)면
+  // 유지해서 다음 방문에 재시도한다 (일시 장애로 강제 로그아웃되지 않도록).
   async function migrateLegacyPin() {
     const usercode = localStorage.getItem("bh_usercode") || "";
     const pin = localStorage.getItem("bh_pin") || "";
@@ -41,6 +42,7 @@
         save(body.usercode, body.token);
         return load();
       }
+      if (res.status === 429 || res.status >= 500) return load();
     } catch (e) { /* 네트워크 오류 — 다음 방문에서 재시도 (PIN 유지) */
       return load();
     }
