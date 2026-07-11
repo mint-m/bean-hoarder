@@ -58,7 +58,9 @@ Next.js(App Router) + Neon/Supabase + Vercel은 국내 채용공고 키워드 �
 
 > **진행 상황** (2026-07-12): Phase 0 ✅ / Phase 1 ✅ (배포 타깃은 "Pages 유지 + Hono를 Pages
 > Functions에 마운트"로 확정 — bnhd.pages.dev 도메인·QR·CI 보존, Hono 앱은 런타임 중립이라
-> 추후 Workers 이전은 설정 변경만으로 가능) / Phase 2~4 예정.
+> 추후 Workers 이전은 설정 변경만으로 가능) / Phase 2 ✅ **범위 조정**: 세션 토큰 + D1 기반
+> rate limit 먼저 배포하고 패스키(WebAuthn)는 후속 라운드로 분리 (사용자 결정), Turnstile은
+> 코드 레벨 rate limit이 커버해 보류 / Phase 3~4 예정.
 
 ### Phase 0 — 기반 ✅
 
@@ -73,7 +75,7 @@ Next.js(App Router) + Neon/Supabase + Vercel은 국내 채용공고 키워드 �
 - vitest-pool-workers로 signup→등록→조회→수정→백업/복원 전 경로 통합 테스트 작성
   — 이후 모든 단계의 회귀 안전망
 
-### Phase 2 — 인증 업그레이드
+### Phase 2 — 인증 업그레이드 ✅ (세션+rate limit / 패스키는 후속)
 
 - 세션 토큰 도입(자격증명 매 요청 전송 중단), 패스키 등록 유도 + PIN은 이행기 폴백
 - Workers Rate Limiting binding(무료) 코드 레벨 적용 + 가입 단계 Turnstile

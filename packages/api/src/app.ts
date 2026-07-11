@@ -3,8 +3,10 @@
 //
 // 인증: Authorization: Bearer {유저코드}:{4자리 암호}  (편의용 암호 — 쓰기에만 필요, 조회는 공개)
 // 라우트:
-//   POST   /api/signup        초대코드 + 암호 → 유저코드 자동 발급 + 복구키(1회 표시)
-//   POST   /api/recover       복구키 + 새 암호 → 유저코드 재확인, 복구키 회전
+//   POST   /api/signup        초대코드 + 암호 → 유저코드 자동 발급 + 복구키(1회 표시) + 세션 토큰
+//   POST   /api/login         유저코드 + 암호 → 세션 토큰 (실패 rate limit)
+//   DELETE /api/session       현재 세션 폐기 (로그아웃)
+//   POST   /api/recover       복구키 + 새 암호 → 유저코드 재확인, 복구키 회전 + 세션 토큰
 //   POST   /api/beans         원두 등록 (KEY 서버 채번)
 //   GET    /api/beans         내 원두 목록
 //   GET    /api/bean/{KEY}    공개 조회
@@ -23,22 +25,29 @@ import { createMiddleware } from "hono/factory";
 import { authenticate } from "./auth";
 import type { AppEnv } from "./env";
 import { json } from "./lib/http";
-import { recoverAccount, signup } from "./routes/auth";
+import { login, logout, recoverAccount, signup } from "./routes/auth";
 import { exportCsv, importCsv } from "./routes/backup";
 import { addBean, deleteBean, getBeanPublic, listBeans, setArchived, updateBean } from "./routes/beans";
 import { deleteLogo, listLogos, putLogo } from "./routes/logos";
 import { fetchExternal } from "./routes/proxy";
 
 const authRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const user = await authenticate(c.env, c.req.raw);
-  if (!user) return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
-  c.set("user", user);
+  const result = await authenticate(c.env, c.req.raw);
+  if (result.kind === "limited") {
+    return json({ ok: false, error: "시도가 너무 많습니다. 잠시 후 다시 시도하세요." }, 429);
+  }
+  if (result.kind === "fail") {
+    return json({ ok: false, error: "인증 실패 — 유저코드와 암호를 확인하세요." }, 401);
+  }
+  c.set("user", result.user);
   await next();
 });
 
 const app = new Hono<AppEnv>().basePath("/api");
 
 app.post("/signup", signup);
+app.post("/login", login); // 유저코드+암호 → 세션 토큰 (rate limit)
+app.delete("/session", authRequired, logout); // 현재 세션 폐기
 app.post("/recover", recoverAccount);
 
 app.get("/bean/:key", getBeanPublic); // 공개 — QR 스캔 조회

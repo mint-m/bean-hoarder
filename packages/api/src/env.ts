@@ -7,6 +7,8 @@ export interface Env {
 
 export interface AuthedUser {
   usercode: string;
+  /** 세션 토큰으로 인증한 경우 그 토큰의 해시 — 로그아웃(해당 세션 폐기)에 사용 */
+  sessionTokenHash?: string;
 }
 
 export type AppEnv = {

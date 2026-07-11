@@ -39,3 +39,19 @@ CREATE TABLE IF NOT EXISTS logos (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (usercode, roastery)
 );
+
+-- 세션 토큰 (Phase 2 인증) — 토큰은 SHA-256 해시만 저장, 만료 90일
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  usercode   TEXT NOT NULL REFERENCES users(usercode),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(usercode);
+
+-- 인증 시도 rate limit용 고정 윈도우 실패 카운터
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  bucket   TEXT PRIMARY KEY,
+  count    INTEGER NOT NULL DEFAULT 0,
+  reset_at TEXT NOT NULL
+);

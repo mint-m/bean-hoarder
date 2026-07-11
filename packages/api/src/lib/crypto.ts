@@ -79,6 +79,13 @@ export function randomRecoveryKey(): string {
   return (hex.match(/.{1,4}/g) || []).join("-");
 }
 
+/** 세션 토큰: bhs_ 접두 + 32자 hex (128비트). 서버엔 SHA-256 해시만 저장한다. */
+export function randomSessionToken(): string {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return `bhs_${[...a].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function normalizeRecoveryKey(k: unknown): string {
   return String(k || "")
     .replace(/[^0-9A-Fa-f]/g, "")

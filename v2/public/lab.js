@@ -12,10 +12,8 @@ const LOGO_MAX_LEN = 140_000;   // 서버와 동일한 상한 (base64 문자 수
 const $ = id => document.getElementById(id);
 const yy = String(new Date().getFullYear() % 100).padStart(2, "0");
 
-const account = {
-  usercode: localStorage.getItem("bh_usercode") || "",
-  pin: localStorage.getItem("bh_pin") || "",
-};
+// 세션 인증 (session.js) — 구버전이 저장한 PIN이 있으면 세션 토큰으로 교환하고 지운다
+const account = await window.bhSession.migrateLegacyPin();
 
 // ── 라벨 디자인 설정: localStorage에 영속화 (새로고침해도 유지) ──
 function loadDesign() {
@@ -125,13 +123,12 @@ function setAutofillStatus(msg, cls) {
 }
 
 function authHeader() {
-  return { "Authorization": `Bearer ${account.usercode}:${account.pin}` };
+  return { "Authorization": `Bearer ${account.token}` };
 }
-function signedIn() { return !!account.usercode && !!account.pin; }
+function signedIn() { return !!account.usercode && !!account.token; }
 
 function saveAccount() {
-  localStorage.setItem("bh_usercode", account.usercode);
-  localStorage.setItem("bh_pin", account.pin);
+  window.bhSession.save(account.usercode, account.token);
 }
 
 function renderAccount() {
@@ -629,7 +626,7 @@ async function signup() {
   const body = await res.json().catch(() => null);
   if (body && body.ok) {
     account.usercode = body.usercode;
-    account.pin = pin;
+    account.token = body.token;
     saveAccount();
     renderAccount();
     showRecoveryBox(body.usercode, body.recovery_key);
@@ -647,13 +644,17 @@ async function login() {
   if (!/^[A-Z0-9]{4}$/.test(uc) || !/^\d{4}$/.test(pin)) {
     setAcctStatus("유저코드 4자리와 숫자 암호 4자리를 입력하세요.", false); return;
   }
-  const res = await fetch("/api/beans", { headers: { "Authorization": `Bearer ${uc}:${pin}` } });
-  if (res.ok) {
-    account.usercode = uc; account.pin = pin;
+  const res = await fetch("/api/login", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usercode: uc, password: pin }),
+  });
+  const body = await res.json().catch(() => null);
+  if (body && body.ok && body.token) {
+    account.usercode = body.usercode; account.token = body.token;
     saveAccount(); renderAccount();
     refreshLogos(); refreshList(); renderAll();
   } else {
-    setAcctStatus("유저코드 또는 암호가 올바르지 않습니다.", false);
+    setAcctStatus((body && body.error) || "유저코드 또는 암호가 올바르지 않습니다.", false);
   }
 }
 
@@ -668,7 +669,7 @@ async function recover() {
   });
   const body = await res.json().catch(() => null);
   if (body && body.ok) {
-    account.usercode = body.usercode; account.pin = pin;
+    account.usercode = body.usercode; account.token = body.token;
     saveAccount(); renderAccount();
     showRecoveryBox(body.usercode, body.recovery_key);
     refreshLogos(); refreshList(); renderAll();
@@ -993,9 +994,10 @@ $("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) $("sh
 $("btn-signup").addEventListener("click", signup);
 $("btn-login").addEventListener("click", login);
 $("btn-recover").addEventListener("click", recover);
-$("btn-signout").addEventListener("click", () => {
-  localStorage.removeItem("bh_usercode");
-  localStorage.removeItem("bh_pin");
+$("btn-signout").addEventListener("click", async () => {
+  // 서버 세션 폐기는 최선 노력 — 실패해도 로컬 세션은 지우고 로그아웃 처리
+  try { await fetch("/api/session", { method: "DELETE", headers: authHeader() }); } catch (e) { /* 무시 */ }
+  window.bhSession.clear();
   location.reload();
 });
 
