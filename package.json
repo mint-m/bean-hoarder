@@ -1,0 +1,31 @@
+{
+  "name": "bean-hoarder",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p v2/functions/tsconfig.json && tsc -p e2e/tsconfig.json",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "e2e": "npm run build --workspace @bnhd/lab && playwright test",
+    "e2e:server": "cd v2 && npx wrangler d1 execute bnhd-v2 --local --file=schema.sql --persist-to .wrangler-e2e && npx wrangler d1 execute bnhd-v2 --local --file=seed.sql --persist-to .wrangler-e2e && npx wrangler pages dev public --binding INVITE_CODE=e2e-invite --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 --r2 LOGOS=bnhd-logos --port 8788 --persist-to .wrangler-e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@cloudflare/vitest-pool-workers": "^0.18.4",
+    "@cloudflare/workers-types": "^5.20260712.1",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.110.0"
+  }
+}

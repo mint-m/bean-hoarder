@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .wrangler/
 node_modules/
+v2/public/admin/
+v2/.wrangler-e2e/
+test-results/
+playwright-report/

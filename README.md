@@ -30,20 +30,21 @@
 bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 ├── v2/public/            정적 페이지
 │     index.html            조회 (QR 스캔 대상)
-│     admin.html+lab.css+lab.js   랩 (등록·관리 화면)
+│     admin/ (빌드 산출물)   랩 — apps/lab React 앱 (CI가 배포 직전 빌드, lab.css 공유)
 │     deck.html             내 원두 월렛 덱
 │     label.js              라벨 렌더러 (3개 사이즈, 사이즈별 기본 표시 항목, QR 검증 포함)
 │     autofill.js           텍스트 → 원두 정보 휴리스틱 파서
 │     origin-color.js       산지 해시 → 색상 (덱·조회 카드 색 구분용, 두 페이지가 공유)
 │     vendor/               qrcode-generator, jsQR (CDN 대신 저장소에 포함)
-├── v2/functions/api/     서버 코드
-│     [[path]].js           라우터: signup/recover/beans/bean/{KEY}/export.csv/import/logos/fetch
-│     _lib.js               순수 헬퍼 (해시, CSV, SSRF 가드 — 테스트 대상)
+├── v2/functions/api/     [[path]].ts — Pages Functions 어댑터 (아래 Hono 앱에 위임)
+├── packages/schema/      @bnhd/schema (TS) — 원두 필드 단일 소스: CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생
+├── packages/api/         @bnhd/api (TS) — Hono 라우터: signup/recover/beans/bean/{KEY}/export.csv/import/logos/fetch,
+│                           인증·Drizzle(D1)·SSRF 가드. 단위 + workerd 통합 테스트(packages/api/test) 포함
 └── D1 (bnhd-v2)          users(usercode, pass_hash, recovery_hash) · beans(key, …) · logos(usercode, roastery, data_url)
 ```
 
-- 쓰기(등록·수정·삭제·백업·복원·로고)는 `유저코드:암호` 인증, 읽기(QR 조회)는 공개
-- 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드)
+- 쓰기(등록·수정·삭제·백업·복원·로고)는 **세션 토큰** 인증(`POST /api/login`으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 `Bearer 유저코드:암호` 인증도 이행기 동안 동작.
+- 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드). **인증 실패는 D1 기반 rate limit**(유저코드당 10회/10분, IP당 30회/10분 — 초과 시 429)으로 4자리 암호 전수 대입을 차단
 - 복구키는 계정 복구 전용 고엔트로피 값 — 해시만 저장, 사용 시(재설정 성공 시) 자동 회전(1회용)
 - 수정·삭제·복원은 KEY 앞 4자리가 내 유저코드인 원두만 가능
 - CSV 내보내기는 스프레드시트 수식 인젝션 가드(`'` 접두) 적용, 복원 시 자동 복원
@@ -60,10 +61,15 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
   - `deploy` — PR 필수(Require a pull request before merging) + Require linear history + 삭제 방지. Linear history 요구 때문에 `main → deploy` 승격 PR은 반드시 **Squash and merge**(또는 Rebase)로 병합한다 — 일반 merge commit은 거부된다.
 - **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
-- **무차별 대입 완화(선택)**: 4자리 암호 특성상 Cloudflare 대시보드의 무료 Rate Limiting 룰 1개를 `/api/*`에 걸어두면 좋다. 미적용 시에도 데이터 손실은 CSV 백업·복원으로 회복 가능.
-- **DB 백업**: `npx wrangler d1 export bnhd-v2 --remote` / 사용자는 각자 CSV 내보내기
+- **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
+- **DB 백업 (3중 안전망)**:
+  1. **D1 Time Travel** — 최근 30일 내 임의 시점 복구: `npx wrangler d1 time-travel info bnhd-v2`로 북마크 확인, `npx wrangler d1 time-travel restore bnhd-v2 --timestamp=<unix|ISO>`로 복구.
+  2. **자동 덤프** — `.github/workflows/backup.yml`이 매일 04:17 KST에 `wrangler d1 export`를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 `bnhd-v2-backup.sql`을 받아 `npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql` (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 `CLOUDFLARE_API_TOKEN`에 D1:Edit 권한 추가.
+  3. **사용자 셀프 백업** — 각자 랩에서 CSV 내보내기/복원.
+  (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
+- **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `cd v2 && npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
 - **스키마**: 새 환경은 `v2/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
-  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql`
+  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql`
   (`migrate_drop.sql`은 초기 재생성용 기록 — 실행 금지)
   적용: `npx wrangler d1 execute bnhd-v2 --remote --file=migrate_logos.sql`
 - **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)
@@ -71,14 +77,17 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 ## 로컬 개발
 
 ```bash
+npm ci                                                      # 루트에서 1회 (npm workspaces)
 cd v2
 npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
 npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
-npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8788
+npx wrangler pages dev public --binding INVITE_CODE=test \
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409              # http://localhost:8788
+# (--d1 플래그: wrangler 4.8x의 pages dev가 wrangler.toml의 d1_databases를 붙여주지 않아 명시 필요)
 ```
 
 - 데모 계정: 유저코드 `DEMO` / 암호 `0000`
-- 테스트: 저장소 루트에서 `node --test` (서버 헬퍼·라벨 엔진·파서 단위 테스트, Node 20+)
+- 테스트: 저장소 루트에서 `npm ci` 후 `npm test` (Vitest — 서버 헬퍼·라벨 엔진·파서 단위 테스트, Node 20+), 린트는 `npm run lint` (Biome)
 
 ## 진행 기록
 
@@ -98,6 +107,11 @@ npx wrangler pages dev public --binding INVITE_CODE=test    # http://localhost:8
 | 2026-07-09 | **40×20 가독성·날짜 정돈 라운드** — ① 로스팅일·패키징일 배치를 사이즈별로 재정리: 카드형(50×60)은 QR 좌측에 "RSTD26.06.29 PKGD26.07.09" 한 줄로 촘촘하게 고정, 가로형(40×20·50×30)은 라벨 최하단 한 줄(2열)의 기존 레이아웃 유지 ② 부제목 3종(지역·가공·품종)은 핵심 정보라 **절대 잘리지 않도록** 최우선 배치 — 길면 여러 줄로 줄바꿈해 전문을 싣고, 공간이 부족하면 스펙·노트를 대신 드롭 ③ 자동 표시되는 테이스팅 노트보다 **사용자가 고른 스펙이 우선**하도록 순위 정정(기존엔 노트 자리 확보 때문에 선택한 스펙이 밀려나던 버그) ④ 감열(203dpi) 인쇄 가독성을 위해 40×20 전체 글자 크기를 키움(헤드라인 2.8→3.1mm, 부제목 1.35→1.55mm, 스펙 라벨 1.1→1.3mm 등) — 표시 정보량은 줄이되 라벨은 읽히게 하고 자세한 정보는 QR로 |
 | 2026-07-09 | **표시 항목 재배치·노트 정책 라운드** — ① **가공·품종을 스펙 칸으로, 지역·랏·워싱스테이션·생산자를 부제목 줄로** 이동(풀 구성 스왑) — 부제목은 최대 3개까지 선택, 값이 채워지면 자동 체크되는 기존 동작 유지 ② 테이스팅 노트를 **항상 한 줄만** 인쇄하도록 변경 — 콤마로 구분된 항목을 앞에서부터 채워보고 그 줄에 다 안 들어가는 항목은 통째로 생략(예: "Grape, Cherry Cordial, Tropical Cit…"처럼 단어 중간을 자르는 대신 "Grape, Cherry Cordial"까지만 표시) ③ 노트 위치를 스펙 그리드 바로 아래가 아니라 **본문 최하단(날짜 바로 위)에 고정** — 스펙이 짧게 끝나도 노트가 붕 뜨지 않음, 남는 공간이 있으면 항상 노출 |
 | 2026-07-10 | **덱 카드 인터랙션 라운드** — ① 호버 시 품종·고도·수확·생산자·랏·워싱스테이션·PKGD·노트를 펼쳐 보여주던 확장 패널을 제거 ② 호버·포커스 인터랙션을 **애플 월렛 카드 뽑기 방식**으로 재구현 — 호버한 카드만 살짝 위로 들리고(`translateY(-8px)`), 그 아래 쌓인 카드들은 `.wcard:hover ~ .wcard` 형제 선택자로 통째로 아래로 밀려나 시야를 가림 없이 자연스럽게 열림(z-index는 전혀 사용하지 않음 — DOM 순서상 뒤 카드가 원래 위에 그려지는 성질만 이용) ③ 카드 클릭 동작을 분리 — 카드 몸통을 클릭·엔터하면 곧바로 상세 페이지로 이동, 호버 시 카드 우측 하단(RSTD/NET 줄 옆 여백)에 나타나는 별도 **⋯ 메뉴 버튼**(터치 기기는 항상 표시, 레이아웃을 밀어내지 않도록 절대 위치)을 눌러야 **상세보기·숨기기·삭제 액션시트**가 뜸 ④ 소비 완료한 원두를 삭제 대신 남겨둘 수 있는 **숨기기(보관)** 기능 신설 — `beans.archived` 컬럼 추가(`migrate_archived.sql`), `PATCH /api/bean/{KEY}/archive`로 토글, 보관된 카드는 덱 최하단으로 정렬되고 채도를 낮춰(grayscale) 표시 ⑤ 카드 최소 표시 정보를 **지역·품종·가공(값 있는 것만)** 으로 재정의하고, **테이스팅 노트 미리보기**를 카드에 추가 — 검색창 아래 "카드에 노트 표시" 체크박스로 켜고 끌 수 있으며 기본은 켜짐, 체크 시 포인트 컬러(`accent-color`)로 표시, 선택은 로컬에 기억 ⑥ 숨긴 카드 스타일 보정 — `opacity`를 빼서(투명해지면 겹친 뒤 카드가 비쳐 지저분해 보이던 문제) 채도(`grayscale`)·명도(`brightness`)만 낮추도록 변경, `.deck`에 `isolation: isolate`를 주고 숨긴 카드에 `z-index: -1`을 줘서 맨 앞이 아니라 **덱의 가장 뒤로 가라앉듯** 다른 카드 밑에 깔리게 수정 |
+| 2026-07-13 | **실서비스 전환 마이그레이션 Phase 4 (운영 준비) — 마이그레이션 완료** — ① 5xx를 구조화 JSON(method·path·stack)으로 로깅해 `wrangler pages deployment tail`/대시보드에서 추적 가능 ② **D1 자동 백업**: Actions cron이 매일 04:17 KST `d1 export` → artifact 30일 보관(오프사이트 2차 — 1차는 D1 Time Travel 30일), 복구 절차 운영 섹션 문서화 ③ **Playwright 스모크 e2e**(공개 조회 → 랩 로그인 → QR 실디코드 검증 → 등록 → 덱)를 CI에 추가하고 **deploy가 e2e 통과를 요구**하도록 게이트 — e2e 전용 로컬 D1(persist 분리)로 라이브·개발 데이터와 격리 ④ Sentry(외부 계정 필요)·커스텀 도메인·Workers 이전은 보류 확정(QR 호환·운영비 0원 유지) |
+| 2026-07-12 | **Phase 3 마무리 — /admin을 React 앱으로 교체** — 프리뷰 `/lab` 검증(등록·편집·삭제·로고 R2 왕복·보관 토글) 통과 후 Vite base를 `/admin/`으로 전환하고 구 admin.html·lab.js·label.js·autofill.js·vendor/qrcode.js 제거(랩 프론트의 단일 소스는 apps/lab + packages/label·autofill). 이 과정에서 **원격 D1에 `migrate_logos.sql`·`migrate_archived.sql`이 미적용 상태였음을 발견**(구버전에서도 로고 저장·덱 숨기기가 원격에서 깨져 있었음) — 순서대로 적용해 해결 |
+| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 3 (프론트·스토리지)** — ① 라벨 렌더러·자동 채우기 파서를 `@bnhd/label`·`@bnhd/autofill` 패키지로 추출(qrcode-generator·jsqr npm 의존, 테스트 단일 소스) ② **랩을 React 19 + Vite + TS로 이식**(`apps/lab`) — 폼·라벨 디자인 토글(우선순위 ↑↓, 자동 체크)·로고 관리·목록·CSV 백업·AI 자동 채우기 전 기능 파리티, `/lab` 경로 병행 배포로 검증 후 `/admin` 교체 예정(스트랭글러), 빌드 산출물은 gitignore + CI가 배포 직전 빌드 ③ **로고 저장을 R2로 이전**(`bnhd-logos` 버킷, 키 `{유저코드}/{로스터리}`) — API 계약 불변(GET이 R2 바이트를 data URL로 재조립), 레거시 인라인 행은 재저장 시 자연 이전, `migrate_logos_r2.sql` |
+| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 2 (인증)** — ① **세션 토큰 도입**: `POST /api/login` → `bhs_` 토큰 발급(90일 만료, 서버엔 SHA-256 해시만 저장, `DELETE /api/session`으로 폐기), 가입·복구 응답에도 토큰 포함(즉시 로그인). 브라우저는 더 이상 **암호(PIN)를 저장·전송하지 않음** — 공용 `session.js`가 lab/deck에서 세션을 관리하고, 구버전이 저장해 둔 PIN은 첫 방문 시 세션으로 자동 교환 후 삭제. 레거시 `Bearer 유저코드:암호`도 이행기 동안 유지 ② **D1 기반 인증 rate limit**: 실패 유저코드당 10회/10분·IP당 30회/10분 초과 시 429 — 4자리 암호 전수 대입 차단(한도 초과 시 정답도 차단, 세션 인증은 무관), 초대코드 추측(가입)·복구키 추측도 IP 단위 제한 ③ `migrate_sessions.sql`(sessions·auth_attempts), 세션·rate limit 통합 테스트 8종 추가(총 71 tests). 패스키(WebAuthn)는 후속 라운드로 분리 |
+| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 0·1** ([MIGRATION_PLAN.md](MIGRATION_PLAN.md)) — ① npm workspaces 모노레포 + TypeScript + Biome + Vitest 도입, 기존 테스트 Vitest 이식 ② **API를 Hono(TS)로 이식**: `packages/api`(라우트·인증·SSRF 가드) + `packages/schema`(원두 필드 단일 소스 — CSV 헤더·필수 규칙·Zod 스키마 파생), Pages Functions는 5줄 어댑터(`[[path]].ts`)만 남김 ③ **Drizzle ORM** 도입(테이블 구조 변경 없음, 스키마 드리프트 가드 테스트) ④ **workerd+D1 통합 테스트 19종** — 가입/복구/CRUD/보관/백업·복원/로고/SSRF 계약 전 구간 검증(63 tests) ⑤ CI에 lint+typecheck 추가, 배포 잡에 npm ci. API 계약(경로·상태코드·메시지)은 완전 동일 — 프론트 무수정, 라이브 무중단 |
 | 2026-07-10 | **필수 정보 재정의 라운드** — 싱글오리진 원두 기준 필수 항목을 **[로스터리·국가(산지)·품종·가공방식·로스팅일·패키징일]** 로 확정하고, 기존엔 선택이었던 **품종·가공방식을 필수로 승격**(클라이언트 `missingRequiredFields`·서버 `REQUIRED_LABELS` 동시 반영) — 품종 입력에도 가공방식과 동일한 방식으로 **"블렌드 (여러 품종 혼합)" 데이터리스트 옵션**을 추가해, 특정하기 어려운 블렌드 원두는 이 옵션 선택만으로 필수 조건을 만족(값이 채워짐)하고 라벨 인쇄 시에는 `stripParen`으로 괄호 설명이 잘려 "블렌드"만 짧게 표시됨. 플레이버 노트는 필수는 아니되 **"권장" 배지**(포인트 컬러 테두리)를 달아 반필수 수준으로 입력을 유도, 라벨도 "Flavor Notes (플레이버 노트)" → **"플레이버 노트"** 로 간결하게 정리 |
 
 ## 남은 일

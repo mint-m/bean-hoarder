@@ -20,14 +20,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build --workspace @bnhd/lab
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
 
   deploy:
-    needs: test
+    needs: [test, e2e]
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
+      # Pages Functions가 npm 패키지(hono, drizzle, @bnhd/*)를 import하므로
+      # wrangler 번들링 전에 워크스페이스 의존성이 설치되어 있어야 한다.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # 랩(React) 빌드 산출물(v2/public/admin)은 gitignore — 배포 직전에 생성한다
+      - run: npm run build --workspace @bnhd/lab
       # deploy 브랜치 → Cloudflare Pages 'main'(프로덕션, bnhd.pages.dev)
       # main 브랜치    → Cloudflare Pages 'preview'(프리뷰, preview.bnhd.pages.dev)
       - name: Determine Cloudflare Pages branch
