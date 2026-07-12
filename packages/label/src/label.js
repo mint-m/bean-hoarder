@@ -12,7 +12,7 @@ export const BASE_URL = "HTTPS://BNHD.PAGES.DEV";
 
 const SANS = "Arial, Helvetica, sans-serif";
 const MONO = "Consolas, 'Courier New', monospace";
-const QUIET = 1.3;
+const _QUIET = 1.3;
 
 // 감열 라벨 프린터(203dpi) 도트 피치 ≈ 0.12512mm. 렌더 캔버스가 mm→px 반올림되므로
 // 0.125mm(8px/mm) 격자로 스냅하면 검증·다운로드 PNG에서 QR 모듈 경계가 픽셀에 정확히 떨어진다.
@@ -202,7 +202,7 @@ function fitText(text, size, factor, maxW) {
     if (u > budget) break;
     out += ch;
   }
-  return out.trimEnd() + "…";
+  return `${out.trimEnd()}…`;
 }
 
 // 폭 예산에 맞춰 최대 maxLines줄로 나누고, 마지막 줄이 넘치면 말줄임.
@@ -453,9 +453,9 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   let rowY = specTop;
   specLayout.rows.forEach((row) => {
     if (row.items.length === 2) {
-      row.items.forEach(([f, val], i) =>
-        els.push(specCell(S, colX[i], rowY, labelOf(f), val, specValueSize, INK)),
-      );
+      row.items.forEach(([f, val], i) => {
+        els.push(specCell(S, colX[i], rowY, labelOf(f), val, specValueSize, INK));
+      });
       rowY += S.specLH;
     } else if (row.lines) {
       const [f] = row.items[0];
@@ -553,7 +553,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
 }
 
 function b64EncodeUnicode(str) {
-  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode("0x" + p1)));
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(`0x${p1}`)));
 }
 
 // SVG 문자열의 viewBox에서 라벨 실치수(mm)를 읽는다 — 사이즈별 렌더 크기 대응
@@ -579,7 +579,7 @@ export function renderCanvas(svg, dpi) {
       resolve({ canvas, ctx, pxW, pxH });
     };
     img.onerror = reject;
-    img.src = "data:image/svg+xml;base64," + b64EncodeUnicode(svg);
+    img.src = `data:image/svg+xml;base64,${b64EncodeUnicode(svg)}`;
   });
 }
 

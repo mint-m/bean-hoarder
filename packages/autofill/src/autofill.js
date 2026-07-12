@@ -224,7 +224,7 @@ export function parseBeanText(text) {
         chars += lines[j].length;
       }
       if (parts.length) {
-        out.MEMO = (out.MEMO ? out.MEMO + " " : "") + parts.join(" ").trim();
+        out.MEMO = (out.MEMO ? `${out.MEMO} ` : "") + parts.join(" ").trim();
         i = j - 1; // 소비한 줄들을 다시 라벨 후보로 재검사하지 않도록 건너뛴다
       }
     } else {
@@ -248,8 +248,11 @@ export function parseBeanText(text) {
   if (out.HARVEST) {
     let m = /(20\d{2})\s*[/-]\s*(?:20)?(\d{2})/.exec(out.HARVEST);
     if (m) out.HARVEST = `${m[1].slice(2)}/${m[2]}`;
-    else if ((m = /^(20\d{2})$/.exec(out.HARVEST.trim()))) out.HARVEST = m[1].slice(2);
-    else out.HARVEST = normalizeHarvestMonths(out.HARVEST);
+    else {
+      m = /^(20\d{2})$/.exec(out.HARVEST.trim());
+      if (m) out.HARVEST = m[1].slice(2);
+      else out.HARVEST = normalizeHarvestMonths(out.HARVEST);
+    }
   }
 
   // 라벨 인식으로 이미 채운 고도·용량은 표기가 제각각이므로("1900-2250m", "150g" 등)
@@ -285,8 +288,7 @@ export function parseBeanText(text) {
     let best = null;
     for (const p of PROCESS_LIST) {
       const re = new RegExp(`\\b${p.replace(/[- ]/g, "[- ]")}\\b(\\s*\\([^)]*\\))?`, "gi");
-      let m;
-      while ((m = re.exec(whole))) {
+      for (const m of whole.matchAll(re)) {
         if (!best || m[0].length > best.length) best = m[0];
       }
     }
