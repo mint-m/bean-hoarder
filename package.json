@@ -19,10 +19,10 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.3",
     "@cloudflare/vitest-pool-workers": "^0.18.4",
-    "@cloudflare/workers-types": "^4.20260702.1",
+    "@cloudflare/workers-types": "^5.20260712.1",
     "@types/node": "^26.1.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.110.0"
   }
 }
