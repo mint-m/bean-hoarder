@@ -5,6 +5,7 @@ import { z } from "zod";
 
 export const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 export const PIN_RE = /^\d{4}$/;
+export const USERCODE_RE = /^[A-Z0-9]{4}$/;
 
 /** 필드별 저장 길이 상한 — 라벨·조회 페이지 표시에 충분한 수준으로 자른다 */
 export const MAX_FIELD_LEN = 1000;
@@ -127,6 +128,10 @@ const looseString = z
 export const signupBodySchema = z
   .object({ invite: z.unknown().optional(), password: looseString.catch("") })
   .catch({ invite: undefined, password: "" });
+
+export const loginBodySchema = z
+  .object({ usercode: looseString.catch(""), password: looseString.catch("") })
+  .catch({ usercode: "", password: "" });
 
 export const recoverBodySchema = z
   .object({ recovery_key: looseString.catch(""), password: looseString.catch("") })

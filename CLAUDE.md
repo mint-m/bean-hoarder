@@ -32,6 +32,7 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   스키마·타입이 전부 여기서 파생. **필드 추가 = 이 배열 한 줄 + D1 마이그레이션 SQL.**
 - `packages/api/` — `@bnhd/api`: Hono 라우터·인증·Drizzle(D1)·SSRF 가드.
   `test/app.test.ts`가 **API 계약 문서** — 상태 코드·메시지를 바꾸는 변경은 계약 파괴.
+- `v2/public/session.js` — 세션 저장·레거시 PIN 교환 공용 모듈 (`window.bhSession`, lab/deck 공유).
 - `v2/public/label.js` — 라벨 SVG 렌더러 (3사이즈). 순수 모듈, 테스트 대상.
 - `v2/public/autofill.js` — 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
 - `tests/` — 레거시 프론트 모듈(label/autofill) 단위 테스트 (v2 소스를 직접 import).

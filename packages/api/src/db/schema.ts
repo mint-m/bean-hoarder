@@ -40,6 +40,21 @@ export const beans = sqliteTable(
   (t) => [index("idx_beans_user").on(t.usercode)],
 );
 
+// 세션 토큰 — 원문이 아니라 SHA-256 해시를 저장, 만료 90일 고정 (Phase 2 인증)
+export const sessions = sqliteTable("sessions", {
+  token_hash: text().primaryKey(),
+  usercode: text().notNull(),
+  created_at: text().notNull().default(sql`(datetime('now'))`),
+  expires_at: text().notNull(),
+});
+
+// 인증 시도 rate limit — bucket당 고정 윈도우 실패 카운터
+export const authAttempts = sqliteTable("auth_attempts", {
+  bucket: text().primaryKey(),
+  count: integer().notNull().default(0),
+  reset_at: text().notNull(),
+});
+
 export const logos = sqliteTable(
   "logos",
   {
