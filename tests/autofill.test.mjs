@@ -1,8 +1,8 @@
 // 자동 채우기 휴리스틱 파서 단위 테스트 — vitest
 
 import assert from "node:assert/strict";
+import { parseBeanText } from "@bnhd/autofill";
 import { test } from "vitest";
-import { parseBeanText } from "../v2/public/autofill.js";
 
 test("라벨: 값 형식 스펙시트 인식", () => {
   const out = parseBeanText(
