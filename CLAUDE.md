@@ -18,8 +18,9 @@ cd v2
 npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
 npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
 npx wrangler pages dev public --binding INVITE_CODE=test \
-  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409              # http://localhost:8788
-# --d1 플래그 필수: wrangler 4.8x pages dev가 wrangler.toml의 d1_databases를 무시함
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
+  --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
+# --d1/--r2 플래그 필수: wrangler 4.8x pages dev가 wrangler.toml의 바인딩을 무시함
 ```
 
 데모 계정: 유저코드 `DEMO` / 암호 `0000`.
@@ -35,8 +36,13 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - `v2/public/session.js` — 세션 저장·레거시 PIN 교환 공용 모듈 (`window.bhSession`, lab/deck 공유).
 - `v2/public/label.js` — 라벨 SVG 렌더러 (3사이즈). 순수 모듈, 테스트 대상.
 - `v2/public/autofill.js` — 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
-- `tests/` — 레거시 프론트 모듈(label/autofill) 단위 테스트 (v2 소스를 직접 import).
-- `apps/` — Phase 3에서 React 랩 앱이 들어올 자리 (npm workspaces).
+- `packages/label/` — `@bnhd/label`: 라벨 SVG 렌더러 (3사이즈, QR 검증). 테스트 대상 단일 소스.
+- `packages/autofill/` — `@bnhd/autofill`: 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
+- `apps/lab/` — `@bnhd/lab`: 랩 React 앱 (Vite, base /lab/). 빌드 산출물 `v2/public/lab`은
+  gitignore — CI가 배포 직전 빌드. 로컬: `npm run dev -w @bnhd/lab` (wrangler 8790에 프록시).
+  검증 후 `/admin`을 이 앱으로 교체 예정 — 그때까지 v2/public의 admin.html·lab.js·label.js·
+  autofill.js는 동결(수정 금지, 수정은 packages/apps 쪽에).
+- `tests/` — label/autofill 단위 테스트 (`@bnhd/*` 패키지를 import).
 - 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml`).
   `main → deploy` 승격 PR은 **Squash and merge** (linear history 규칙).
 

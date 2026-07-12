@@ -60,7 +60,8 @@ Next.js(App Router) + Neon/Supabase + Vercel은 국내 채용공고 키워드 �
 > Functions에 마운트"로 확정 — bnhd.pages.dev 도메인·QR·CI 보존, Hono 앱은 런타임 중립이라
 > 추후 Workers 이전은 설정 변경만으로 가능) / Phase 2 ✅ **범위 조정**: 세션 토큰 + D1 기반
 > rate limit 먼저 배포하고 패스키(WebAuthn)는 후속 라운드로 분리 (사용자 결정), Turnstile은
-> 코드 레벨 rate limit이 커버해 보류 / Phase 3~4 예정.
+> 코드 레벨 rate limit이 커버해 보류 / Phase 3 구현 완료(React lab은 /lab 병행 배포로 검증 후
+> /admin 교체 — 사용자 결정으로 로고 R2 이전 포함, 프로덕션 R2 버킷 생성 필요) / Phase 4 예정.
 
 ### Phase 0 — 기반 ✅
 

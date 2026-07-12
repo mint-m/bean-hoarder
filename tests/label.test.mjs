@@ -3,16 +3,8 @@
 // (renderCanvas/verifyQr는 브라우저 전용 — 라이브에서 렌더링 때마다 자동 실행됨).
 
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
+import { BASE_URL, buildLabelSVG, DEFAULT_DESIGN, SIZE_SPECS, SPEC_POOL, SUB_POOL } from "@bnhd/label";
 import { test } from "vitest";
-
-const require = createRequire(import.meta.url);
-// label.js는 브라우저에서 <script>로 선로드되는 전역 qrcode에 의존 — 테스트에선 vendored 사본을 주입
-globalThis.qrcode = require("../v2/public/vendor/qrcode.js");
-
-const { buildLabelSVG, SIZE_SPECS, DEFAULT_DESIGN, SPEC_POOL, SUB_POOL, BASE_URL } = await import(
-  "../v2/public/label.js"
-);
 
 const ROW = {
   KEY: "TEST26-001",

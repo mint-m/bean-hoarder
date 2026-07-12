@@ -55,12 +55,15 @@ export const authAttempts = sqliteTable("auth_attempts", {
   reset_at: text().notNull(),
 });
 
+// 로고: 신규 행은 R2에 바이트 저장 + content_type 메타만 D1에 (data_url='').
+// 레거시 행은 data_url에 인라인 — 재저장 시점에 R2로 자연 이전(lazy migration).
 export const logos = sqliteTable(
   "logos",
   {
     usercode: text().notNull(),
     roastery: text().notNull(),
     data_url: text().notNull(),
+    content_type: text().notNull().default(""),
     updated_at: text().notNull().default(sql`(datetime('now'))`),
   },
   (t) => [primaryKey({ columns: [t.usercode, t.roastery] })],

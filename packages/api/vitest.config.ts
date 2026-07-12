@@ -13,6 +13,7 @@ export default defineConfig({
         compatibilityDate: "2026-05-03",
         compatibilityFlags: ["nodejs_compat"],
         d1Databases: ["DB"],
+        r2Buckets: ["LOGOS"],
         bindings: {
           INVITE_CODE: "TEST-INVITE",
           TEST_SCHEMA_SQL: schemaSql,
