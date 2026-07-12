@@ -63,7 +63,16 @@ export async function geminiExtract(apiKey: string, text: string): Promise<Recor
     throw new Error(body?.error?.message || `HTTP ${res.status}`);
   }
   const raw = body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  if (!raw) {
+    // 안전 필터 차단·빈 입력 등으로 candidates가 비는 경우 — JSON.parse("")로 죽지 않게 명시적 안내
+    throw new Error("AI가 결과를 반환하지 않았습니다 (안전 필터 또는 빈 응답)");
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch (_e) {
+    throw new Error("AI 응답을 해석하지 못했습니다 — 다시 시도해 주세요");
+  }
   const out: Record<string, string> = {};
   for (const k of AI_FIELD_KEYS) {
     const v = parsed[k];

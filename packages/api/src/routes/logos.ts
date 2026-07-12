@@ -27,20 +27,23 @@ export async function listLogos(c: Context<AppEnv>): Promise<Response> {
     .orderBy(schema.logos.roastery)
     .all();
 
-  const logos: { roastery: string; data_url: string }[] = [];
-  for (const row of rows) {
-    if (row.data_url) {
-      // 레거시 인라인 행
-      logos.push({ roastery: row.roastery, data_url: row.data_url });
-      continue;
-    }
-    const obj = await c.env.LOGOS.get(r2Key(user.usercode, row.roastery));
-    if (!obj) continue; // R2 오브젝트 유실 — 행만 남은 경우 목록에서 제외
-    logos.push({
-      roastery: row.roastery,
-      data_url: bytesToDataUrl(row.content_type || "image/png", await obj.arrayBuffer()),
-    });
-  }
+  // R2 조회는 병렬로 — 순차 await는 로고 수만큼 지연이 누적된다
+  const logos = (
+    await Promise.all(
+      rows.map(async (row) => {
+        if (row.data_url) {
+          // 레거시 인라인 행
+          return { roastery: row.roastery, data_url: row.data_url };
+        }
+        const obj = await c.env.LOGOS.get(r2Key(user.usercode, row.roastery));
+        if (!obj) return null; // R2 오브젝트 유실 — 행만 남은 경우 목록에서 제외
+        return {
+          roastery: row.roastery,
+          data_url: bytesToDataUrl(row.content_type || "image/png", await obj.arrayBuffer()),
+        };
+      }),
+    )
+  ).filter((l): l is { roastery: string; data_url: string } => l !== null);
   return json({ ok: true, logos });
 }
 

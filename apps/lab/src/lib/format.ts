@@ -54,12 +54,15 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function download(filename: string, blob: Blob): void {
+export function download(filename: string, blob: Blob | null): void {
+  if (!blob) return; // Blob 생성 실패(캔버스 오염 등) 시 조용히 무시 — createObjectURL(null)은 런타임 에러
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(a.href);
+  // 즉시 revoke하면 일부 브라우저에서 다운로드가 시작되기 전에 URL이 해제될 수 있다
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 /** QR 단독 이미지(콰이엇존 4모듈 포함, 512px급)를 클립보드에 복사 */
