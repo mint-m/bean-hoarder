@@ -63,7 +63,12 @@ Next.js(App Router) + Neon/Supabase + Vercel은 국내 채용공고 키워드 �
 > 코드 레벨 rate limit이 커버해 보류 / Phase 3 ✅ — React lab을 /lab 병행 배포로 검증한 뒤
 > **/admin을 React 앱으로 교체**, 구 admin.html·lab.js·label.js·autofill.js·vendor/qrcode.js 제거.
 > 로고 R2 이전 완료(사용자 결정, bnhd-logos 버킷). 이 과정에서 원격 D1에 미적용 상태였던
-> migrate_logos.sql·migrate_archived.sql도 발견·적용됨 / Phase 4 예정.
+> migrate_logos.sql·migrate_archived.sql도 발견·적용됨 / Phase 4 ✅ — ① 5xx 구조화 JSON
+> 로깅(onError) ② D1 자동 백업: Actions cron(매일 04:17 KST) d1 export → artifact 30일 보관,
+> Time Travel(30일)이 1차 안전망 — 복구 절차는 README 운영 섹션 ③ Playwright 스모크(공개
+> 조회·로그인·등록·덱)를 CI 게이트로 추가(deploy가 e2e 통과를 요구) ④ Sentry는 외부 계정
+> 필요로 보류(구조화 로그+대시보드로 충분), 커스텀 도메인·Workers 이전은 QR 호환·0원 유지를
+> 위해 보류 확정. **마이그레이션 완료.**
 
 ### Phase 0 — 기반 ✅
 
