@@ -1,13 +1,13 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// 랩(React)은 /lab/ 아래로 빌드된다 — Pages 정적 서빙(v2/public/lab)에 그대로 올라간다.
-// 검증 완료 후 /admin을 이 앱으로 교체하는 것이 Phase 3의 마지막 단계.
+// 랩(React)은 /admin/ 아래로 빌드된다 — Pages 정적 서빙(v2/public/admin)에 그대로 올라간다.
+// (프리뷰 검증을 마치고 구 admin.html을 교체한 상태 — Phase 3 완료.)
 export default defineConfig({
-  base: "/lab/",
+  base: "/admin/",
   plugins: [react()],
   build: {
-    outDir: "../../v2/public/lab",
+    outDir: "../../v2/public/admin",
     emptyOutDir: true,
   },
   server: {

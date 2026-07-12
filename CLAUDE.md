@@ -27,7 +27,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 
 ## 아키텍처 지도
 
-- `v2/public/` — 라이브 정적 페이지 (index=QR 조회, admin=랩, deck=덱). 브라우저 ES 모듈, 빌드 없음.
+- `v2/public/` — 라이브 정적 페이지 (index=QR 조회, deck=덱 — 브라우저 ES 모듈, 빌드 없음).
+  admin/은 apps/lab의 빌드 산출물(gitignore).
 - `v2/functions/api/[[path]].ts` — Pages Functions 어댑터 (5줄) → `@bnhd/api`에 위임.
 - `packages/schema/` — `@bnhd/schema`: 원두 필드 단일 소스(BEAN_FIELDS). CSV 헤더·필수 규칙·Zod
   스키마·타입이 전부 여기서 파생. **필드 추가 = 이 배열 한 줄 + D1 마이그레이션 SQL.**
@@ -38,10 +39,10 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - `v2/public/autofill.js` — 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
 - `packages/label/` — `@bnhd/label`: 라벨 SVG 렌더러 (3사이즈, QR 검증). 테스트 대상 단일 소스.
 - `packages/autofill/` — `@bnhd/autofill`: 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
-- `apps/lab/` — `@bnhd/lab`: 랩 React 앱 (Vite, base /lab/). 빌드 산출물 `v2/public/lab`은
-  gitignore — CI가 배포 직전 빌드. 로컬: `npm run dev -w @bnhd/lab` (wrangler 8790에 프록시).
-  검증 후 `/admin`을 이 앱으로 교체 예정 — 그때까지 v2/public의 admin.html·lab.js·label.js·
-  autofill.js는 동결(수정 금지, 수정은 packages/apps 쪽에).
+- `apps/lab/` — `@bnhd/lab`: 랩 React 앱 (Vite, base /admin/) — **/admin이 이 앱이다**.
+  빌드 산출물 `v2/public/admin`은 gitignore — CI가 배포 직전 빌드하므로 로컬에서도
+  `npm run build -w @bnhd/lab` 후에야 wrangler pages dev에서 /admin이 뜬다.
+  로컬 개발: `npm run dev -w @bnhd/lab` (wrangler 8790에 /api 프록시).
 - `tests/` — label/autofill 단위 테스트 (`@bnhd/*` 패키지를 import).
 - 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml`).
   `main → deploy` 승격 PR은 **Squash and merge** (linear history 규칙).
