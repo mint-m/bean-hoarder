@@ -56,3 +56,12 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   count    INTEGER NOT NULL DEFAULT 0,
   reset_at TEXT NOT NULL
 );
+
+-- R2 비용 백스톱 — 서비스 전역 월간 R2 쓰기(Class A) 카운터. 단일 행(id='global').
+-- 월이 바뀌면 write_count 리셋, 임계값 초과 시 로고 쓰기를 거부해 요금 폭탄을 물리적으로 막는다.
+-- (스토리지 상한은 별도 테이블 없이 R2 백드 logos 행 수로 강제 — packages/api/src/lib/budget.ts)
+CREATE TABLE IF NOT EXISTS r2_usage (
+  id          TEXT PRIMARY KEY,       -- 'global'
+  month       TEXT NOT NULL,          -- 현재 집계 월 'YYYY-MM'
+  write_count INTEGER NOT NULL DEFAULT 0
+);
