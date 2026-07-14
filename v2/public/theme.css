@@ -34,6 +34,7 @@
   --focus-ring: color-mix(in srgb, var(--accent) 45%, transparent);
   --t: .15s ease;                         /* 공통 트랜지션 속도·이징 */
   --shadow: 0 1px 2px rgba(16, 16, 18, .05), 0 16px 40px -20px rgba(16, 16, 18, .25);
+  --shadow-hover: 0 1px 2px rgba(16, 16, 18, .06), 0 10px 20px -14px rgba(16, 16, 18, .32);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,6 +52,7 @@
     --bad: #f08575;
     --scrim: rgba(0, 0, 0, .62);
     --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 16px 40px -20px rgba(0, 0, 0, .8);
+    --shadow-hover: 0 1px 2px rgba(0, 0, 0, .6), 0 10px 20px -14px rgba(0, 0, 0, .9);
   }
 }
 
@@ -87,7 +89,7 @@ button, .btn {
   padding: 8px 14px;
   transition: border-color var(--t), background var(--t), color var(--t);
 }
-button:hover { border-color: var(--ink); }
+button:hover, .btn:hover { border-color: var(--ink); }
 button.primary {
   background: var(--ink);
   border-color: var(--ink);

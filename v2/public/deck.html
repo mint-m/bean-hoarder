@@ -54,7 +54,7 @@
      기본적으로 앞 카드 위에 그려지므로, 뒤 카드들을 비켜주기만 해도 호버한 카드가 온전히 드러난다. */
   .wcard:hover, .wcard:focus-within {
     transform: translateY(-8px);
-    box-shadow: 0 1px 2px rgba(16,16,18,.06), 0 10px 20px -14px rgba(16,16,18,.32);
+    box-shadow: var(--shadow-hover);
   }
   .wcard:hover ~ .wcard, .wcard:focus-within ~ .wcard {
     transform: translateY(54px);
