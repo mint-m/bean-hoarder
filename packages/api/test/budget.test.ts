@@ -85,6 +85,51 @@ test("월이 바뀌면 카운터가 리셋되어 저장이 다시 허용된다",
   expect(row?.write_count).toBe(1); // 새 달 첫 쓰기
 });
 
+test("동시 요청이 몰려도 남은 예산만큼만 통과시킨다 (원자적 예약 — TOCTOU 레이스 방지)", async () => {
+  const user = await signupUser();
+  // 예산을 1건만 남기고 채워둔다
+  await env.DB.prepare("INSERT INTO r2_usage (id, month, write_count) VALUES ('global', ?, ?)")
+    .bind(thisMonth(), MONTHLY_WRITE_BUDGET - 1)
+    .run();
+
+  // 동시에 5개 요청 — 남은 예산은 1이므로 정확히 1개만 성공해야 함
+  const results = await Promise.all(
+    ["race1", "race2", "race3", "race4", "race5"].map((name) => putLogo(user, name)),
+  );
+  expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+  expect(results.filter((r) => r.status === 503)).toHaveLength(4);
+
+  const row = await env.DB.prepare("SELECT write_count FROM r2_usage WHERE id = 'global'").first<{
+    write_count: number;
+  }>();
+  expect(row?.write_count).toBe(MONTHLY_WRITE_BUDGET); // 초과분 없이 정확히 상한
+});
+
+test("R2 저장이 실패하면 예약했던 쓰기 카운트를 되돌린다", async () => {
+  const user = await signupUser();
+  const failingLogos = {
+    put: () => {
+      throw new Error("R2 unavailable");
+    },
+  } as unknown as R2Bucket;
+  const failingEnv = { ...env, LOGOS: failingLogos };
+
+  const res = await app.fetch(
+    new Request("https://bnhd.pages.dev/api/logos", {
+      method: "PUT",
+      body: JSON.stringify({ roastery: "fails", data_url: PNG_DATAURL }),
+      headers: user.auth,
+    }),
+    failingEnv,
+  );
+  expect(res.status).toBe(500);
+
+  const row = await env.DB.prepare("SELECT write_count FROM r2_usage WHERE id = 'global'").first<{
+    write_count: number;
+  }>();
+  expect(row?.write_count ?? 0).toBe(0); // 예약이 되돌려져 카운터에 흔적이 없어야 함
+});
+
 test("스토리지 개수 상한 도달 시 신규 로고는 거부하되 기존 로고 덮어쓰기는 허용한다", async () => {
   const user = await signupUser();
   // R2 백드 로고 행을 상한만큼 채운다 (개수 판정만 필요 — 실제 R2 오브젝트는 불필요).
