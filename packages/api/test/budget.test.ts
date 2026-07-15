@@ -2,14 +2,16 @@
 import { env } from "cloudflare:test";
 import { beforeEach, expect, test } from "vitest";
 import app from "../src/app";
-import { MAX_R2_LOGO_OBJECTS, MONTHLY_WRITE_BUDGET, R2_BUDGET_ERROR } from "../src/lib/budget";
+import { MONTHLY_WRITE_BUDGET, R2_BUDGET_ERROR, setLimitsForTesting } from "../src/lib/budget";
 
 // r2_usage는 고정 PK('global') 싱글톤이고 logos 개수는 전역 집계라, 이 풀은 테스트별 스토리지
 // 롤백에 의존하지 않는다(다른 테스트는 랜덤 유저코드로 충돌을 피함). 백스톱 상태를 결정적으로
-// 검증하려면 매 테스트 전에 두 테이블을 비운다.
+// 검증하려면 매 테스트 전에 두 테이블을 비우고 한도를 기본값으로 되돌린다(개별 테스트가
+// setLimitsForTesting으로 낮춰도 다음 테스트로 새지 않도록).
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM r2_usage").run();
   await env.DB.prepare("DELETE FROM logos").run();
+  setLimitsForTesting({ monthlyWriteBudget: 100_000, maxR2LogoObjects: 20_000 });
 });
 
 const INVITE = "TEST-INVITE";
@@ -132,10 +134,12 @@ test("R2 저장이 실패하면 예약했던 쓰기 카운트를 되돌린다", 
 
 test("스토리지 개수 상한 도달 시 신규 로고는 거부하되 기존 로고 덮어쓰기는 허용한다", async () => {
   const user = await signupUser();
-  // R2 백드 로고 행을 상한만큼 채운다 (개수 판정만 필요 — 실제 R2 오브젝트는 불필요).
-  // MAX_R2_LOGO_OBJECTS는 우리 코드의 숫자 상수라 문자열 보간이 안전하다.
+  // 상한을 작게 낮춰서 검증 — 실제 상한(MAX_R2_LOGO_OBJECTS)만큼 행을 채우면
+  // WITH RECURSIVE가 SQLite 재귀 깊이 한도에 걸리거나 테스트가 불필요하게 느려진다.
+  const CAP = 5;
+  setLimitsForTesting({ maxR2LogoObjects: CAP });
   await env.DB.prepare(
-    `WITH RECURSIVE c(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM c WHERE value < ${MAX_R2_LOGO_OBJECTS})
+    `WITH RECURSIVE c(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM c WHERE value < ${CAP})
      INSERT INTO logos (usercode, roastery, data_url, content_type, updated_at)
      SELECT ?, 'CAP' || value, '', 'image/png', datetime('now') FROM c`,
   )

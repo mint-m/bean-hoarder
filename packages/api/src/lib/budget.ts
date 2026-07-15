@@ -18,14 +18,23 @@
 // 참조가 남는다(지금의 "R2 성공 후에만 D1 기록" 불변식이 깨짐) — 그래서 best-effort 체크로
 // 남겨둔다. 스토리지 카운트는 실시간 count(*)라 로고 삭제 시 즉시 자연 치유되고, 레이스로 한도를
 // 살짝 넘겨도 오브젝트당 최대 100KB라 스토리지비 영향은 무시할 수준이라 감수 가능한 트레이드오프다.
-import { sql } from "drizzle-orm";
+import { and, count, eq, ne, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { schema } from "../db";
 
 /** R2 put/월 상한 (무료 100만의 10% — 청구가 시작되는 지점까지 10배 여유). 초과 시 로고 쓰기 차단. */
-export const MONTHLY_WRITE_BUDGET = 100_000;
+export let MONTHLY_WRITE_BUDGET = 100_000;
 /** R2 저장 로고 총 개수 상한 (×100KB ≈ 2GB, 무료 10GB의 20%). 신규 오브젝트 생성만 막음. */
-export const MAX_R2_LOGO_OBJECTS = 20_000;
+export let MAX_R2_LOGO_OBJECTS = 20_000;
+
+/** 테스트 전용 — 상한값을 일시적으로 낮춰 경계 케이스를 대량 데이터 없이 검증한다. */
+export function setLimitsForTesting(limits: {
+  monthlyWriteBudget?: number;
+  maxR2LogoObjects?: number;
+}): void {
+  if (limits.monthlyWriteBudget !== undefined) MONTHLY_WRITE_BUDGET = limits.monthlyWriteBudget;
+  if (limits.maxR2LogoObjects !== undefined) MAX_R2_LOGO_OBJECTS = limits.maxR2LogoObjects;
+}
 
 export const R2_BUDGET_ERROR =
   "로고 저장이 일시 중단되었습니다 — 서비스 사용량 한도에 도달했습니다. 잠시 후 다시 시도하세요.";
@@ -76,13 +85,13 @@ export async function overStorageCap(db: Db, usercode: string, roastery: string)
   const existing = await db
     .select({ content_type: schema.logos.content_type })
     .from(schema.logos)
-    .where(sql`${schema.logos.usercode} = ${usercode} AND ${schema.logos.roastery} = ${roastery}`)
+    .where(and(eq(schema.logos.usercode, usercode), eq(schema.logos.roastery, roastery)))
     .get();
   if (existing && existing.content_type !== "") return false; // 기존 R2 키 덮어쓰기 → 순증 없음
   const row = await db
-    .select({ n: sql<number>`count(*)` })
+    .select({ n: count() })
     .from(schema.logos)
-    .where(sql`${schema.logos.content_type} != ''`)
+    .where(ne(schema.logos.content_type, ""))
     .get();
   return (row?.n ?? 0) >= MAX_R2_LOGO_OBJECTS;
 }
