@@ -141,9 +141,14 @@ export const archiveBodySchema = z
   .object({ archived: z.unknown().transform((v) => !!v) })
   .catch({ archived: false });
 
+// 로고의 로스터리명은 R2 오브젝트 키({usercode}/{roastery})에 그대로 들어간다.
+// R2 키는 평면 문자열이라 경로 탐색은 성립하지 않지만, 구분자(/·역슬래시)가 섞이면
+// 키 구조가 흐려지므로 심층 방어로 제거한다.
+const roasteryName = (s: string) => s.toUpperCase().replace(/[/\\]/g, "");
+
 export const logoPutBodySchema = z
   .object({
-    roastery: looseString.transform((s) => s.toUpperCase().slice(0, 80)).catch(""),
+    roastery: looseString.transform((s) => roasteryName(s).slice(0, 80)).catch(""),
     data_url: z
       .unknown()
       .transform((v) => String(v || ""))
@@ -152,7 +157,7 @@ export const logoPutBodySchema = z
   .catch({ roastery: "", data_url: "" });
 
 export const logoDeleteBodySchema = z
-  .object({ roastery: looseString.transform((s) => s.toUpperCase()).catch("") })
+  .object({ roastery: looseString.transform(roasteryName).catch("") })
   .catch({ roastery: "" });
 
 export const fetchBodySchema = z

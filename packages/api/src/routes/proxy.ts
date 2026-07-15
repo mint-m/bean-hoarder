@@ -87,6 +87,10 @@ export async function fetchExternal(c: Context<AppEnv>): Promise<Response> {
   if (!res) return json({ ok: false, error: "리다이렉트가 너무 많습니다." }, 502);
   if (!res.ok) return json({ ok: false, error: `대상 응답 오류 (HTTP ${res.status})` }, 502);
 
+  // Content-Length가 있으면 본문을 메모리에 올리기 전에 조기 차단 — 헤더는 신뢰할 수 없으므로
+  // 실제 크기 검사도 유지한다.
+  const declaredLen = Number(res.headers.get("content-length"));
+  if (declaredLen > 2_000_000) return json({ ok: false, error: "응답이 너무 큽니다 (2MB 제한)." }, 413);
   const buf = await res.arrayBuffer();
   if (buf.byteLength > 2_000_000) return json({ ok: false, error: "응답이 너무 큽니다 (2MB 제한)." }, 413);
   const ct = (res.headers.get("content-type") || "").toLowerCase();
