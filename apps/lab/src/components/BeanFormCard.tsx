@@ -279,7 +279,7 @@ export default function BeanFormCard(p: Props) {
           <div className="field">
             <label>고도</label>
             <div className="unit-wrap">
-              <input type="text" inputMode="numeric" placeholder="1900-2100" {...bind("ALTITUDE")} />
+              <input type="text" placeholder="1900-2100" {...bind("ALTITUDE")} />
               <span className="unit">m</span>
             </div>
           </div>
