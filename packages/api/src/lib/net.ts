@@ -32,6 +32,19 @@ export function hostBlocked(host: string): boolean {
   return false;
 }
 
+/**
+ * content-type 헤더의 charset으로 응답 바디를 디코딩한다 — 국내 구형 쇼핑몰·로스터리
+ * 사이트의 EUC-KR 대응. 미지정·미지원 charset이면 utf-8로 폴백한다.
+ */
+export function decodeBody(buf: ArrayBuffer, contentType: string): string {
+  const charset = (/charset=([^;\s]+)/i.exec(contentType)?.[1] || "utf-8").trim().replace(/^["']|["']$/g, "");
+  try {
+    return new TextDecoder(charset).decode(buf);
+  } catch (_e) {
+    return new TextDecoder("utf-8").decode(buf);
+  }
+}
+
 export function htmlToText(html: string): string {
   const s = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")

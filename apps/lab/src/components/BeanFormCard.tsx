@@ -75,6 +75,7 @@ interface Props {
   call: <T = Record<string, unknown>>(path: string, opts?: RequestInit) => Promise<ApiResult<T>>;
   recognizeText: (raw: string) => Promise<boolean>;
   runAiRecognition: (raw: string) => Promise<boolean>;
+  onRoasteryBlur: () => void;
 }
 
 export default function BeanFormCard(p: Props) {
@@ -234,7 +235,13 @@ export default function BeanFormCard(p: Props) {
         <label>
           로스터리<span className="req">*</span>
         </label>
-        <input type="text" list="dl-roastery" placeholder="SEY" {...bind("ROASTERY")} />
+        <input
+          type="text"
+          list="dl-roastery"
+          placeholder="SEY"
+          {...bind("ROASTERY")}
+          onBlur={p.onRoasteryBlur}
+        />
       </div>
       <div className="row2">
         <div className="field">
@@ -272,7 +279,7 @@ export default function BeanFormCard(p: Props) {
           <div className="field">
             <label>고도</label>
             <div className="unit-wrap">
-              <input type="text" inputMode="numeric" placeholder="1900-2100" {...bind("ALTITUDE")} />
+              <input type="text" placeholder="1900-2100" {...bind("ALTITUDE")} />
               <span className="unit">m</span>
             </div>
           </div>

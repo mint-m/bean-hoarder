@@ -6,6 +6,8 @@ import {
   FIELDS,
   IMPORT_REQUIRED_LABELS,
   KEY_RE,
+  logoDeleteBodySchema,
+  logoPutBodySchema,
   MAX_FIELD_LEN,
   missingRequired,
   pickFields,
@@ -63,6 +65,11 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     roast_date: "로스팅일",
     package_date: "패키징일",
   });
+});
+
+test("로고 로스터리명: 대문자 정규화 + 경로 구분자 제거 (R2 키 안전)", () => {
+  assert.equal(logoPutBodySchema.parse({ roastery: "a/b\\c", data_url: "" }).roastery, "ABC");
+  assert.equal(logoDeleteBodySchema.parse({ roastery: "../../evil" }).roastery, "....EVIL");
 });
 
 test("KEY_RE: 유저코드4 + 연도2 + 순번3", () => {

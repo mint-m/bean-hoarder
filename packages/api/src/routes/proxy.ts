@@ -5,8 +5,9 @@
 import { fetchBodySchema } from "@bnhd/schema";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
+import { bytesToDataUrl } from "../lib/dataurl";
 import { json } from "../lib/http";
-import { hostBlocked, htmlToText, isPrivateIp } from "../lib/net";
+import { decodeBody, hostBlocked, htmlToText, isPrivateIp } from "../lib/net";
 
 interface DohAnswer {
   type: number;
@@ -86,19 +87,20 @@ export async function fetchExternal(c: Context<AppEnv>): Promise<Response> {
   if (!res) return json({ ok: false, error: "리다이렉트가 너무 많습니다." }, 502);
   if (!res.ok) return json({ ok: false, error: `대상 응답 오류 (HTTP ${res.status})` }, 502);
 
+  // Content-Length가 있으면 본문을 메모리에 올리기 전에 조기 차단 — 헤더는 신뢰할 수 없으므로
+  // 실제 크기 검사도 유지한다.
+  const declaredLen = Number(res.headers.get("content-length"));
+  if (declaredLen > 2_000_000) return json({ ok: false, error: "응답이 너무 큽니다 (2MB 제한)." }, 413);
   const buf = await res.arrayBuffer();
   if (buf.byteLength > 2_000_000) return json({ ok: false, error: "응답이 너무 큽니다 (2MB 제한)." }, 413);
   const ct = (res.headers.get("content-type") || "").toLowerCase();
 
   if (ct.startsWith("image/")) {
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i += 0x8000)
-      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return json({ ok: true, kind: "image", dataUrl: `data:${ct.split(";")[0]};base64,${btoa(bin)}` });
+    return json({ ok: true, kind: "image", dataUrl: bytesToDataUrl(ct.split(";")[0] || ct, buf) });
   }
 
-  const text = htmlToText(new TextDecoder("utf-8").decode(buf));
+  // EUC-KR 등 비UTF-8 사이트 대응 — content-type charset을 따르고 실패 시 utf-8 폴백
+  const text = htmlToText(decodeBody(buf, ct));
   if (!text.trim()) return json({ ok: false, error: "텍스트를 추출하지 못했습니다." }, 422);
   return json({ ok: true, kind: "text", text: text.slice(0, 20000) });
 }

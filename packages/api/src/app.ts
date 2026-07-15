@@ -65,7 +65,20 @@ app.delete("/logos", authRequired, deleteLogo);
 app.post("/fetch", authRequired, fetchExternal);
 
 app.notFound(() => json({ ok: false, error: "not found" }, 404));
-app.onError((err) => json({ ok: false, error: `서버 오류: ${String(err)}` }, 500));
+// 5xx는 구조화 JSON으로 로깅 — wrangler pages deployment tail / 대시보드 Real-time Logs에서
+// method·path·stack으로 바로 원인을 추적할 수 있게 한다. 응답 형태는 종전과 동일.
+app.onError((err, c) => {
+  console.error(
+    JSON.stringify({
+      level: "error",
+      msg: String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+    }),
+  );
+  return json({ ok: false, error: `서버 오류: ${String(err)}` }, 500);
+});
 
 export default app;
 export type { AppEnv, Env } from "./env";
