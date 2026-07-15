@@ -113,7 +113,8 @@ export async function importCsv(c: Context<AppEnv>): Promise<Response> {
     else added++;
   }
 
-  // D1 batch는 단일 트랜잭션 — 부분 성공 없이 전체 반영 또는 전체 실패 (50개 단위 청크)
+  // D1 batch는 배치 크기 제한 때문에 50개 단위 청크로 나눠 실행한다 — 각 청크는 트랜잭션이지만
+  // 전체 복원이 원자적이진 않다. 행 단위 upsert(멱등)라 중간 실패 시 같은 파일 재실행으로 이어받으면 된다.
   for (let i = 0; i < stmts.length; i += 50) {
     const chunk = stmts.slice(i, i + 50);
     if (chunk.length) await db.batch(chunk as [(typeof chunk)[number], ...typeof chunk]);

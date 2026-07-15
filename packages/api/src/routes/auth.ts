@@ -36,6 +36,14 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
   const recoveryHash = await sha256hex(normalizeRecoveryKey(recoveryKey));
   for (let attempt = 0; attempt < 5; attempt++) {
     const usercode = randomUsercode();
+    // PBKDF2(25k회)는 CPU가 비싸다 — 해시 전에 가벼운 조회로 충돌을 걸러 CPU 한도 낭비를 막는다
+    // (조회~삽입 사이 레이스는 아래 try/catch의 UNIQUE 제약이 계속 방어).
+    const taken = await db
+      .select({ usercode: schema.users.usercode })
+      .from(schema.users)
+      .where(eq(schema.users.usercode, usercode))
+      .get();
+    if (taken) continue;
     const hash = await hashPassword(usercode, pin);
     try {
       await db.insert(schema.users).values({ usercode, pass_hash: hash, recovery_hash: recoveryHash }).run();

@@ -22,6 +22,7 @@ export function parseDataUrl(dataUrl: string): ParsedDataUrl | null {
 export function bytesToDataUrl(contentType: string, buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  // 스프레드 인자 수를 8K로 제한 — 32K는 일부 엔진에서 호출 스택 한도에 걸릴 수 있다
+  for (let i = 0; i < bytes.length; i += 0x2000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x2000));
   return `data:${contentType};base64,${btoa(bin)}`;
 }
