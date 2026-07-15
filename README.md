@@ -62,6 +62,7 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 - **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
+- **R2 비용 백스톱**: 로고 저장(`PUT /api/logos`)에 서비스 전역 물리적 상한 내장(`packages/api/src/lib/budget.ts`) — 월간 R2 쓰기 10만 회·R2 저장 로고 2만 개 초과 시 503으로 저장 거부(무료 티어를 넘겨 과금되기 전에 차단). 삭제는 무과금이라 제한하지 않는다(한도에 걸려도 삭제로 공간 확보 가능). 코드 밖 안전망으로 **Cloudflare 대시보드 → R2/Billing 사용량 알림**을 별도로 설정할 것(대시보드 예산은 서비스를 멈추지 않는 알림뿐이라 코드 백스톱이 실제 상한).
 - **DB 백업 (3중 안전망)**:
   1. **D1 Time Travel** — 최근 30일 내 임의 시점 복구: `npx wrangler d1 time-travel info bnhd-v2`로 북마크 확인, `npx wrangler d1 time-travel restore bnhd-v2 --timestamp=<unix|ISO>`로 복구.
   2. **자동 덤프** — `.github/workflows/backup.yml`이 매일 04:17 KST에 `wrangler d1 export`를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 `bnhd-v2-backup.sql`을 받아 `npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql` (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 `CLOUDFLARE_API_TOKEN`에 D1:Edit 권한 추가.
@@ -69,7 +70,7 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
   (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
 - **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `cd v2 && npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
 - **스키마**: 새 환경은 `v2/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
-  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql`
+  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql` → `migrate_logos_r2.sql` → `migrate_r2_usage.sql`
   (`migrate_drop.sql`은 초기 재생성용 기록 — 실행 금지)
   적용: `npx wrangler d1 execute bnhd-v2 --remote --file=migrate_logos.sql`
 - **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)

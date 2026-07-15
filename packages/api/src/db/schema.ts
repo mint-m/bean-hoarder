@@ -55,6 +55,14 @@ export const authAttempts = sqliteTable("auth_attempts", {
   reset_at: text().notNull(),
 });
 
+// R2 비용 백스톱 — 서비스 전역 월간 R2 쓰기(Class A) 카운터. 단일 행(id='global').
+// 월이 바뀌면 write_count를 리셋한다(budget.ts가 판정). 자세한 근거는 lib/budget.ts 참조.
+export const r2Usage = sqliteTable("r2_usage", {
+  id: text().primaryKey(),
+  month: text().notNull(),
+  write_count: integer().notNull().default(0),
+});
+
 // 로고: 신규 행은 R2에 바이트 저장 + content_type 메타만 D1에 (data_url='').
 // 레거시 행은 data_url에 인라인 — 재저장 시점에 R2로 자연 이전(lazy migration).
 export const logos = sqliteTable(

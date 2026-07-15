@@ -8,6 +8,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import { createDb, schema } from "../db";
 import type { AppEnv } from "../env";
+import { overStorageCap, R2_BUDGET_ERROR, releaseWrite, reserveWrite } from "../lib/budget";
 import { bytesToDataUrl, parseDataUrl } from "../lib/dataurl";
 import { json } from "../lib/http";
 
@@ -60,10 +61,24 @@ export async function putLogo(c: Context<AppEnv>): Promise<Response> {
   const parsed = parseDataUrl(body.data_url);
   if (!parsed) return json({ ok: false, error: "로고는 PNG/JPEG/WebP/SVG data URL이어야 합니다." }, 400);
 
-  await c.env.LOGOS.put(r2Key(user.usercode, body.roastery), parsed.bytes, {
-    httpMetadata: { contentType: parsed.contentType },
-  });
+  // R2 비용 백스톱 — 전역 스토리지 개수 상한(best-effort) / 월간 쓰기 예산(원자적 예약) 초과 시
+  // 저장 거부(요금 폭탄 방지). 예약 후 R2 저장 자체가 실패하면 예약을 되돌린다.
   const db = createDb(c.env.DB);
+  if (await overStorageCap(db, user.usercode, body.roastery)) {
+    return json({ ok: false, error: R2_BUDGET_ERROR }, 503);
+  }
+  if (!(await reserveWrite(db))) {
+    return json({ ok: false, error: R2_BUDGET_ERROR }, 503);
+  }
+
+  try {
+    await c.env.LOGOS.put(r2Key(user.usercode, body.roastery), parsed.bytes, {
+      httpMetadata: { contentType: parsed.contentType },
+    });
+  } catch (err) {
+    await releaseWrite(db);
+    throw err;
+  }
   await db
     .insert(schema.logos)
     .values({
