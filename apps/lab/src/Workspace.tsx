@@ -156,6 +156,45 @@ export default function Workspace({ account }: { account: Account }) {
     });
   }, [roasteryUpper, logosMap]);
 
+  /** 현재 로고를 로스터리 이름으로 서버에 저장 — DesignCard(업로드 직후)와 로스터리 blur(뒤늦은 이름 입력)가 공유 */
+  async function saveLogoForRoastery(dataUrl: string) {
+    if (!roasteryUpper) {
+      setLogoStatus({
+        msg: "로고를 불러왔습니다. 로스터리 이름을 입력하면 저장되어 다음부터 자동 적용됩니다.",
+        cls: "ok",
+      });
+      return;
+    }
+    setLogoStatus({ msg: `${roasteryUpper} 로고 저장 중…`, cls: "loading" });
+    const { body } = await call("/api/logos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roastery: roasteryUpper, data_url: dataUrl }),
+    });
+    if (body?.ok) {
+      setLogosMap((m) => ({ ...m, [roasteryUpper]: dataUrl }));
+      setLogo({ dataUrl, source: "server" });
+      setLogoStatus({
+        msg: `✓ ${roasteryUpper} 로고 저장됨 — 다음부터 이름만 입력해도 자동 적용됩니다.`,
+        cls: "ok",
+      });
+    } else {
+      setLogoStatus({ msg: body?.error || "로고 저장 실패", cls: "error" });
+    }
+  }
+
+  /** 로고를 먼저 올리고 나중에 로스터리 이름을 입력한 경우 — 이름 입력을 마친(blur) 시점에 약속대로 저장 */
+  function handleRoasteryBlur() {
+    if (
+      logo.source === "manual" &&
+      logo.dataUrl &&
+      roasteryUpper &&
+      logosMap[roasteryUpper] !== logo.dataUrl
+    ) {
+      saveLogoForRoastery(logo.dataUrl);
+    }
+  }
+
   const refreshLogos = useCallback(async () => {
     const { body } = await call<{ logos: { roastery: string; data_url: string }[] }>("/api/logos");
     if (body?.ok && body.logos) {
@@ -432,6 +471,7 @@ export default function Workspace({ account }: { account: Account }) {
           setAutofillText={setAutofillText}
           autofillStatus={autofillStatus}
           setAutofillStatus={setAutofillStatus}
+          onRoasteryBlur={handleRoasteryBlur}
           call={call}
           recognizeText={recognizeText}
           runAiRecognition={runAiRecognition}
@@ -446,6 +486,7 @@ export default function Workspace({ account }: { account: Account }) {
           setLogosMap={setLogosMap}
           logoStatus={logoStatus}
           setLogoStatus={setLogoStatus}
+          saveLogoForRoastery={saveLogoForRoastery}
           call={call}
           logoMaxLen={LOGO_MAX_LEN}
         />

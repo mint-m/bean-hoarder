@@ -16,6 +16,7 @@ interface Props {
   setLogosMap: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   logoStatus: StatusLine;
   setLogoStatus: (s: StatusLine) => void;
+  saveLogoForRoastery: (dataUrl: string) => Promise<void>;
   call: <T = Record<string, unknown>>(path: string, opts?: RequestInit) => Promise<ApiResult<T>>;
   logoMaxLen: number;
 }
@@ -43,33 +44,7 @@ export default function DesignCard(p: Props) {
     });
   }
 
-  // ── 로고 저장/삭제 ─────────────────────────────────────────
-  async function saveLogoForRoastery(dataUrl: string) {
-    if (!roasteryUpper) {
-      p.setLogoStatus({
-        msg: "로고를 불러왔습니다. 로스터리 이름을 입력하면 저장되어 다음부터 자동 적용됩니다.",
-        cls: "ok",
-      });
-      return;
-    }
-    p.setLogoStatus({ msg: `${roasteryUpper} 로고 저장 중…`, cls: "loading" });
-    const { body } = await p.call("/api/logos", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roastery: roasteryUpper, data_url: dataUrl }),
-    });
-    if (body?.ok) {
-      p.setLogosMap((m) => ({ ...m, [roasteryUpper]: dataUrl }));
-      p.setLogo({ dataUrl, source: "server" });
-      p.setLogoStatus({
-        msg: `✓ ${roasteryUpper} 로고 저장됨 — 다음부터 이름만 입력해도 자동 적용됩니다.`,
-        cls: "ok",
-      });
-    } else {
-      p.setLogoStatus({ msg: body?.error || "로고 저장 실패", cls: "error" });
-    }
-  }
-
+  // ── 로고 저장/삭제 (서버 저장은 Workspace.saveLogoForRoastery — 로스터리 blur 자동 저장과 공유) ──
   async function setManualLogo(rawDataUrl: string) {
     let dataUrl: string;
     try {
@@ -84,7 +59,7 @@ export default function DesignCard(p: Props) {
     }
     p.setLogo({ dataUrl, source: "manual" });
     setDesign((d) => ({ ...d, showLogo: true }));
-    await saveLogoForRoastery(dataUrl);
+    await p.saveLogoForRoastery(dataUrl);
   }
 
   async function loadLogoFromUrl(url: string) {
