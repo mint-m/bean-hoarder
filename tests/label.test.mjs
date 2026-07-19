@@ -3,7 +3,16 @@
 // (renderCanvas/verifyQr는 브라우저 전용 — 라이브에서 렌더링 때마다 자동 실행됨).
 
 import assert from "node:assert/strict";
-import { BASE_URL, buildLabelSVG, DEFAULT_DESIGN, SIZE_SPECS, SPEC_POOL, SUB_POOL } from "@bnhd/label";
+import {
+  BASE_URL,
+  buildHeadline,
+  buildLabelSVG,
+  DEFAULT_DESIGN,
+  headlineUsedFields,
+  SIZE_SPECS,
+  SPEC_POOL,
+  SUB_POOL,
+} from "@bnhd/label";
 import { test } from "vitest";
 
 const ROW = {
@@ -103,7 +112,8 @@ test("스펙 값이 칸 절반 폭을 넘으면 말줄임 대신 전체 폭 단�
   d.subFields = [];
   d.specFields = ["PROCESS"];
   const { svg } = buildLabelSVG(
-    Object.assign({}, ROW, { PROCESS: "Extended Anaerobic Natural Fermentation Process" }),
+    // REGION 비움: 이 테스트는 스펙 랩 동작만 검증 — 긴 헤드라인이 말줄임되는 건 별개 관심사
+    Object.assign({}, ROW, { REGION: "", PROCESS: "Extended Anaerobic Natural Fermentation Process" }),
     d,
   );
   assert.ok(
@@ -117,6 +127,7 @@ test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮
   const d = designFor("50x30");
   d.specFields = ["NET_WEIGHT", "AGTRON", "PROCESS", "VARIETY", "ALTITUDE", "HARVEST"];
   const row = Object.assign({}, ROW, {
+    REGION: "", // 헤드라인 말줄임과 분리 — 이 테스트는 스펙 드롭 우선순위만 검증
     PROCESS: "Extended Anaerobic Natural Fermentation",
     VARIETY: "Long Variety Name Blend Mix",
     ALTITUDE: "1900-2250m",
@@ -130,21 +141,60 @@ test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮
   }
 });
 
-test("40x20(가로형): 부제목 3종은 잘리지 않고 모두 표시, 날짜는 최하단 한 줄(2열)로 배치", () => {
+test("헤드라인 조합: 국가+가장 세부 장소, LOT은 보조로 덧붙임, 시그니쳐명은 대체", () => {
+  // 장소 앵커 우선순위: 워싱스테이션 > 생산자 > 지역
+  assert.equal(buildHeadline({ ORIGIN: "ETHIOPIA", REGION: "Yirgacheffe" }), "ETHIOPIA YIRGACHEFFE");
+  assert.equal(
+    buildHeadline({ ORIGIN: "ETHIOPIA", REGION: "Sidama", WASHING_STATION: "Gara Agena" }),
+    "ETHIOPIA GARA AGENA",
+  );
+  // LOT은 단독 앵커가 아니라 장소 뒤 보조
+  assert.equal(
+    buildHeadline({ ORIGIN: "COLOMBIA", PRODUCER: "El Paraiso", LOT: "Lot 12" }),
+    "COLOMBIA EL PARAISO · LOT 12",
+  );
+  // 시그니쳐/블렌드명 오버라이드
+  assert.equal(
+    buildHeadline({ ORIGIN: "블렌드", COFFEE_NAME: "푸루티 봉봉", REGION: "무시됨" }),
+    "푸루티 봉봉".toUpperCase(),
+  );
+  // 블렌드 원산지는 stripParen으로 축약 (#9 흡수분)
+  assert.equal(buildHeadline({ ORIGIN: "블렌드 (여러 원산지 혼합)" }), "블렌드");
+  // 헤드라인이 소비한 필드 목록 (부제목 중복 방지)
+  assert.deepEqual(headlineUsedFields({ ORIGIN: "ETHIOPIA", WASHING_STATION: "Gara Agena", LOT: "Lot 1" }), [
+    "WASHING_STATION",
+    "LOT",
+  ]);
+  assert.deepEqual(headlineUsedFields({ ORIGIN: "ETHIOPIA", COFFEE_NAME: "봉봉", REGION: "X" }), []);
+});
+
+test("노트 렌더링 보장: 스펙이 많아도 테이스팅 노트는 드롭되지 않는다", () => {
+  const d = designFor("40x20");
+  d.subFields = [];
+  d.specFields = ["NET_WEIGHT", "AGTRON", "PROCESS", "VARIETY", "ALTITUDE", "HARVEST"];
+  const row = Object.assign({}, ROW, {
+    ALTITUDE: "1900-2250m",
+    HARVEST: "25/26",
+    TASTING_NOTE: "Jasmine, Bergamot, White Peach",
+  });
+  const { svg } = buildLabelSVG(row, d);
+  assert.ok(svg.includes("Jasmine"), "노트 첫 항목이 라벨에 존재(생략되지 않음)");
+});
+
+test("40x20(가로형): 헤드라인이 장소·랏을 흡수하고 잔여 부제목만 표시, 날짜는 최하단 한 줄(2열)", () => {
   const d = designFor("40x20");
   d.subFields = ["REGION", "LOT", "WASHING_STATION"];
   d.specFields = ["NET_WEIGHT", "AGTRON"];
   const row = Object.assign({}, ROW, {
     REGION: "Nariño, Buesaco",
-    LOT: "Sewda Premium Reserve",
-    WASHING_STATION: "Gedeb CWS",
+    LOT: "Sewda",
+    WASHING_STATION: "Gedeb",
   });
   const { svg } = buildLabelSVG(row, d);
-  // 부제목 3종의 모든 단어가 (줄바꿈되더라도) 말줄임 없이 살아있어야 한다
-  for (const w of ["Nariño", "Buesaco", "Sewda", "Premium", "Reserve", "Gedeb", "CWS"]) {
-    assert.ok(svg.includes(w), `부제목 단어 '${w}' 표시됨`);
-  }
-  assert.ok(!svg.includes("…"), "부제목·스펙 모두 말줄임 없이 표시");
+  // 헤드라인은 국가로 시작(길면 말줄임될 수 있으나 국가 접두는 유지). 정확한 조합은 buildHeadline 단위 테스트가 검증.
+  assert.ok(svg.includes("ETHIOPIA"), "헤드라인에 국가 포함");
+  // 헤드라인이 쓴 WASHING_STATION·LOT은 부제목에서 제외, 잔여 REGION은 부제목에 남음
+  assert.ok(svg.includes("Nariño"), "잔여 부제목(REGION) 표시");
   const S = SIZE_SPECS["40x20"];
   const rstd = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>RSTD</.exec(svg);
   const pkgd = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>PKGD</.exec(svg);
@@ -206,6 +256,7 @@ test("노트: 콤마 항목이 한 줄에 다 안 들어가면 말줄임(…) �
   d.subFields = [];
   d.specFields = ["NET_WEIGHT", "ALTITUDE"];
   const row = Object.assign({}, ROW, {
+    REGION: "", // 헤드라인 말줄임과 분리 — 이 테스트는 노트 항목 단위 축약만 검증
     ALTITUDE: "1850-1910m",
     TASTING_NOTE: "Grape, Cherry Cordial, Tropical Citrus, Long Extra Flavor Note That Never Fits",
   });
@@ -226,15 +277,18 @@ test("노트: 스펙 그리드가 짧게 끝나도 노트는 본문 최하단(�
   assert.ok(+note[1] > S.H * 0.7, `노트가 하단(날짜 바로 위)에 위치 (y=${note[1]})`);
 });
 
-test("노트: 사용자가 고른 스펙이 다 채워 여백이 없으면 노트는 생략(스펙이 우선)", () => {
+test("노트 우선: 스펙이 공간을 다 채워도 노트(2순위)는 보장되고 스펙(3순위)이 먼저 드롭된다", () => {
   const d = designFor("40x20");
   d.subFields = [];
   d.specFields = ["NET_WEIGHT", "AGTRON", "PROCESS", "VARIETY", "ALTITUDE", "HARVEST"];
   const row = Object.assign({}, ROW, {
+    REGION: "",
     PROCESS: "Extended Anaerobic Natural Fermentation Process Description",
     ALTITUDE: "1900-2250m",
     HARVEST: "25/26",
+    TASTING_NOTE: "Jasmine, Bergamot",
   });
   const { svg } = buildLabelSVG(row, d);
-  assert.ok(!/font-style="italic"/.test(svg), "여백이 없으면 노트 생략");
+  assert.ok(/font-style="italic"/.test(svg), "공간이 빡빡해도 노트는 항상 표시된다");
+  assert.ok(svg.includes("Jasmine"), "노트 내용이 라벨에 존재");
 });

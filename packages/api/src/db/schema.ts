@@ -34,6 +34,7 @@ export const beans = sqliteTable(
     tasting_note: text().notNull().default(""),
     memo: text().notNull().default(""),
     source_url: text().notNull().default(""),
+    coffee_name: text().notNull().default(""),
     archived: integer().notNull().default(0),
     created_at: text().notNull().default(sql`(datetime('now'))`),
   },

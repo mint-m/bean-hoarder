@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
 <script src="/origin-color.js"></script>
+<script src="/headline.js"></script>
 <script src="/session.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 0 16px 40px; }
@@ -182,7 +183,9 @@ function cardHTML(b) {
   const d = parseDot(g("ROAST_DATE"));
   const n = d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null;
   const dday = n != null && n >= 0 ? `<span class="dday">D+${n}</span>` : "";
-  const meta = [g("REGION"), g("VARIETY"), g("PROCESS")].filter(Boolean).join(" · ");
+  // 헤드라인이 이미 쓴 필드(세부지역 등)는 메타에서 제외 — 라벨과 동일하게 중복 방지
+  const usedInHead = typeof bhHeadlineUsedFields === "function" ? bhHeadlineUsedFields(b) : [];
+  const meta = ["REGION", "VARIETY", "PROCESS"].filter(k => !usedInHead.includes(k)).map(g).filter(Boolean).join(" · ");
   const foot = [
     g("ROAST_DATE") && `RSTD ${g("ROAST_DATE")}`,
     g("NET_WEIGHT") && `NET ${g("NET_WEIGHT")}`,
@@ -190,15 +193,16 @@ function cardHTML(b) {
   ].filter(Boolean).join(" · ");
   const note = notesEnabled && g("TASTING_NOTE");
 
+  const headline = (typeof bhHeadline === "function" ? bhHeadline(b) : g("ORIGIN")) || g("KEY");
   const originColor = bhOriginColor(g("ORIGIN"));
   const borderStyle = originColor ? ` style="border-top-color:${originColor}"` : "";
   const dot = originColor ? `<span class="w-origin-dot" style="background:${originColor}"></span>` : "";
   const archivedClass = b.ARCHIVED ? " archived" : "";
   return `<div class="wcard${archivedClass}"${borderStyle} tabindex="0" role="link"
-      aria-label="${escapeHtml(g("ORIGIN") || g("KEY"))} 상세보기" data-key="${g("KEY")}">
+      aria-label="${escapeHtml(headline)} 상세보기" data-key="${g("KEY")}">
     <button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>
     <div class="w-top"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
-    <div class="w-origin"><span class="w-origin-label">${dot}${escapeHtml(g("ORIGIN"))}</span>${dday}</div>
+    <div class="w-origin"><span class="w-origin-label">${dot}${escapeHtml(headline)}</span>${dday}</div>
     ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
     ${note ? `<p class="w-note">${escapeHtml(note)}</p>` : ""}
     ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
@@ -246,7 +250,7 @@ function openSheet(key) {
   const bean = allBeans.find(b => b.KEY === key);
   if (!bean) return;
   sheetKey = key;
-  sheetTitle.innerHTML = `<b>${escapeHtml(bean.ORIGIN || key)}</b> · ${escapeHtml(key)}`;
+  sheetTitle.innerHTML = `<b>${escapeHtml((typeof bhHeadline === "function" ? bhHeadline(bean) : bean.ORIGIN) || key)}</b> · ${escapeHtml(key)}`;
   sheetBackdrop.querySelector('[data-act="archive"]').textContent = bean.ARCHIVED ? "숨기기 해제" : "숨기기";
   sheetBackdrop.classList.add("open");
 }
@@ -322,7 +326,7 @@ function applyFilter() {
   const q = document.getElementById("filter").value.trim().toLowerCase();
   if (!q) { renderDeck(allBeans); return; }
   renderDeck(allBeans.filter(b =>
-    ["KEY", "ROASTERY", "ORIGIN", "REGION", "PROCESS", "VARIETY", "TASTING_NOTE", "PRODUCER", "LOT", "WASHING_STATION", "MEMO"]
+    ["KEY", "ROASTERY", "ORIGIN", "COFFEE_NAME", "REGION", "PROCESS", "VARIETY", "TASTING_NOTE", "PRODUCER", "LOT", "WASHING_STATION", "MEMO"]
       .some(k => (b[k] || "").toLowerCase().includes(q))));
 }
 
