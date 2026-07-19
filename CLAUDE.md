@@ -35,9 +35,11 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - `packages/api/` — `@bnhd/api`: Hono 라우터·인증·Drizzle(D1)·SSRF 가드.
   `test/app.test.ts`가 **API 계약 문서** — 상태 코드·메시지를 바꾸는 변경은 계약 파괴.
 - `v2/public/session.js` — 세션 저장·레거시 PIN 교환 공용 모듈 (`window.bhSession`, lab/deck 공유).
-- `v2/public/label.js` — 라벨 SVG 렌더러 (3사이즈). 순수 모듈, 테스트 대상.
-- `v2/public/autofill.js` — 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
-- `packages/label/` — `@bnhd/label`: 라벨 SVG 렌더러 (3사이즈, QR 검증). 테스트 대상 단일 소스.
+- `v2/public/origin-color.js` · `v2/public/headline.js` — 조회(index)·덱(deck) 공용 브라우저 모듈
+  (전역 `bhOriginColor`·`bhHeadline`). `headline.js`의 헤드라인 조합 규칙(국가+세부장소[+랏] / 시그니쳐명
+  오버라이드)은 `@bnhd/label`의 `buildHeadline`과 **반드시 동일하게 유지** — 라벨·카드·조회 제목이 일치해야 함.
+- `packages/label/` — `@bnhd/label`: 라벨 SVG 렌더러 (3사이즈, QR 검증) + `buildHeadline` 헤드라인 조합.
+  테스트 대상 단일 소스.
 - `packages/autofill/` — `@bnhd/autofill`: 상품 페이지 텍스트 → 필드 휴리스틱 파서. 테스트 대상.
 - `apps/lab/` — `@bnhd/lab`: 랩 React 앱 (Vite, base /admin/) — **/admin이 이 앱이다**.
   빌드 산출물 `v2/public/admin`은 gitignore — CI가 배포 직전 빌드하므로 로컬에서도
