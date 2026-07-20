@@ -3,8 +3,9 @@
 > **이 문서는 v1(구글시트 기반) 회고 기록입니다.** 현재 라이브 서비스는 v2(Cloudflare
 > D1 + Functions) — [README.md](README.md)와 [v2/DESIGN.md](v2/DESIGN.md)를 참고하세요.
 > v1 웹 파일·도구(`admin.html`, `index.html`, `make_label.py`, `apps_script.gs`,
-> `deploy.ps1`, `registry_template.csv`)는 저장소 트리에서 제거됐고, 필요하면 git 히스토리의
-> 태그 **`legacy-v1`** 에서 복원할 수 있다(`git show legacy-v1:legacy/make_label.py`).
+> `deploy.ps1`, `registry_template.csv`)는 저장소 트리에서 제거됐지만 git 히스토리에 남아 있다 —
+> 삭제 직전 커밋에서 복원 가능(`git log --diff-filter=D -- 'legacy/*'`로 삭제 커밋을 찾은 뒤
+> `git show <삭제커밋>^:legacy/make_label.py`).
 > ⚠️ v1 라벨 도구 `make_label.py`는 **v1 디자인 산출물**이라 v2의 보딩패스 라벨과 다르다 —
 > v2 라벨의 단일 소스는 `packages/label`이다.
 
