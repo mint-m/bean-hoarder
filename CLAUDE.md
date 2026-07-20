@@ -43,7 +43,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   빌드 산출물 `v2/public/admin`은 gitignore — CI가 배포 직전 빌드하므로 로컬에서도
   `npm run build -w @bnhd/lab` 후에야 wrangler pages dev에서 /admin이 뜬다.
   로컬 개발: `npm run dev -w @bnhd/lab` (wrangler 8790에 /api 프록시).
-- `tests/` — label/autofill 단위 테스트 (`@bnhd/*` 패키지를 import).
+- 단위 테스트는 각 패키지에 co-located: `packages/label/test/`·`packages/autofill/test/`(*.mjs),
+  `packages/schema/src/*.test.ts`. workerd 통합 테스트는 `packages/api/test/`(별도 vitest 프로젝트).
 - `e2e/` — Playwright 스모크 (공개 조회→로그인→등록→덱). `playwright.config.ts`가
   `npm run e2e:server`를 자동 기동 — 라이브·개발 데이터와 분리된 `v2/.wrangler-e2e` persist 사용.
 - 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml` —

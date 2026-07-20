@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["tests/**", "packages/**", "apps/**", "v2/functions/**/*.ts", "*.json", "*.ts", "e2e/**"]
+    "includes": ["packages/**", "apps/**", "v2/functions/**/*.ts", "*.json", "*.ts", "e2e/**"]
   },
   "formatter": {
     "enabled": true,
