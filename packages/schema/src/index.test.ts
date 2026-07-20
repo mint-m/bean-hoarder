@@ -32,6 +32,7 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     "tasting_note",
     "memo",
     "source_url",
+    "coffee_name",
   ]);
   assert.deepEqual(CSV_HEADERS, [
     "KEY",
@@ -52,6 +53,7 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     "TASTING_NOTE",
     "MEMO",
     "SOURCE_URL",
+    "COFFEE_NAME",
   ]);
   assert.deepEqual(REQUIRED_LABELS, {
     origin: "국가(산지)",

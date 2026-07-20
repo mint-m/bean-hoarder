@@ -66,6 +66,7 @@ export default function Workspace({ account }: { account: Account }) {
       KEY: currentKey,
       ROASTERY: form.ROASTERY.trim(),
       ORIGIN: form.ORIGIN.trim(),
+      COFFEE_NAME: form.COFFEE_NAME.trim(),
       REGION: form.REGION.trim(),
       PRODUCER: form.PRODUCER.trim(),
       LOT: form.LOT.trim(),
@@ -290,6 +291,7 @@ export default function Workspace({ account }: { account: Account }) {
     const next: FormState = {
       ROASTERY: g("ROASTERY"),
       ORIGIN: g("ORIGIN"),
+      COFFEE_NAME: g("COFFEE_NAME"),
       REGION: g("REGION"),
       PRODUCER: g("PRODUCER"),
       LOT: g("LOT"),

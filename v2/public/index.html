@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/theme.css">
 <script src="/vendor/jsQR.js"></script>
 <script src="/origin-color.js"></script>
+<script src="/headline.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
   main { width: 100%; max-width: 430px; flex: 1; }
@@ -328,13 +329,21 @@ function render(row, isPreview) {
 
   document.getElementById("f-key").textContent = g("KEY");
   document.getElementById("f-roastery").textContent = g("ROASTERY");
-  document.getElementById("f-origin").textContent = g("ORIGIN");
+  // 메인 식별자: 국가+세부지역 조합(또는 시그니쳐/블렌드명). 라벨·카드와 동일 규칙(headline.js).
+  const usedInHead = typeof bhHeadlineUsedFields === "function" ? bhHeadlineUsedFields(row) : [];
+  const headline = (typeof bhHeadline === "function" ? bhHeadline(row) : g("ORIGIN")) || g("KEY");
+  document.getElementById("f-origin").textContent = headline;
 
   // 산지별 색상 코딩: 상단 스트립을 산지 해시 색으로 (라벨 물리 인쇄 색과는 무관, 조회 화면 전용)
   const originColor = typeof bhOriginColor === "function" ? bhOriginColor(g("ORIGIN")) : null;
   document.getElementById("bean").style.borderTopColor = originColor || "";
 
-  const subParts = [g("REGION"), g("PRODUCER")].filter(Boolean);
+  // 시그니쳐명일 땐 국가를 서브라인에 보존, 헤드라인이 이미 쓴 지역·생산자는 제외(중복 방지)
+  const subParts = [];
+  if (g("COFFEE_NAME") && g("ORIGIN")) subParts.push(g("ORIGIN"));
+  for (const k of ["REGION", "PRODUCER"]) {
+    if (!usedInHead.includes(k) && g(k)) subParts.push(g(k));
+  }
   const sub = document.getElementById("f-subline");
   sub.classList.toggle("hidden", !subParts.length);
   sub.innerHTML = subParts.map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
@@ -358,6 +367,7 @@ function render(row, isPreview) {
   const dl = document.getElementById("f-specs");
   dl.innerHTML = "";
   for (const [col, label] of SPEC_FIELDS) {
+    if (usedInHead.includes(col)) continue; // 헤드라인에 이미 표시된 필드(워싱스테이션·랏)는 제외
     const v = g(col);
     if (!v) continue;
     const div = document.createElement("div");
@@ -388,7 +398,7 @@ function render(row, isPreview) {
   document.getElementById("f-srcline").classList.toggle("hidden", !g("SOURCE_URL"));
   if (g("SOURCE_URL")) document.getElementById("f-source").href = g("SOURCE_URL");
 
-  document.title = `${g("ORIGIN")} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
+  document.title = `${headline} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
 }
 
 function b64DecodeUnicode(str) {

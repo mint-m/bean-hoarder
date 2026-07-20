@@ -5,6 +5,7 @@ import { isoOffset } from "./lib/format";
 export interface FormState {
   ROASTERY: string;
   ORIGIN: string;
+  COFFEE_NAME: string;
   REGION: string;
   PRODUCER: string;
   LOT: string;
@@ -28,6 +29,7 @@ export function emptyForm(): FormState {
   return {
     ROASTERY: "",
     ORIGIN: "",
+    COFFEE_NAME: "",
     REGION: "",
     PRODUCER: "",
     LOT: "",

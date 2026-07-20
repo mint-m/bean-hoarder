@@ -28,6 +28,9 @@ declare module "@bnhd/label" {
     showLogo: boolean;
   }
   export const DEFAULT_DESIGN: LabelDesign;
+  export const HEADLINE_PLACE_ORDER: string[];
+  export function buildHeadline(row: Record<string, string>): string;
+  export function headlineUsedFields(row: Record<string, string>): string[];
   export function buildLabelSVG(
     row: Record<string, string>,
     design?: LabelDesign,

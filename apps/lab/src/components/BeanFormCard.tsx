@@ -255,6 +255,15 @@ export default function BeanFormCard(p: Props) {
           <input type="text" placeholder="Yirgacheffe, Gedeb" {...bind("REGION")} />
         </div>
       </div>
+      <div className="field">
+        <label>
+          커피 이름{" "}
+          <span style={{ color: "var(--sub)", fontWeight: 400 }}>
+            — 시그니쳐·블렌드명(예: 푸루티 봉봉). 입력하면 라벨·카드 제목이 이 이름으로 표시됩니다
+          </span>
+        </label>
+        <input type="text" placeholder="비우면 국가+세부지역으로 자동 표시" {...bind("COFFEE_NAME")} />
+      </div>
       <div className="row2">
         <div className="field">
           <label>
