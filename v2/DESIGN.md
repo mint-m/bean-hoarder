@@ -84,7 +84,8 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
 ## 마이그레이션
 
 - `bnhd.pages.dev` Pages 프로젝트에 v2를 배포해 v1(구글시트 방식)을 교체. 인쇄된 실라벨이 없던 시점이라 손실 없음.
-- v1 웹 파일은 리포의 `legacy/`로 이동, 라벨 배치 생성기(`tools/make_label.py`)는 KEY 형식·도메인이 동일해 그대로 사용 가능.
+- v1 웹 파일·라벨 도구는 트리에서 제거(git 히스토리에 보존 — 삭제 직전 커밋에서 복원). 파이썬 배치
+  생성기 `make_label.py`는 v1 라벨 디자인 산출물이라 v2 보딩패스 라벨과 다르다 — v2 라벨의 단일 소스는 `packages/label`.
 
 ## 운영 절차
 

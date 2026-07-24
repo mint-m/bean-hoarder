@@ -9,7 +9,13 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["tests/**/*.test.mjs", "packages/**/src/**/*.test.ts"],
+          // 각 패키지 안에 co-located: label/autofill은 test/*.mjs, schema는 src/*.test.ts.
+          // packages/api/test/*.test.ts는 별도 workers 프로젝트(아래)가 소유하므로 제외.
+          include: [
+            "packages/label/test/**/*.test.mjs",
+            "packages/autofill/test/**/*.test.mjs",
+            "packages/schema/src/**/*.test.ts",
+          ],
         },
       },
       "./packages/api/vitest.config.ts",

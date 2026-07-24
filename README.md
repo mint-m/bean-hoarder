@@ -28,19 +28,22 @@
 
 ```
 bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
-├── v2/public/            정적 페이지
+├── v2/public/            정적 페이지 (빌드 없는 브라우저 ES 모듈)
 │     index.html            조회 (QR 스캔 대상)
-│     admin/ (빌드 산출물)   랩 — apps/lab React 앱 (CI가 배포 직전 빌드, lab.css 공유)
+│     admin/ (빌드 산출물)   랩 — apps/lab React 앱 (CI가 배포 직전 빌드, gitignore)
 │     deck.html             내 원두 월렛 덱
-│     label.js              라벨 렌더러 (3개 사이즈, 사이즈별 기본 표시 항목, QR 검증 포함)
-│     autofill.js           텍스트 → 원두 정보 휴리스틱 파서
+│     session.js            세션 저장·레거시 PIN 교환 공용 모듈 (lab/deck 공유)
 │     origin-color.js       산지 해시 → 색상 (덱·조회 카드 색 구분용, 두 페이지가 공유)
-│     vendor/               qrcode-generator, jsQR (CDN 대신 저장소에 포함)
+│     theme.css · lab.css   공용 테마 · 랩 스타일
+│     vendor/jsQR.js        QR 디코드 검증용 (qrcode-generator는 @bnhd/label npm 의존)
 ├── v2/functions/api/     [[path]].ts — Pages Functions 어댑터 (아래 Hono 앱에 위임)
 ├── packages/schema/      @bnhd/schema (TS) — 원두 필드 단일 소스: CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생
 ├── packages/api/         @bnhd/api (TS) — Hono 라우터: signup/recover/beans/bean/{KEY}/export.csv/import/logos/fetch,
 │                           인증·Drizzle(D1)·SSRF 가드. 단위 + workerd 통합 테스트(packages/api/test) 포함
-└── D1 (bnhd-v2)          users(usercode, pass_hash, recovery_hash) · beans(key, …) · logos(usercode, roastery, data_url)
+├── packages/label/       @bnhd/label — 라벨 SVG 렌더러(3사이즈, QR 검증), packages/label/test
+├── packages/autofill/    @bnhd/autofill — 텍스트 → 원두 정보 휴리스틱 파서, packages/autofill/test
+├── apps/lab/             @bnhd/lab — 랩 React 앱(Vite, base /admin/) = /admin
+└── D1 (bnhd-v2) + R2     users · beans(key, …) · logos · sessions · auth_attempts · r2_usage · R2(bnhd-logos) 로고 원본
 ```
 
 - 쓰기(등록·수정·삭제·백업·복원·로고)는 **세션 토큰** 인증(`POST /api/login`으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 `Bearer 유저코드:암호` 인증도 이행기 동안 동작.
@@ -51,7 +54,7 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
 
 ## 운영
 
-- **배포(자동)**: `main`과 `deploy` 푸시 모두 GitHub Actions(`.github/workflows/deploy.yml`)가 `node --test` 통과 후 `wrangler pages deploy`를 실행하되, 도착지가 다르다.
+- **배포(자동)**: `main`과 `deploy` 푸시 모두 GitHub Actions(`.github/workflows/deploy.yml`)가 lint·테스트(Vitest)·랩 빌드 + **Playwright e2e 통과**를 게이트로 `wrangler pages deploy`를 실행하되, 도착지가 다르다.
   - `main` 푸시 → **프리뷰** `preview.bnhd.pages.dev` (개발 중 확인용)
   - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR을 **Squash and merge**로 승격)
   - 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
@@ -83,8 +86,10 @@ cd v2
 npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
 npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
 npx wrangler pages dev public --binding INVITE_CODE=test \
-  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409              # http://localhost:8788
-# (--d1 플래그: wrangler 4.8x의 pages dev가 wrangler.toml의 d1_databases를 붙여주지 않아 명시 필요)
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
+  --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
+# (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
+# /admin(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
 - 데모 계정: 유저코드 `DEMO` / 암호 `0000`
@@ -116,14 +121,12 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 | 2026-07-12 | **실서비스 전환 마이그레이션 Phase 0·1** ([MIGRATION_PLAN.md](MIGRATION_PLAN.md)) — ① npm workspaces 모노레포 + TypeScript + Biome + Vitest 도입, 기존 테스트 Vitest 이식 ② **API를 Hono(TS)로 이식**: `packages/api`(라우트·인증·SSRF 가드) + `packages/schema`(원두 필드 단일 소스 — CSV 헤더·필수 규칙·Zod 스키마 파생), Pages Functions는 5줄 어댑터(`[[path]].ts`)만 남김 ③ **Drizzle ORM** 도입(테이블 구조 변경 없음, 스키마 드리프트 가드 테스트) ④ **workerd+D1 통합 테스트 19종** — 가입/복구/CRUD/보관/백업·복원/로고/SSRF 계약 전 구간 검증(63 tests) ⑤ CI에 lint+typecheck 추가, 배포 잡에 npm ci. API 계약(경로·상태코드·메시지)은 완전 동일 — 프론트 무수정, 라이브 무중단 |
 | 2026-07-10 | **필수 정보 재정의 라운드** — 싱글오리진 원두 기준 필수 항목을 **[로스터리·국가(산지)·품종·가공방식·로스팅일·패키징일]** 로 확정하고, 기존엔 선택이었던 **품종·가공방식을 필수로 승격**(클라이언트 `missingRequiredFields`·서버 `REQUIRED_LABELS` 동시 반영) — 품종 입력에도 가공방식과 동일한 방식으로 **"블렌드 (여러 품종 혼합)" 데이터리스트 옵션**을 추가해, 특정하기 어려운 블렌드 원두는 이 옵션 선택만으로 필수 조건을 만족(값이 채워짐)하고 라벨 인쇄 시에는 `stripParen`으로 괄호 설명이 잘려 "블렌드"만 짧게 표시됨. 플레이버 노트는 필수는 아니되 **"권장" 배지**(포인트 컬러 테두리)를 달아 반필수 수준으로 입력을 유도, 라벨도 "Flavor Notes (플레이버 노트)" → **"플레이버 노트"** 로 간결하게 정리 |
 
-## 남은 일
+## 로드맵 / 남은 작업
 
-- [ ] 실제 인쇄(3개 사이즈) → 폰 카메라 스캔 테스트
-- [ ] 운영 배포 절차: `wrangler pages secret put INVITE_CODE` 실행 + 기존 초대코드 폐기, `migrate_logos.sql` 적용, `seed.sql` 재실행(데모 갱신)
-- [x] 배포 자동화 활성화: 리포 Settings > Secrets and variables > Actions에 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 등록 완료 — `main`/`deploy` 푸시 모두 실제 배포 확인됨
-- [ ] 브랜치 보호 규칙 설정: GitHub Settings > Rules > Rulesets에서 `main`(직접 push 허용, 삭제 방지)·`deploy`(PR 필수 + Require linear history + 삭제 방지) 규칙 생성 — API로는 설정 불가, 대시보드에서 직접 등록 필요
-- [ ] Cloudflare 대시보드에서 `/api/*` Rate Limiting 룰 1개 적용(선택)
-- [ ] 첫 실사용자 초대 (초대코드 전달)
-- [ ] 링크 가져오기 파서 품질을 실제 봇 차단·JS 렌더링 사이트 대상으로 계속 검증(현재 개발 환경은 외부망 접근이 막혀 있어 실사이트로 직접 재현 검증하지 못함 — 안 되는 사례 재현되면 이슈로 남겨줄 것)
-- [ ] (이슈 검토) 라벨 사이즈를 원두별로 D1에 저장할지 여부 — 자세한 내용은 GitHub 이슈 참고
-- [ ] (이슈) 로스팅 레벨(로스팅 포인트)을 컬러 팔레트 개념으로 선택하는 UI — 현재는 텍스트 프리셋(#120~#45) 목록 선택뿐, 색상 스와치로 직관적으로 고르는 방식 검토(구현 보류, 아이디어만 기록)
+남은 작업·백로그는 README가 아니라 **GitHub Issues**에서 관리한다.
+
+- 🗺️ 한눈에 보는 트래킹: [#31 로드맵 / 남은 작업 트래킹](../../issues/31)
+- 🚀 실서비스 오픈 전 수동 운영 항목: [#30 운영 런칭 체크리스트](../../issues/30)
+- 기능·개선·인증 백로그: 각 이슈 [#27](../../issues/27) [#26](../../issues/26) [#25](../../issues/25) [#24](../../issues/24) [#23](../../issues/23) [#16](../../issues/16) [#2](../../issues/2) [#1](../../issues/1), 배포 [#29](../../issues/29)
+
+과거 종합 평가는 [REVIEW.md](REVIEW.md)(2026-07-08 스냅샷, 지적 대부분 Phase 0~4로 해소).
