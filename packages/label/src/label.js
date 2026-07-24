@@ -25,11 +25,13 @@ const RED = "#e8341c";
 // [필드키, 라벨 인쇄 약어, 관리자 화면 표시명]
 // 로스팅일·패키징일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
 // 배열 순서 = 기본 표시 우선순위(공간이 부족할 때 뒤쪽부터 자동으로 숨겨짐) — lab.js에서 사용자가 직접 재정렬 가능.
+// 우선순위 체계(#27): 가공·품종은 2순위(향미·정체성), 고도·수확시기는 3순위(전문 디테일)이므로
+// 2순위를 앞에 둔다. 용량(NET)은 유통 필수라 1위 유지, 로스팅 포인트는 품종 다음.
 export const SPEC_POOL = [
   ["NET_WEIGHT", "NET", "용량"],
-  ["AGTRON", "RSTP", "로스팅 포인트"],
   ["PROCESS", "PROC", "가공"],
   ["VARIETY", "VAR", "품종"],
+  ["AGTRON", "RSTP", "로스팅 포인트"],
   ["ALTITUDE", "ALT", "고도"],
   ["HARVEST", "CROP", "수확시기"],
 ];
@@ -160,10 +162,12 @@ export const SIZE_SPECS = {
 
 // 사이즈가 커질수록 물리적 여유가 생기므로 기본으로 표시하는 항목 수도 늘린다.
 // (사용자가 직접 토글을 바꾼 뒤에는 사이즈를 바꿔도 이 기본값으로 되돌리지 않는다 — lab.js 참고)
+// 2순위(가공·품종)를 기본 노출하고, 사이즈가 커질수록 3순위(고도)까지 더한다.
+// 테이스팅 노트는 별도 토글 없이 값이 있으면 항상 표시된다(buildLabelSVG의 노트 예약 로직).
 export const SIZE_DEFAULT_FIELDS = {
-  "40x20": { subFields: ["REGION"], specFields: ["NET_WEIGHT"] },
-  "50x30": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "AGTRON"] },
-  "50x60": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "AGTRON", "ALTITUDE"] },
+  "40x20": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "PROCESS"] },
+  "50x30": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "PROCESS", "VARIETY"] },
+  "50x60": { subFields: ["REGION"], specFields: ["NET_WEIGHT", "PROCESS", "VARIETY", "ALTITUDE"] },
 };
 
 export const DEFAULT_DESIGN = {
@@ -287,6 +291,44 @@ function specCell(S, x, y, label, value, size, ink) {
 // QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
 const stripParen = (s) => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
 
+// ── 헤드라인(메인 식별자) 조합 ─────────────────────────────
+// 국가만으로는 비슷한 원두 구분이 어려워, 국가 + 가장 세부 장소 1개를 조합해 변별력을 높인다.
+// 장소 앵커 우선순위(가장 구체적 순): 워싱스테이션 > 생산자 > 지역. 랏(LOT)은 번호만으론 단독
+// 식별이 어려워 앵커 뒤에 보조로만 덧붙인다. 시그니쳐/블렌드명(COFFEE_NAME)이 있으면 그대로 대체.
+// 국가·장소엔 stripParen을 적용 — "블렌드 (여러 원산지 혼합)" → "블렌드".
+// deck.html·index.html의 bhHeadline(v2/public/headline.js)이 이 규칙과 동일해야 한다.
+export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"];
+
+function headlinePlaceKey(row) {
+  for (const k of HEADLINE_PLACE_ORDER) {
+    if (stripParen((row[k] || "").trim())) return k;
+  }
+  return null;
+}
+
+export function buildHeadline(row) {
+  const g = (k) => stripParen((row[k] || "").trim());
+  const name = (row.COFFEE_NAME || "").trim();
+  if (name) return name.toUpperCase();
+  const pk = headlinePlaceKey(row);
+  const parts = [g("ORIGIN"), pk ? g(pk) : ""].filter(Boolean);
+  let head = parts.join(" ");
+  const lot = g("LOT");
+  if (lot) head = head ? `${head} · ${lot}` : lot;
+  return head.toUpperCase();
+}
+
+// 헤드라인이 이미 소비한 부제목 후보 필드 — 중복 표시를 막는다.
+// COFFEE_NAME 오버라이드 시엔 장소·랏을 헤드라인이 쓰지 않으므로 빈 배열(부제목에 그대로 노출).
+export function headlineUsedFields(row) {
+  if ((row.COFFEE_NAME || "").trim()) return [];
+  const used = [];
+  const pk = headlinePlaceKey(row);
+  if (pk) used.push(pk);
+  if (stripParen((row.LOT || "").trim())) used.push("LOT");
+  return used;
+}
+
 // 스펙 그리드를 줄 단위로 배치: 값이 칸 절반 폭에 들어가면 2열 한 줄, 넘치면 그 항목만
 // 전체 폭으로 단독 줄(최대 2줄 랩)을 차지한다 — 말줄임(…)으로 잘리는 대신 줄바꿈으로 전문을 보존한다.
 function layoutSpecRows(list, specValueSize, S, fullMaxW) {
@@ -371,8 +413,9 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   }
 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
+  // 국가 단독이 아니라 국가+세부장소[+랏] 조합(또는 시그니쳐/블렌드명)으로 변별력을 높인다.
   let yCur;
-  const origin = g("ORIGIN").toUpperCase();
+  const origin = buildHeadline(row);
   if (portrait) {
     const headLines = wrapN(origin, headlineSize, 0.68, headMax, S.headMaxLines || 2);
     let hy = S.headY;
@@ -394,7 +437,11 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   };
 
   // ── 플로우 레이아웃: 내용량에 따라 y를 흘려 배치 ──
-  const subOrder = SUB_POOL.map(([k]) => k).filter((k) => design.subFields.includes(k));
+  // 헤드라인이 이미 쓴 장소·랏은 부제목에서 제외해 중복 인쇄를 막는다.
+  const usedInHead = headlineUsedFields(row);
+  const subOrder = SUB_POOL.map(([k]) => k).filter(
+    (k) => design.subFields.includes(k) && !usedInHead.includes(k),
+  );
   const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
 
   // 로스팅일·패키징일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
@@ -438,10 +485,12 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
 
   // 스펙 그리드: 절취선 아래 남는 공간에 채우되, 넘치면 우선순위 낮은(나중 선택) 항목부터 드롭한다.
   // 값이 칸 절반 폭을 넘으면 그 항목만 전체 폭 단독 줄(최대 2줄 랩) — 로스팅 포인트는 "#95 (라이트)" 중 "#95"만.
-  // 사용자가 고른 스펙이 자동 표시되는 테이스팅 노트보다 우선 — 노트 공간을 미리 잡지 않고 스펙을 먼저 채운다.
-  // (노트는 아래에서 남는 공간에만 표시되며, 자리가 없으면 생략된다. 자세한 노트는 QR 조회로 확인.)
+  // 테이스팅 노트(2순위)는 값이 있으면 반드시 표시하므로, 노트 한 줄을 스펙 채움 예산에서 미리 뺀다 —
+  // 공간이 부족하면 스펙(3순위 항목 포함)이 먼저 드롭되고 노트가 살아남는다.
+  const noteReserve = hasNote ? S.noteGapSpec + S.noteSize : 0;
+  const specBottom = CONTENT_BOTTOM - noteReserve;
   const specTop = divY + S.specTopOff;
-  const specFits = (lines) => specTop + (Math.max(lines, 1) - 1) * S.specLH <= CONTENT_BOTTOM;
+  const specFits = (lines) => specTop + (Math.max(lines, 1) - 1) * S.specLH <= specBottom;
   const specList = allSpecs.slice();
   let specLayout = layoutSpecRows(specList, specValueSize, S, specFullMaxW);
   while (specList.length > 0 && !specFits(specLayout.totalLines)) {
@@ -485,10 +534,9 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
       rowY += S.specLH;
     }
   });
-  // 테이스팅 노트: 항상 한 줄만, 스펙 그리드 바로 아래가 아니라 본문 최하단(고정 푸터 바로 위)에 고정 —
-  // 스펙이 짧게 끝나도 노트가 붕 뜨지 않고 날짜 바로 위에 자리잡는다. 스펙 그리드와 겹칠 자리가 없으면 생략.
-  const noteMinY = specLayout.rows.length > 0 ? rowY - S.specLH + S.noteGapSpec : divY + S.noteGapDiv;
-  if (hasNote && noteMinY <= CONTENT_BOTTOM) {
+  // 테이스팅 노트: 항상 한 줄만, 본문 최하단(고정 푸터 바로 위)에 고정 — 스펙이 짧게 끝나도 붕 뜨지
+  // 않고 날짜 바로 위에 자리잡는다. 위에서 노트 한 줄을 예약해 뒀으므로 스펙과 겹치지 않는다(항상 표시).
+  if (hasNote) {
     const line = fitNoteLine(g("TASTING_NOTE"), S.noteSize, 0.5, TEXT_MAX);
     if (line)
       els.push(

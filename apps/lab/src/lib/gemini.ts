@@ -3,6 +3,7 @@
 const AI_FIELD_KEYS = [
   "ROASTERY",
   "ORIGIN",
+  "COFFEE_NAME",
   "REGION",
   "PRODUCER",
   "LOT",
@@ -22,6 +23,8 @@ const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에서 추�
 규칙:
 - 값을 찾지 못한 키는 생략한다. 절대 추측하지 않는다.
 - ORIGIN: 생산 국가명, 영문 대문자 (예: "ETHIOPIA"). 블렌드면 "블렌드".
+- COFFEE_NAME: 로스터가 붙인 고유 제품명·시그니쳐/블렌드 네이밍이 있을 때만 (예: "푸루티 봉봉").
+  단순히 국가+지역을 나열한 이름은 넣지 않는다. 없으면 생략.
 - REGION: 국가 아래 세부 지역 계층을 콤마로 이어 한 줄로 (예: "Yirgacheffe, Gedeb").
 - VARIETY: 품종명만 짧게 (예: "Chiroso", "Gesha"). 재배·선별 과정 설명은 넣지 않는다.
 - PROCESS: 가공방식 핵심 명칭만 짧게 (예: "Washed", "Natural", "Honey"). 페이지에 "PROCESSING"
