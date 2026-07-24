@@ -1,7 +1,20 @@
 # Bean-Hoarder 작업 가이드
 
 커피 원두 소분 라벨링(QR) & 조회 서비스. Cloudflare Pages + Functions + D1, 운영비 0원.
-현재 [MIGRATION_PLAN.md](MIGRATION_PLAN.md)에 따라 실서비스 전환 마이그레이션 진행 중.
+실서비스 전환 마이그레이션([MIGRATION_PLAN.md](MIGRATION_PLAN.md))은 Phase 4까지 완료(2026-07-13)
+— 패스키(WebAuthn) 도입만 후속 과제로 남음.
+
+## 작업 방식
+
+- **불확실하면 진행하지 말고 물어라** — 요구사항 해석이 여러 갈래로 갈리거나 전제가 불확실하면
+  가정하고 진행하지 않는다. 무엇이 불확실한지 구체적으로 짚어 질문한다. 자명한 작업(오타 수정,
+  단순 리네임 등)까지 매번 확인받으라는 뜻은 아니다 — 판단은 여전히 필요하다.
+- **목표를 검증 가능하게 정의하고, 검증까지 끝내야 완료다** — "버그 고침"이 아니라 "재현 테스트
+  작성 → 통과시키기", "기능 추가"가 아니라 "관련 케이스 테스트 작성 → 통과 확인"으로 접근한다.
+  여러 단계짜리 작업은 시작 전에 `1. [작업] → 검증: [방법]` 형태로 짧게 계획을 밝힌다. 이 저장소는
+  검증 수단이 이미 갖춰져 있다 — `npm test`(Vitest 유닛 + workerd 통합), `npm run e2e`
+  (Playwright), `npm run check`(커밋 전 게이트)를 실제로 돌려 확인하고, "됐다"는 주장이 아니라
+  결과로 보여준다.
 
 ## 명령어
 
@@ -10,8 +23,9 @@ npm ci                 # 의존성 설치 (루트, npm workspaces)
 npm test               # Vitest 전체 (unit: node 환경 / workers: workerd+D1 통합)
 npm run lint           # Biome 체크 (tests/, packages/, apps/, v2 TS만 대상)
 npm run lint:fix       # Biome 자동 수정
-npm run typecheck      # tsc (워크스페이스 + v2/functions)
+npm run typecheck      # tsc (워크스페이스 + v2/functions + e2e)
 npm run check          # lint + typecheck + test — 커밋 전 필수
+npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
 
 # 로컬 개발 서버 (v2/)
 cd v2
@@ -20,7 +34,7 @@ npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원�
 npx wrangler pages dev public --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
-# --d1/--r2 플래그 필수: wrangler 4.8x pages dev가 wrangler.toml의 바인딩을 무시함
+# --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
 ```
 
 데모 계정: 유저코드 `DEMO` / 암호 `0000`.
@@ -46,8 +60,13 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   `npm run build -w @bnhd/lab` 후에야 wrangler pages dev에서 /admin이 뜬다.
   로컬 개발: `npm run dev -w @bnhd/lab` (wrangler 8790에 /api 프록시).
 - `tests/` — label/autofill 단위 테스트 (`@bnhd/*` 패키지를 import).
-- 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml`).
+- `e2e/` — Playwright 스모크 (공개 조회→로그인→등록→덱). `playwright.config.ts`가
+  `npm run e2e:server`를 자동 기동 — 라이브·개발 데이터와 분리된 `v2/.wrangler-e2e` persist 사용.
+- 배포: `main` 푸시 → 프리뷰, `deploy` 푸시 → 프로덕션 (`.github/workflows/deploy.yml` —
+  lint·test·lab 빌드 + **e2e 통과가 배포 게이트**).
   `main → deploy` 승격 PR은 **Squash and merge** (linear history 규칙).
+- 백업: `.github/workflows/backup.yml`이 매일 04:17 KST 프로덕션 D1을 덤프 → Actions
+  artifact 30일 보관. 1차 안전망은 D1 Time Travel — 복구 절차는 README 운영 섹션.
 
 ## 규칙과 함정
 
@@ -57,7 +76,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   라벨과 묶여 있다 — 절대 변경 금지.
 - `v2/migrate_drop.sql`은 초기 재생성용 기록 — **실행 금지**.
 - D1 스키마 변경은 새 `migrate_*.sql` 파일 추가 (기존 파일 수정 금지), README 운영 섹션에 순서 기록.
-- 루트 package.json에 `"type": "module"`을 넣지 말 것 — v2의 vendored CJS(qrcode.js)와
-  Node 테스트 로더 해석이 깨진다. 새 패키지는 각자 package.json에 type을 선언한다.
+- 루트 package.json에는 `"type"`을 선언하지 않는다 — 각 패키지가 자신의 package.json에
+  type을 선언한다. (원래 근거였던 vendored CJS qrcode.js는 제거됨 — 루트에 type을
+  올리려면 전체 check + e2e로 검증 후에만.)
 - Biome 대상은 `tests/`, `packages/`, `apps/` — v2 레거시 JS는 건드리지 않는다(Phase별 이식 시 TS화).
 - 커밋 전 `npm run check` 통과 확인.
