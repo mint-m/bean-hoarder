@@ -10,8 +10,8 @@
 | 랩 (등록·관리) | **[bnhd.pages.dev/admin](https://bnhd.pages.dev/admin)** — 가입/로그인 필요 |
 | 덱 (내 원두 카드) | **[bnhd.pages.dev/deck](https://bnhd.pages.dev/deck)** — 로그인 필요 |
 | 원두 카드 상세 (데모) | [bnhd.pages.dev/DEMO26-001](https://bnhd.pages.dev/DEMO26-001) |
-| 작동 방식 (그래픽 문서) | [v2/HOW_IT_WORKS.html](v2/HOW_IT_WORKS.html) |
-| 설계 근거 | [v2/DESIGN.md](v2/DESIGN.md) |
+| 작동 방식 (그래픽 문서) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 설계 근거 | [DESIGN.md](DESIGN.md) · 저장소 구조 [STRUCTURE.md](STRUCTURE.md) |
 
 ## 사용 흐름
 
@@ -47,8 +47,8 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 - **브랜치 보호 규칙** (GitHub Settings > Rules > Rulesets):
   - `main` — PR 없이 직접 push 허용, 삭제만 방지(Restrict deletions).
   - `deploy` — PR 필수(Require a pull request before merging) + Require linear history + 삭제 방지. Linear history 요구 때문에 `main → deploy` 승격 PR은 반드시 **Squash and merge**(또는 Rebase)로 병합한다 — 일반 merge commit은 거부된다.
-- **배포(수동/로컬)**: `cd v2 && npx wrangler pages deploy` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
-- **초대코드**: Cloudflare **secret**으로 관리 — `cd v2 && npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
+- **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
+- **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
 - **R2 비용 백스톱**: 로고 저장(`PUT /api/logos`)에 서비스 전역 물리적 상한 내장(`packages/api/src/lib/budget.ts`) — 월간 R2 쓰기 10만 회·R2 저장 로고 2만 개 초과 시 503으로 저장 거부(무료 티어를 넘겨 과금되기 전에 차단). 삭제는 무과금이라 제한하지 않는다(한도에 걸려도 삭제로 공간 확보 가능). 코드 밖 안전망으로 **Cloudflare 대시보드 → R2/Billing 사용량 알림**을 별도로 설정할 것(대시보드 예산은 서비스를 멈추지 않는 알림뿐이라 코드 백스톱이 실제 상한).
 - **DB 백업 (3중 안전망)**:
@@ -56,20 +56,19 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   2. **자동 덤프** — `.github/workflows/backup.yml`이 매일 04:17 KST에 `wrangler d1 export`를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 `bnhd-v2-backup.sql`을 받아 `npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql` (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 `CLOUDFLARE_API_TOKEN`에 D1:Edit 권한 추가.
   3. **사용자 셀프 백업** — 각자 랩에서 CSV 내보내기/복원.
   (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
-- **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `cd v2 && npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
-- **스키마**: 새 환경은 `v2/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
+- **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
+- **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
   `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql` → `migrate_logos_r2.sql` → `migrate_r2_usage.sql` → `migrate_coffee_name.sql`
   (`migrate_drop.sql`은 초기 재생성용 기록 — 실행 금지)
-  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=migrate_logos.sql`
-- **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)
+  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_logos.sql` (`db/` 아래에 있다)
+- **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=db/seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)
 
 ## 로컬 개발
 
 ```bash
-npm ci                                                      # 루트에서 1회 (npm workspaces)
-cd v2
-npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
+npm ci                                                        # 루트에서 1회 (npm workspaces)
+npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
 npx wrangler pages dev public --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
@@ -83,37 +82,20 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
   `npm run e2e`는 Playwright가 wrangler를 직접 띄우므로 별도 서버 기동이 필요 없다.
 
-## 진행 기록
+## 주요 변경
 
-이 표는 지나간 사실의 기록이라 **지워진 파일을 일부러 언급한다** — 아래 마커로 경로 검증에서 제외한다.
+세부 이력은 커밋 히스토리를 본다. 여기에는 서비스의 성격이 바뀐 지점만 남긴다.
 
-<!-- check-docs:ignore-start -->
-
-| 날짜 | 내용 |
+| 시기 | 무엇이 달라졌나 |
 |---|---|
-| 2026-07-03 | v1: 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지. `bnhd.pages.dev` 첫 배포 |
-| 2026-07-04 | v1 관리자 페이지(KEY 채번·QR 미리보기·디자인 편집기) 추가 |
-| 2026-07-06 | 멀티유저 시도(레지스트리 시트 + Apps Script) 후, **v2 제로베이스 재설계** — Cloudflare D1 + Pages Functions로 재구축, 라벨 렌더러 단일화, jsQR 브라우저 검증 |
-| 2026-07-07 | **v2 정식 완성·배포** — 서비스 정의를 "원두 호더 개인용"으로 확정(가입에서 로스터리 제거), 인증을 유저코드+4자리 암호로 교체, 목록·수정·삭제, 상세 URL/QR 이미지 클립보드 복사 추가. `bnhd.pages.dev`에서 v1 교체, 라이브 전 구간 검증. v1 웹 파일은 `legacy/`로 이동 |
-| 2026-07-08 | 오프라인 **복구키** 추가(가입 시 1회 표시, 사용 시 회전), 애그트론→**로스팅 포인트**(프리셋 제안 + 자유 입력)로 개편, 원산지·가공방식 옵션 제안(블렌드 포함), 신규 **메모** 필드, 필수 항목 빨간 별표 표시 및 서버 검증, 고도·수확시기 접기, 서브라인 필드 입력 시 표시 항목 자동 체크, 용어 정리, 동적 날짜 힌트. 기존 계정·데이터 보존한 채 무중단 스키마 마이그레이션 |
-| 2026-07-08 | **종합 개선 라운드** — ① 라벨 사이즈 3종(40×20·50×30·50×60, 사이즈별 맞춤 레이아웃) ② 로스터리 로고 서버 저장·자동 적용 + 이름 자동 제안 ③ CSV 백업 **복원** 기능(같은 KEY 덮어쓰기) ④ 초대코드를 Cloudflare secret으로 이전 ⑤ 암호 해시 PBKDF2 전환(무중단) ⑥ CSV 수식 인젝션 가드 ⑦ 링크 프록시 SSRF 가드 강화(DoH 검사 + 리다이렉트 홉별 재검사) ⑧ **Gemini AI 인식**(사용자 본인 키, 브라우저 직접 호출) ⑨ 라벨 디자인 설정 localStorage 영속화 ⑩ 스튜디오 코드 모듈 분리(lab.js/lab.css) + QR 라이브러리 vendoring ⑪ 단위 테스트 + GitHub Actions CI ⑫ MIT 라이선스 |
-| 2026-07-08 | **UX 다듬기 라운드** — ① 조회 페이지에 **카메라 QR 스캔** 버튼(별도 앱 없이 폰에서 바로 스캔→조회) ② 덱 카드 **호버 시 상세 확장**(품종·고도·수확·생산자·랏·노트, 터치 기기는 항상 표시) ③ 로고 관리 UI 개편(썸네일 미리보기 + 저장 상태 배지 + 전용 피드백 줄, 링크 로드 진행/성공/실패 명확화, "현재 로고 지우기" 분리) ④ 로스터리 자동완성 보정(로고 저장/삭제 시에도 등록 이력 제안 유지, 로고 보유 로스터리 우선·★ 표시) |
-| 2026-07-08 | **메모/사이즈/색상 다듬기 라운드** — ① 메모 필드를 "산지·로스터리·생산자 스토리" 전용 공간으로 재안내(개인 감상평 아님을 명시, "About Beans" 형식 예시 플레이스홀더로 교체) ② 라벨 사이즈 라디오를 미리보기 카드에도 복제해 빠른 전환 제공(두 곳 동기화) + **사이즈별 기본 표시 항목 확대**(50×30·50×60은 품종·고도 등 기본 노출 항목 추가, 커스터마이즈한 항목은 유지) ③ "새 원두 입력" 초기화 버튼을 항상 노출(기존엔 등록 완료 후에만 보여 입력 중이던 내용을 손으로 지워야 했음) ④ **덱·조회 카드 산지별 색상 구분** 추가(`origin-color.js`, 산지 문자열 해시 → 카드 상단 띠 색, 라벨 인쇄 색상과는 무관) ⑤ 자동 채우기 파서가 "라벨"과 값이 서로 다른 줄(블록)에 나뉘는 사이트 구조도 인식하도록 보강, 소개글(About/Description/Story)을 메모 후보로 인식 |
-| 2026-07-08 | **배포 자동화** — `main`과 분리된 `deploy` 브랜치 도입, 해당 브랜치 푸시 시 GitHub Actions가 단위 테스트 통과 확인 후 `wrangler pages deploy` 자동 실행(`.github/workflows/deploy.yml`). `main` 머지는 더 이상 라이브에 자동 반영되지 않으며, 배포는 `main → deploy` 병합으로 명시적으로 승격 |
-| 2026-07-09 | **라벨 레이아웃·문구 정리 라운드** — ① 인쇄 색상 **컬러/흑백** 선택 옵션 추가(흑백만 지원하는 감열 프린터 대응, 미리보기·다운로드 모두 반영) ② 스펙 그리드 레이아웃을 유연화 — 값이 칸 절반 폭을 넘으면 말줄임(…) 대신 전체 폭 단독 줄(최대 2줄 랩)로 전환해 텍스트가 잘리지 않도록 보장, 세로 공간이 부족하면 우선순위 낮은(나중 선택) 스펙 항목부터 자동으로 숨김 ③ **메모 → 기타 정보**로 명칭 변경(랩 입력 폼·조회 페이지 라벨 모두) ④ 라벨 사이즈 수정 위치를 미리보기 카드 한 곳으로 통일(라벨 디자인 카드의 중복 라디오 제거) ⑤ 과도하게 긴 안내 문구를 핵심만 남기고 정리 |
-| 2026-07-09 | **스펙 우선순위·카드형 레이아웃 라운드** — ① 값이 없는 필드는 부제목/스펙 표시 체크박스를 비활성화(체크해도 안 찍히는 죽은 옵션 제거), 값이 막 채워진 시점에만 자동 체크하고 그 뒤 사용자가 직접 끈 체크는 다른 필드를 입력해도 되살아나지 않도록 수정(기존의 숨은 버그) ② 스펙 칸 **표시 우선순위를 ↑↓ 버튼으로 직접 조정**하는 기능 추가, 기본 우선순위를 용량·로스팅포인트·고도·랏·워싱스테이션·생산자·수확시기 순으로 재정의 ③ 카드형(50×60) 레이아웃에서 QR을 우측으로 옮기고 로스팅일·패키징일을 좌측에 두 줄로 쌓아 배치(보딩패스 바코드 옆 항공편 정보 컨셉), 그만큼 본문에 쓸 세로 공간 확대 ④ 인쇄 색상 기본값을 컬러→**흑백**으로 변경(2도 인쇄 미지원 프린터가 다수라는 실사용 피드백 반영), "흑백 (블랙만)" 라디오 라벨의 중복 설명 제거 |
-| 2026-07-09 | **40×20 가독성·날짜 정돈 라운드** — ① 로스팅일·패키징일 배치를 사이즈별로 재정리: 카드형(50×60)은 QR 좌측에 "RSTD26.06.29 PKGD26.07.09" 한 줄로 촘촘하게 고정, 가로형(40×20·50×30)은 라벨 최하단 한 줄(2열)의 기존 레이아웃 유지 ② 부제목 3종(지역·가공·품종)은 핵심 정보라 **절대 잘리지 않도록** 최우선 배치 — 길면 여러 줄로 줄바꿈해 전문을 싣고, 공간이 부족하면 스펙·노트를 대신 드롭 ③ 자동 표시되는 테이스팅 노트보다 **사용자가 고른 스펙이 우선**하도록 순위 정정(기존엔 노트 자리 확보 때문에 선택한 스펙이 밀려나던 버그) ④ 감열(203dpi) 인쇄 가독성을 위해 40×20 전체 글자 크기를 키움(헤드라인 2.8→3.1mm, 부제목 1.35→1.55mm, 스펙 라벨 1.1→1.3mm 등) — 표시 정보량은 줄이되 라벨은 읽히게 하고 자세한 정보는 QR로 |
-| 2026-07-09 | **표시 항목 재배치·노트 정책 라운드** — ① **가공·품종을 스펙 칸으로, 지역·랏·워싱스테이션·생산자를 부제목 줄로** 이동(풀 구성 스왑) — 부제목은 최대 3개까지 선택, 값이 채워지면 자동 체크되는 기존 동작 유지 ② 테이스팅 노트를 **항상 한 줄만** 인쇄하도록 변경 — 콤마로 구분된 항목을 앞에서부터 채워보고 그 줄에 다 안 들어가는 항목은 통째로 생략(예: "Grape, Cherry Cordial, Tropical Cit…"처럼 단어 중간을 자르는 대신 "Grape, Cherry Cordial"까지만 표시) ③ 노트 위치를 스펙 그리드 바로 아래가 아니라 **본문 최하단(날짜 바로 위)에 고정** — 스펙이 짧게 끝나도 노트가 붕 뜨지 않음, 남는 공간이 있으면 항상 노출 |
-| 2026-07-10 | **덱 카드 인터랙션 라운드** — ① 호버 시 품종·고도·수확·생산자·랏·워싱스테이션·PKGD·노트를 펼쳐 보여주던 확장 패널을 제거 ② 호버·포커스 인터랙션을 **애플 월렛 카드 뽑기 방식**으로 재구현 — 호버한 카드만 살짝 위로 들리고(`translateY(-8px)`), 그 아래 쌓인 카드들은 `.wcard:hover ~ .wcard` 형제 선택자로 통째로 아래로 밀려나 시야를 가림 없이 자연스럽게 열림(z-index는 전혀 사용하지 않음 — DOM 순서상 뒤 카드가 원래 위에 그려지는 성질만 이용) ③ 카드 클릭 동작을 분리 — 카드 몸통을 클릭·엔터하면 곧바로 상세 페이지로 이동, 호버 시 카드 우측 하단(RSTD/NET 줄 옆 여백)에 나타나는 별도 **⋯ 메뉴 버튼**(터치 기기는 항상 표시, 레이아웃을 밀어내지 않도록 절대 위치)을 눌러야 **상세보기·숨기기·삭제 액션시트**가 뜸 ④ 소비 완료한 원두를 삭제 대신 남겨둘 수 있는 **숨기기(보관)** 기능 신설 — `beans.archived` 컬럼 추가(`migrate_archived.sql`), `PATCH /api/bean/{KEY}/archive`로 토글, 보관된 카드는 덱 최하단으로 정렬되고 채도를 낮춰(grayscale) 표시 ⑤ 카드 최소 표시 정보를 **지역·품종·가공(값 있는 것만)** 으로 재정의하고, **테이스팅 노트 미리보기**를 카드에 추가 — 검색창 아래 "카드에 노트 표시" 체크박스로 켜고 끌 수 있으며 기본은 켜짐, 체크 시 포인트 컬러(`accent-color`)로 표시, 선택은 로컬에 기억 ⑥ 숨긴 카드 스타일 보정 — `opacity`를 빼서(투명해지면 겹친 뒤 카드가 비쳐 지저분해 보이던 문제) 채도(`grayscale`)·명도(`brightness`)만 낮추도록 변경, `.deck`에 `isolation: isolate`를 주고 숨긴 카드에 `z-index: -1`을 줘서 맨 앞이 아니라 **덱의 가장 뒤로 가라앉듯** 다른 카드 밑에 깔리게 수정 |
-| 2026-07-19 | **카드·라벨 표시 정보 우선순위 체계 (#27)** — ① 헤드라인을 국가 단독이 아니라 **국가 + 가장 세부 장소(워싱스테이션>생산자>지역) + 랏 보조**로 조합해 변별력을 높임(`@bnhd/label` `buildHeadline`, 카드·조회는 공유 모듈 `v2/public/headline.js`). 시그니쳐·블렌드명이 있으면 헤드라인을 대체하는 **선택 필드 `coffee_name` 신설**(`migrate_coffee_name.sql`) ② **테이스팅 노트 렌더링 보장** — 값이 있으면 라벨에서 노트 한 줄을 미리 예약해 스펙(3순위)이 먼저 드롭되고 노트(2순위)는 항상 표시 ③ 스펙 우선순위를 **2순위(가공·품종) → 3순위(고도·수확)** 로 정렬하고 사이즈별 기본 표시 항목을 이에 맞게 조정. 헤드라인이 쓴 필드는 부제목·스펙에서 중복 제거 |
-| 2026-07-13 | **실서비스 전환 마이그레이션 Phase 4 (운영 준비) — 마이그레이션 완료** — ① 5xx를 구조화 JSON(method·path·stack)으로 로깅해 `wrangler pages deployment tail`/대시보드에서 추적 가능 ② **D1 자동 백업**: Actions cron이 매일 04:17 KST `d1 export` → artifact 30일 보관(오프사이트 2차 — 1차는 D1 Time Travel 30일), 복구 절차 운영 섹션 문서화 ③ **Playwright 스모크 e2e**(공개 조회 → 랩 로그인 → QR 실디코드 검증 → 등록 → 덱)를 CI에 추가하고 **deploy가 e2e 통과를 요구**하도록 게이트 — e2e 전용 로컬 D1(persist 분리)로 라이브·개발 데이터와 격리 ④ Sentry(외부 계정 필요)·커스텀 도메인·Workers 이전은 보류 확정(QR 호환·운영비 0원 유지) |
-| 2026-07-12 | **Phase 3 마무리 — /admin을 React 앱으로 교체** — 프리뷰 `/lab` 검증(등록·편집·삭제·로고 R2 왕복·보관 토글) 통과 후 Vite base를 `/admin/`으로 전환하고 구 admin.html·lab.js·label.js·autofill.js·vendor/qrcode.js 제거(랩 프론트의 단일 소스는 apps/lab + packages/label·autofill). 이 과정에서 **원격 D1에 `migrate_logos.sql`·`migrate_archived.sql`이 미적용 상태였음을 발견**(구버전에서도 로고 저장·덱 숨기기가 원격에서 깨져 있었음) — 순서대로 적용해 해결 |
-| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 3 (프론트·스토리지)** — ① 라벨 렌더러·자동 채우기 파서를 `@bnhd/label`·`@bnhd/autofill` 패키지로 추출(qrcode-generator·jsqr npm 의존, 테스트 단일 소스) ② **랩을 React 19 + Vite + TS로 이식**(`apps/lab`) — 폼·라벨 디자인 토글(우선순위 ↑↓, 자동 체크)·로고 관리·목록·CSV 백업·AI 자동 채우기 전 기능 파리티, `/lab` 경로 병행 배포로 검증 후 `/admin` 교체 예정(스트랭글러), 빌드 산출물은 gitignore + CI가 배포 직전 빌드 ③ **로고 저장을 R2로 이전**(`bnhd-logos` 버킷, 키 `{유저코드}/{로스터리}`) — API 계약 불변(GET이 R2 바이트를 data URL로 재조립), 레거시 인라인 행은 재저장 시 자연 이전, `migrate_logos_r2.sql` |
-| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 2 (인증)** — ① **세션 토큰 도입**: `POST /api/login` → `bhs_` 토큰 발급(90일 만료, 서버엔 SHA-256 해시만 저장, `DELETE /api/session`으로 폐기), 가입·복구 응답에도 토큰 포함(즉시 로그인). 브라우저는 더 이상 **암호(PIN)를 저장·전송하지 않음** — 공용 `session.js`가 lab/deck에서 세션을 관리하고, 구버전이 저장해 둔 PIN은 첫 방문 시 세션으로 자동 교환 후 삭제. 레거시 `Bearer 유저코드:암호`도 이행기 동안 유지 ② **D1 기반 인증 rate limit**: 실패 유저코드당 10회/10분·IP당 30회/10분 초과 시 429 — 4자리 암호 전수 대입 차단(한도 초과 시 정답도 차단, 세션 인증은 무관), 초대코드 추측(가입)·복구키 추측도 IP 단위 제한 ③ `migrate_sessions.sql`(sessions·auth_attempts), 세션·rate limit 통합 테스트 8종 추가(총 71 tests). 패스키(WebAuthn)는 후속 라운드로 분리 |
-| 2026-07-12 | **실서비스 전환 마이그레이션 Phase 0·1** ([MIGRATION_PLAN.md](MIGRATION_PLAN.md)) — ① npm workspaces 모노레포 + TypeScript + Biome + Vitest 도입, 기존 테스트 Vitest 이식 ② **API를 Hono(TS)로 이식**: `packages/api`(라우트·인증·SSRF 가드) + `packages/schema`(원두 필드 단일 소스 — CSV 헤더·필수 규칙·Zod 스키마 파생), Pages Functions는 5줄 어댑터(`[[path]].ts`)만 남김 ③ **Drizzle ORM** 도입(테이블 구조 변경 없음, 스키마 드리프트 가드 테스트) ④ **workerd+D1 통합 테스트 19종** — 가입/복구/CRUD/보관/백업·복원/로고/SSRF 계약 전 구간 검증(63 tests) ⑤ CI에 lint+typecheck 추가, 배포 잡에 npm ci. API 계약(경로·상태코드·메시지)은 완전 동일 — 프론트 무수정, 라이브 무중단 |
-| 2026-07-10 | **필수 정보 재정의 라운드** — 싱글오리진 원두 기준 필수 항목을 **[로스터리·국가(산지)·품종·가공방식·로스팅일·패키징일]** 로 확정하고, 기존엔 선택이었던 **품종·가공방식을 필수로 승격**(클라이언트 `missingRequiredFields`·서버 `REQUIRED_LABELS` 동시 반영) — 품종 입력에도 가공방식과 동일한 방식으로 **"블렌드 (여러 품종 혼합)" 데이터리스트 옵션**을 추가해, 특정하기 어려운 블렌드 원두는 이 옵션 선택만으로 필수 조건을 만족(값이 채워짐)하고 라벨 인쇄 시에는 `stripParen`으로 괄호 설명이 잘려 "블렌드"만 짧게 표시됨. 플레이버 노트는 필수는 아니되 **"권장" 배지**(포인트 컬러 테두리)를 달아 반필수 수준으로 입력을 유도, 라벨도 "Flavor Notes (플레이버 노트)" → **"플레이버 노트"** 로 간결하게 정리 |
-
-<!-- check-docs:ignore-end -->
+| 2026-07-03 | **v1 첫 배포** — 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지 |
+| 2026-07-07 | **v2 제로베이스 재설계·교체** — Cloudflare D1 + Pages Functions로 재구축. 인증을 유저코드+4자리 암호로, 라벨 렌더러를 단일화하고 jsQR 브라우저 검증 도입 |
+| 2026-07-08 | **개인 서비스로서의 기본기** — 오프라인 복구키, 라벨 3사이즈, 로스터리 로고 서버 저장, CSV 백업·복원, PBKDF2 해시, SSRF 가드, 단위 테스트 + CI, `deploy` 브랜치 승격 방식 |
+| 2026-07-09~10 | **라벨·카드 표시 체계 확립** — 표시 우선순위(부제목 > 스펙 > 노트)와 자동 드롭 규칙, 감열 인쇄 가독성 대응, 덱을 월렛 카드 인터랙션으로 재구현, 보관(숨기기) 기능 |
+| 2026-07-12~13 | **실서비스 전환 (Phase 0~4)** — 모노레포 + TypeScript + Hono + Drizzle 이식, 세션 토큰 인증과 D1 rate limit, 랩을 React로 재작성해 `/admin` 교체, 로고를 R2로 이전, 구조화 로깅, D1 자동 백업, Playwright e2e를 배포 게이트로 |
+| 2026-07-19 | **원두 식별자 체계** — 헤드라인을 국가 + 최세부 장소로 조합하고, 시그니쳐·블렌드명을 위한 `coffee_name` 필드 신설 |
+| 2026-07-24 | **R2 요금 백스톱** — 로고 저장에 서비스 전역 물리 상한을 걸어 무료 티어 초과 과금을 코드 레벨에서 차단 |
+| 2026-07-29 | **문서 체계 정리** — 저장소 구조를 코드에서 생성([STRUCTURE.md](STRUCTURE.md))하고 문서 참조를 자동 검증. v1 잔재를 걷어내고 `v2/` 디렉터리를 루트로 평탄화 |
 
 ## 로드맵 / 남은 작업
 
@@ -122,5 +104,3 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - 🗺️ 한눈에 보는 트래킹: [#31 로드맵 / 남은 작업 트래킹](../../issues/31)
 - 🚀 실서비스 오픈 전 수동 운영 항목: [#30 운영 런칭 체크리스트](../../issues/30)
 - 기능·개선·인증 백로그: 각 이슈 [#27](../../issues/27) [#26](../../issues/26) [#25](../../issues/25) [#24](../../issues/24) [#23](../../issues/23) [#16](../../issues/16) [#2](../../issues/2) [#1](../../issues/1), 배포 [#29](../../issues/29)
-
-과거 종합 평가는 [REVIEW.md](REVIEW.md)(2026-07-08 스냅샷, 지적 대부분 Phase 0~4로 해소).

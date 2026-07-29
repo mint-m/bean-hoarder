@@ -1,8 +1,7 @@
 # Bean-Hoarder 작업 가이드
 
 커피 원두 소분 라벨링(QR) & 조회 서비스. Cloudflare Pages + Functions + D1 + R2, 운영비 0원.
-실서비스 전환 마이그레이션([MIGRATION_PLAN.md](MIGRATION_PLAN.md))은 Phase 4까지 완료(2026-07-13)
-— 패스키(WebAuthn) 도입만 후속 과제로 남음.
+실서비스 전환은 2026-07-13에 끝났고, 패스키(WebAuthn) 도입만 후속 과제로 남아 있다.
 
 **이 문서는 원칙과 함정만 다룬다.** 디렉터리·파일 배치와 API 라우트는 생성되는
 [STRUCTURE.md](STRUCTURE.md), 사용법·운영 절차는 [README.md](README.md)에 있고
@@ -29,16 +28,15 @@ npm ci                 # 의존성 설치 (루트, npm workspaces)
 npm test               # Vitest 전체 (unit: node 환경 / workers: workerd+D1 통합)
 npm run lint           # Biome 체크
 npm run lint:fix       # Biome 자동 수정
-npm run typecheck      # tsc (워크스페이스 + v2/functions + e2e)
+npm run typecheck      # tsc (워크스페이스 + functions + e2e)
 npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
 npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
 npm run check          # lint + typecheck + test + 문서 검증 — 커밋 전 필수
 npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
 
-# 로컬 개발 서버 (v2/)
-cd v2
-npx wrangler d1 execute bnhd-v2 --local --file=schema.sql   # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=seed.sql     # 데모 계정/원두 (선택)
+# 로컬 개발 서버 (저장소 루트에서)
+npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
 npx wrangler pages dev public --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
@@ -54,26 +52,26 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - **API 계약 불변**: 기존 엔드포인트의 요청/응답 형태를 바꾸지 않는다 — 라이브 프론트가 그대로
   동작해야 한다. `packages/api/test/app.test.ts`가 **계약 문서**이므로 상태 코드나 메시지를
   바꾸는 변경은 그 자체로 계약 파괴다. 필요하면 먼저 계획 문서에 기록한다.
-- `v2/migrate_drop.sql`은 초기 재생성용 기록 — **실행 금지**.
+- `db/migrate_drop.sql`은 초기 재생성용 기록 — **실행 금지**.
 - 루트 package.json에는 `"type"`을 선언하지 않는다 — 각 패키지가 자신의 package.json에
   type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루트에 type을 올리려면
   전체 check + e2e로 검증한 뒤에만.)
 
 ## 걸려 넘어지기 쉬운 것
 
-- **헤드라인 조합 규칙이 두 곳에 있다**: `v2/public/headline.js`(브라우저 전역 `bhHeadline`)와
+- **헤드라인 조합 규칙이 두 곳에 있다**: `public/headline.js`(브라우저 전역 `bhHeadline`)와
   `@bnhd/label`의 `buildHeadline`(번들). 한쪽만 고치면 라벨·카드·조회 제목이 어긋난다 —
   반드시 함께 고친다. 구조상 중복이 남은 유일한 지점이라 특히 주의할 것.
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.
-- **`/admin`은 빌드 산출물**: `v2/public/admin`은 gitignore이고 CI가 배포 직전에 만든다.
+- **`/admin`은 빌드 산출물**: `public/admin`은 gitignore이고 CI가 배포 직전에 만든다.
   로컬에서 `/admin`을 보려면 먼저 `npm run build -w @bnhd/lab`.
 - **필드 추가 = `packages/schema`의 BEAN_FIELDS 한 줄 + D1 마이그레이션 SQL.**
   CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되므로 다른 곳은 손댈 필요가 없다.
 - D1 스키마 변경은 **새 `migrate_*.sql` 파일 추가** (기존 파일 수정 금지). 적용 순서는
   README 운영 섹션에 기록한다 — 원격 D1에 미적용 마이그레이션이 남아 조용히 깨진 전례가 있다.
-- `v2/public/`의 브라우저 JS는 Biome·tsc 대상에서 빠져 있다 — 손대면 검증 없이 배포된다.
+- `public/`의 브라우저 JS는 Biome·tsc 대상에서 빠져 있다 — 손대면 검증 없이 배포된다.
 - `deploy` 브랜치는 linear history를 요구하므로 `main → deploy` 승격 PR은 **Squash and merge**.
 - 커밋 전 `npm run check` 통과 확인.
 
@@ -90,7 +88,7 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 | 배포·백업·마이그레이션 절차 | [README.md](README.md) "운영" |
 | 변경 이력 | [README.md](README.md) "진행 기록" |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
-| 설계 근거 | [v2/DESIGN.md](v2/DESIGN.md) |
+| 설계 근거 | [DESIGN.md](DESIGN.md) |
 | 원칙·금지 사항·함정 | 이 문서 |
 
 - **문서 파일을 늘리지 않는다.** 새 `.md`를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수

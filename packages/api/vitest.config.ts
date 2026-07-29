@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
-const schemaSql = readFileSync(fileURLToPath(new URL("../../v2/schema.sql", import.meta.url)), "utf8");
+const schemaSql = readFileSync(fileURLToPath(new URL("../../db/schema.sql", import.meta.url)), "utf8");
 
 export default defineConfig({
   plugins: [

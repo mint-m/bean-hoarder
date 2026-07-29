@@ -7,7 +7,7 @@
 //   · 각 파일의 역할 → 파일 머리 주석 (없으면 HTML <title>)
 //   · 워크스페이스   → package.json workspaces + 각 package.json name
 //   · API 라우트     → packages/api/src/app.ts 의 app.<method>(...) 호출
-//   · D1 테이블      → v2/schema.sql 의 CREATE TABLE
+//   · D1 테이블      → db/schema.sql 의 CREATE TABLE
 //
 // 손으로 유지하는 건 아래 GROUPS(무엇을 보여줄지에 대한 정책)뿐이다. 정책은 잘 안 변하고,
 // 사실은 자주 변한다 — 자주 변하는 쪽을 기계가 맡는다.
@@ -24,14 +24,14 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 const OUT = "STRUCTURE.md";
 
 const APP_TS = "packages/api/src/app.ts";
-const SCHEMA_SQL = "v2/schema.sql";
+const SCHEMA_SQL = "db/schema.sql";
 
 // 목록에 넣어도 읽는 사람에게 정보가 없는 파일
 const EXCLUDE = [/(^|\/)tsconfig\.json$/, /(^|\/)package\.json$/];
 
 // 스스로를 설명할 수 없는 파일만 여기 적는다 — 손대면 안 되는 서드파티 코드가 그렇다.
 const OVERRIDES = {
-  "v2/public/vendor/jsQR.js": "카메라 QR 디코딩 라이브러리 (서드파티 — CDN 대신 저장소에 포함).",
+  "public/vendor/jsQR.js": "카메라 QR 디코딩 라이브러리 (서드파티 — CDN 대신 저장소에 포함).",
 };
 
 // 주석 문법은 파일 타입마다 다르다. 한 규칙으로 뭉뚱그리면 CSS 커스텀 속성(--bg)을
@@ -64,10 +64,10 @@ const GROUPS = [
   {
     title: "정적 페이지",
     hint: "빌드 없이 브라우저가 그대로 받는 파일. Cloudflare Pages가 서빙한다.",
-    prefix: "v2/public/",
+    prefix: "public/",
     extra: [
       {
-        path: "v2/public/admin/",
+        path: "public/admin/",
         desc: "랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다.",
       },
     ],
@@ -75,12 +75,17 @@ const GROUPS = [
   {
     title: "서버",
     hint: "Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.",
-    prefix: "v2/functions/",
+    prefix: "functions/",
   },
   {
     title: "워크스페이스",
     hint: "npm workspaces. 로직의 단일 소스는 전부 여기에 있다.",
     kind: "workspaces",
+  },
+  {
+    title: "D1 스키마",
+    hint: "새 환경은 schema.sql 하나로 만들고, 기존 DB에는 migrate_*.sql을 순서대로 적용한다.",
+    prefix: "db/",
   },
   {
     title: "테스트",
@@ -228,7 +233,7 @@ const HEADER = [
   "",
   "> **이 파일은 생성된다 — 손으로 고치지 말 것.** `npm run gen:structure`가 저장소에서 직접",
   "> 읽어 만든다. 파일 목록은 `git ls-files`, 각 항목의 설명은 그 파일의 머리 주석, API 라우트는",
-  "> `packages/api/src/app.ts`, D1 테이블은 `v2/schema.sql`에서 온다. 설명을 바꾸려면 해당",
+  "> `packages/api/src/app.ts`, D1 테이블은 `db/schema.sql`에서 온다. 설명을 바꾸려면 해당",
   "> 파일의 머리 주석을 고치고 다시 생성한다.",
   ">",
   "> 원칙·함정은 [CLAUDE.md](CLAUDE.md), 사용법·운영 절차는 [README.md](README.md).",

@@ -27,26 +27,17 @@ v1을 운영하며 드러난 마찰을 근거로 삼았다.
 
 ## 아키텍처
 
-```
-bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
-├── /                핵심 조회: /{KEY} → GET /api/bean/{KEY} → 카드 렌더 (인증 없음)
-├── /admin           랩(스튜디오): 가입/로그인, 입력, 라벨 미리보기+검증, 등록·수정·삭제, 목록, 백업·복원, 로고
-├── /deck            내 원두 월렛 덱 (로그인 필요)
-├── functions/api/   Pages Functions (서버 코드, 같은 배포에 포함)
-│     POST   /api/signup        초대코드+암호 → 유저코드 자동 발급 + 복구키
-│     POST   /api/recover       복구키+새 암호 → 계정 복구 (복구키 회전)
-│     POST   /api/beans         원두 등록 (KEY 서버 채번)
-│     GET    /api/beans         내 원두 목록
-│     GET    /api/bean/{KEY}    공개 조회
-│     PUT    /api/bean/{KEY}    수정 (소유자만)
-│     PATCH  /api/bean/{KEY}/archive  숨기기(보관) 토글 (소유자만)
-│     DELETE /api/bean/{KEY}    삭제 (소유자만)
-│     GET    /api/export.csv    내 데이터 CSV 백업 (수식 인젝션 가드)
-│     POST   /api/import        CSV 백업 복원 (내 KEY만, 같은 KEY 덮어쓰기)
-│     GET/PUT/DELETE /api/logos 로스터리 로고 저장·재사용 (100KB 제한)
-│     POST   /api/fetch         상품 페이지 프록시 (SSRF 가드: DoH 검사 + 리다이렉트 홉별 재검사)
-└── D1: users(usercode, pass_hash, recovery_hash) / beans(key, usercode, roastery, …, archived) / logos(usercode, roastery, data_url)
-```
+Cloudflare Pages 프로젝트 **하나가 전부**다. 정적 페이지, 서버(Pages Functions), DB(D1),
+오브젝트 스토리지(R2)가 같은 배포 안에 있고 그 밖에는 아무것도 없다 — 이 단일성이
+운영비 0원과 운영 부담 최소화의 근거다.
+
+- `/{KEY}` — 핵심 조회. QR 스캔이 도착하는 곳이며 인증이 없다.
+- `/admin` — 랩(스튜디오). 가입·로그인, 입력, 라벨 미리보기·검증, 등록·수정·삭제, 백업·복원, 로고.
+- `/deck` — 내 원두 월렛 덱 (로그인 필요).
+
+파일 배치와 API 라우트·D1 테이블의 **현재 목록은 [STRUCTURE.md](STRUCTURE.md)** 에 있다
+(저장소에서 생성된다). 이 문서는 그 구조를 왜 그렇게 골랐는지만 다룬다 — 목록을 여기에
+옮겨 적었다가 실제로 낡은 전례가 있다.
 
 ## 비용 (100명 기준, 전액 무료)
 
@@ -83,12 +74,16 @@ bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개 — 이게 전부)
 
 ## 마이그레이션
 
-- `bnhd.pages.dev` Pages 프로젝트에 v2를 배포해 v1(구글시트 방식)을 교체. 인쇄된 실라벨이 없던 시점이라 손실 없음.
-- v1 웹 파일·라벨 도구는 트리에서 제거(git 히스토리에 보존 — 삭제 직전 커밋에서 복원). 파이썬 배치
-  생성기 `make_label.py`는 v1 라벨 디자인 산출물이라 v2 보딩패스 라벨과 다르다 — v2 라벨의 단일 소스는 `packages/label`.
+- `bnhd.pages.dev` Pages 프로젝트에 v2를 배포해 v1(구글시트 방식)을 교체. 인쇄된 실라벨이 없던
+  시점이라 손실 없음.
+- v1 웹 파일과 파이썬 라벨 생성기는 저장소에서 완전히 제거했다 — git 히스토리에만 남아 있다.
+  라벨 디자인이 v2에서 완전히 새로 잡혔기 때문에 되살릴 이유가 없다. 라벨의 단일 소스는
+  `packages/label`이다.
 
 ## 운영 절차
 
-- 신규 사용자: 초대코드 전달 → admin.html에서 가입 → 끝 (운영자 작업 0)
+- 신규 사용자: 초대코드 전달 → 랩(`/admin`)에서 가입 → 끝 (운영자 작업 0)
 - 백업: 각자 CSV 내보내기, 운영자는 `wrangler d1 export bnhd-v2`
-- 스키마 변경: `schema.sql` 수정 후 `wrangler d1 execute`
+- 스키마 변경: 새 마이그레이션 파일 추가 후 `wrangler d1 execute`
+
+구체적인 절차·명령은 [README.md](README.md) "운영"에 있다.

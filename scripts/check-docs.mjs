@@ -10,15 +10,17 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const DOCS = ["CLAUDE.md", "README.md"];
+// 생성되지 않는(= 손으로 쓰는) 문서 전부. DESIGN.md가 빠져 있어 낡은 라우트 목록을
+// 오래 방치한 전례가 있다 — 새 문서를 만들면 여기에 추가한다.
+const DOCS = ["CLAUDE.md", "README.md", "DESIGN.md"];
 
 const IGNORE_START = "<!-- check-docs:ignore-start -->";
 const IGNORE_END = "<!-- check-docs:ignore-end -->";
 
 // 저장소에 없지만 문서가 정당하게 가리키는 이름 (빌드 산출물·실행 중 생기는 것)
 const GENERATED_DIRS = [
-  "v2/public/admin", // 랩 빌드 산출물 — CI가 배포 직전 생성
-  "v2/.wrangler-e2e", // e2e 전용 로컬 D1/R2 persist
+  "public/admin", // 랩 빌드 산출물 — CI가 배포 직전 생성
+  ".wrangler-e2e", // e2e 전용 로컬 D1/R2 persist
 ];
 const EXTERNAL_FILES = new Set([
   "bnhd-v2-backup.sql", // backup.yml이 만드는 Actions artifact
@@ -87,7 +89,7 @@ function resolves(candidate, { files, dirs }) {
   const c = candidate.replace(/\/+$/, "");
   if (EXTERNAL_FILES.has(c)) return true;
   if (files.has(c) || dirs.has(c)) return true;
-  // migrate_logos.sql(= v2/ 기준)처럼 상대 참조도 흔하다 — 경로 접미사 일치를 허용한다.
+  // migrate_logos.sql(= db/ 기준)처럼 상대 참조도 흔하다 — 경로 접미사 일치를 허용한다.
   const suffix = `/${c}`;
   for (const f of files) if (f.endsWith(suffix)) return true;
   for (const d of dirs) if (d.endsWith(suffix)) return true;
