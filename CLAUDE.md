@@ -4,8 +4,9 @@
 실서비스 전환 마이그레이션([MIGRATION_PLAN.md](MIGRATION_PLAN.md))은 Phase 4까지 완료(2026-07-13)
 — 패스키(WebAuthn) 도입만 후속 과제로 남음.
 
-**이 문서는 원칙과 함정만 다룬다.** 디렉터리·파일 배치, API 라우트, 운영 절차는
-[README.md](README.md)가 단일 출처이며 여기에 옮겨 적지 않는다 (아래 "문서 관리 원칙").
+**이 문서는 원칙과 함정만 다룬다.** 디렉터리·파일 배치와 API 라우트는 생성되는
+[STRUCTURE.md](STRUCTURE.md), 사용법·운영 절차는 [README.md](README.md)에 있고
+여기에 옮겨 적지 않는다 (아래 "문서 관리 원칙").
 
 ## 작업 방식
 
@@ -29,7 +30,7 @@ npm test               # Vitest 전체 (unit: node 환경 / workers: workerd+D1 
 npm run lint           # Biome 체크
 npm run lint:fix       # Biome 자동 수정
 npm run typecheck      # tsc (워크스페이스 + v2/functions + e2e)
-npm run gen:structure  # README "구조" 섹션 재생성 (저장소에서 파생)
+npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
 npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
 npm run check          # lint + typecheck + test + 문서 검증 — 커밋 전 필수
 npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
@@ -83,14 +84,22 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 
 | 사실 | 어디서 오는가 |
 |---|---|
-| 파일 배치, API 라우트, D1 테이블 | **생성** — `npm run gen:structure` (README "구조" 섹션) |
+| 파일 배치, API 라우트, D1 테이블 | **생성** — `npm run gen:structure` → [STRUCTURE.md](STRUCTURE.md) |
 | 각 파일이 무엇인가 | **그 파일의 머리 주석** — 생성기가 읽어 간다 |
+| 서비스 소개·사용법·로컬 개발 | [README.md](README.md) |
 | 배포·백업·마이그레이션 절차 | [README.md](README.md) "운영" |
 | 변경 이력 | [README.md](README.md) "진행 기록" |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
 | 설계 근거 | [v2/DESIGN.md](v2/DESIGN.md) |
 | 원칙·금지 사항·함정 | 이 문서 |
 
+- **문서 파일을 늘리지 않는다.** 새 `.md`를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수
+  없는지 먼저 본다. 문서가 늘면 같은 사실이 여러 곳에 흩어지고, 그게 곧 낡는 원인이다.
+  `STRUCTURE.md`는 예외인데 — 전부 생성물이라 사람이 유지할 게 없고, README에서 덜어낸
+  것이지 새로 더한 게 아니다.
+- **문서는 독자로 가른다.** README는 사람이 읽는다(무엇인지·어떻게 쓰는지·어떻게 운영하는지),
+  STRUCTURE.md는 코드 파악용, 이 문서는 원칙. 한 파일이 여러 독자를 상대하기 시작하면
+  양쪽 모두에게 불친절해진다.
 - **구조는 어느 문서에도 손으로 적지 않는다.** 파일 목록은 저장소를 보면 알 수 있으므로
   옮겨 적으면 낡기만 한다. `gen-structure.mjs`가 `git ls-files`·`app.ts`·`schema.sql`에서
   직접 읽어 생성하고, `npm run check`가 재생성 결과와 커밋된 내용이 같은지 검사한다.

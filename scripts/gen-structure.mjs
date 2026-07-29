@@ -12,15 +12,16 @@
 // 손으로 유지하는 건 아래 GROUPS(무엇을 보여줄지에 대한 정책)뿐이다. 정책은 잘 안 변하고,
 // 사실은 자주 변한다 — 자주 변하는 쪽을 기계가 맡는다.
 //
-// 실행: npm run gen:structure            README "구조" 섹션 갱신
+// 산출물은 STRUCTURE.md 하나다 — 파일 전체가 생성물이라 손댈 여지를 남기지 않는다.
+// README는 사람이 읽는 문서로 두고 여기를 링크만 한다.
+//
+// 실행: npm run gen:structure            STRUCTURE.md 갱신
 //       npm run gen:structure -- --check 재생성 결과가 커밋된 것과 같은지만 검사
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const README = "README.md";
-const MARK_START = "<!-- gen:structure:start -->";
-const MARK_END = "<!-- gen:structure:end -->";
+const OUT = "STRUCTURE.md";
 
 const APP_TS = "packages/api/src/app.ts";
 const SCHEMA_SQL = "v2/schema.sql";
@@ -222,12 +223,20 @@ function buildModel() {
   return { groups, routes: routes(), tables: tables() };
 }
 
-const GENERATED_NOTE =
-  "이 섹션은 `npm run gen:structure`가 저장소에서 직접 읽어 생성한다 — 손으로 고치지 말 것. " +
-  "각 항목의 설명은 해당 파일의 머리 주석에서 가져오므로, 설명을 바꾸려면 그 파일의 주석을 고친다.";
+const HEADER = [
+  "# Bean-Hoarder 저장소 구조",
+  "",
+  "> **이 파일은 생성된다 — 손으로 고치지 말 것.** `npm run gen:structure`가 저장소에서 직접",
+  "> 읽어 만든다. 파일 목록은 `git ls-files`, 각 항목의 설명은 그 파일의 머리 주석, API 라우트는",
+  "> `packages/api/src/app.ts`, D1 테이블은 `v2/schema.sql`에서 온다. 설명을 바꾸려면 해당",
+  "> 파일의 머리 주석을 고치고 다시 생성한다.",
+  ">",
+  "> 원칙·함정은 [CLAUDE.md](CLAUDE.md), 사용법·운영 절차는 [README.md](README.md).",
+  "",
+];
 
 function renderMarkdown(model) {
-  const out = [GENERATED_NOTE, ""];
+  const out = [...HEADER];
   for (const g of model.groups) {
     out.push(`**${g.title}** — ${g.hint}`, "");
     out.push("| 경로 | 역할 |", "|---|---|");
@@ -250,32 +259,21 @@ function renderMarkdown(model) {
   return out.join("\n");
 }
 
-function spliceReadme(markdown) {
-  const src = readFileSync(README, "utf8");
-  const s = src.indexOf(MARK_START);
-  const e = src.indexOf(MARK_END);
-  if (s === -1 || e === -1) {
-    console.error(`${README}에 ${MARK_START} / ${MARK_END} 마커가 없다.`);
-    process.exit(1);
-  }
-  return `${src.slice(0, s + MARK_START.length)}\n\n${markdown}\n${src.slice(e)}`;
-}
-
 const check = process.argv.includes("--check");
 const model = buildModel();
-const nextReadme = spliceReadme(renderMarkdown(model));
+const next = renderMarkdown(model);
 
 if (check) {
-  if (readFileSync(README, "utf8") !== nextReadme) {
-    console.error(`생성 구간이 저장소와 어긋난다: ${README}`);
+  if (!existsSync(OUT) || readFileSync(OUT, "utf8") !== next) {
+    console.error(`생성 문서가 저장소와 어긋난다: ${OUT}`);
     console.error("`npm run gen:structure`를 실행해 갱신하고 함께 커밋할 것.");
     process.exit(1);
   }
-  console.log("gen:structure — 생성 구간이 저장소와 일치함");
+  console.log(`gen:structure — ${OUT}가 저장소와 일치함`);
 } else {
-  writeFileSync(README, nextReadme);
+  writeFileSync(OUT, next);
   const rows = model.groups.reduce((n, g) => n + g.rows.length, 0);
   console.log(
-    `gen:structure — ${README} 갱신 (항목 ${rows}개 · 라우트 ${model.routes.length}개 · 테이블 ${model.tables.length}개)`,
+    `gen:structure — ${OUT} 갱신 (항목 ${rows}개 · 라우트 ${model.routes.length}개 · 테이블 ${model.tables.length}개)`,
   );
 }

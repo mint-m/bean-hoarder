@@ -78,6 +78,7 @@ function isPathCandidate(token, topLevel) {
   if (/\.(?:dev|com|io|org|net)\b/.test(token)) return false; // 도메인
   if (/[{}<>]/.test(token)) return false; // 플레이스홀더·HTML
   if (token.includes("*")) return false; // 글로브 — 실존을 따질 대상이 아니다
+  if (/^\.[A-Za-z0-9]+$/.test(token)) return false; // 확장자 조각 (`.md`, `.sql`)
   if (FILE_EXT.test(token)) return true;
   return token.includes("/") && topLevel.has(token.split("/")[0]);
 }
