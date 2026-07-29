@@ -22,8 +22,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
+      # lint + typecheck + test + check:docs — 커밋 전 게이트와 같은 명령
+      - run: npm run check
       - run: npm run build --workspace @bnhd/lab
 
   e2e:

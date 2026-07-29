@@ -1,0 +1,13 @@
+# 줄바꿈 정책을 저장소에 고정한다.
+#
+# Git for Windows의 시스템 기본값 core.autocrlf=true는 체크아웃 시 LF를 CRLF로 바꿔 쓴다.
+# biome은 LF를 기준으로 포맷을 검사하므로(formatter.lineEnding 기본값 lf), 그렇게 기록된
+# 파일은 내용이 그대로여도 `npm run lint`에서 실패한다 — git은 커밋 시 LF로 되돌리기
+# 때문에 `git diff`에는 아무것도 안 잡혀 원인을 찾기 어렵다.
+#
+# eol=lf는 core.autocrlf 설정을 덮어써서 체크아웃도 LF로 만든다.
+# 저장소·워킹트리·CI가 모두 LF로 통일된다 (맥·리눅스 기본 동작과 동일).
+* text=auto eol=lf
+
+# 바이너리는 변환 대상에서 제외 (text=auto도 자동 판별하지만 명시해 둔다)
+*.png binary

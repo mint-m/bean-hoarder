@@ -1,4 +1,4 @@
-// 세션 저장·이행 공용 모듈 (admin/lab.js와 deck.html이 공유 — 일반 스크립트, window.bhSession 노출).
+// 세션 저장·이행 공용 모듈 (deck.html과 랩이 공유 — 일반 스크립트, window.bhSession 노출).
 // Phase 2 인증: 브라우저는 PIN을 저장하지 않고 세션 토큰(bhs_…)만 보관한다.
 // 구버전이 저장해 둔 bh_pin이 남아 있으면 1회 로그인으로 세션과 교환하고 PIN을 지운다.
 (function () {

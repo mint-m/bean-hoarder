@@ -26,25 +26,88 @@
 
 ## 구조
 
-```
-bnhd.pages.dev  (Cloudflare Pages 프로젝트 1개)
-├── v2/public/            정적 페이지 (빌드 없는 브라우저 ES 모듈)
-│     index.html            조회 (QR 스캔 대상)
-│     admin/ (빌드 산출물)   랩 — apps/lab React 앱 (CI가 배포 직전 빌드, gitignore)
-│     deck.html             내 원두 월렛 덱
-│     session.js            세션 저장·레거시 PIN 교환 공용 모듈 (lab/deck 공유)
-│     origin-color.js       산지 해시 → 색상 (덱·조회 카드 색 구분용, 두 페이지가 공유)
-│     theme.css · lab.css   공용 테마 · 랩 스타일
-│     vendor/jsQR.js        QR 디코드 검증용 (qrcode-generator는 @bnhd/label npm 의존)
-├── v2/functions/api/     [[path]].ts — Pages Functions 어댑터 (아래 Hono 앱에 위임)
-├── packages/schema/      @bnhd/schema (TS) — 원두 필드 단일 소스: CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생
-├── packages/api/         @bnhd/api (TS) — Hono 라우터: signup/recover/beans/bean/{KEY}/export.csv/import/logos/fetch,
-│                           인증·Drizzle(D1)·SSRF 가드. 단위 + workerd 통합 테스트(packages/api/test) 포함
-├── packages/label/       @bnhd/label — 라벨 SVG 렌더러(3사이즈, QR 검증), packages/label/test
-├── packages/autofill/    @bnhd/autofill — 텍스트 → 원두 정보 휴리스틱 파서, packages/autofill/test
-├── apps/lab/             @bnhd/lab — 랩 React 앱(Vite, base /admin/) = /admin
-└── D1 (bnhd-v2) + R2     users · beans(key, …) · logos · sessions · auth_attempts · r2_usage · R2(bnhd-logos) 로고 원본
-```
+Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙은 단일 서비스다.
+
+<!-- gen:structure:start -->
+
+이 섹션은 `npm run gen:structure`가 저장소에서 직접 읽어 생성한다 — 손으로 고치지 말 것. 각 항목의 설명은 해당 파일의 머리 주석에서 가져오므로, 설명을 바꾸려면 그 파일의 주석을 고친다.
+
+**정적 페이지** — 빌드 없이 브라우저가 그대로 받는 파일. Cloudflare Pages가 서빙한다.
+
+| 경로 | 역할 |
+|---|---|
+| `v2/public/admin/` | 랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다. |
+| `v2/public/deck.html` | 내 원두 덱 |
+| `v2/public/headline.js` | 카드/조회 헤드라인(메인 식별자) 조합. |
+| `v2/public/index.html` | 원두 조회 |
+| `v2/public/lab.css` | Bean-Hoarder LAB(스튜디오) 전용 스타일 — 공용 토큰은 theme.css |
+| `v2/public/origin-color.js` | 산지(ORIGIN)별 카드 색상 코딩. |
+| `v2/public/session.js` | 세션 저장·이행 공용 모듈 (deck.html과 랩이 공유 — 일반 스크립트, window.bhSession 노출). |
+| `v2/public/theme.css` | 공용 디자인 토큰 & 기본 컴포넌트 (index / admin 공유) 컨셉: 모바일 보딩패스/월렛 — 화이트·블랙 베이스 + 포인트 컬러 하나 |
+| `v2/public/vendor/jsQR.js` | 카메라 QR 디코딩 라이브러리 (서드파티 — CDN 대신 저장소에 포함). |
+
+**서버** — Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.
+
+| 경로 | 역할 |
+|---|---|
+| `v2/functions/api/[[path]].ts` | Cloudflare Pages Functions 어댑터 — 라우팅·로직은 @bnhd/api(Hono, packages/api)로 이전됐다. |
+
+**워크스페이스** — npm workspaces. 로직의 단일 소스는 전부 여기에 있다.
+
+| 경로 | 역할 |
+|---|---|
+| `apps/lab/`<br>`@bnhd/lab` | 랩(등록·관리 화면)의 React 진입점 — base /admin/으로 빌드되어 v2/public/admin에 올라간다. |
+| `packages/api/`<br>`@bnhd/api` | Bean-Hoarder v2 API — Hono 앱 (Cloudflare Pages Functions에 마운트). |
+| `packages/autofill/`<br>`@bnhd/autofill` | 붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서. |
+| `packages/label/`<br>`@bnhd/label` | 라벨 렌더러 단일 모듈 (@bnhd/label) 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거). |
+| `packages/schema/`<br>`@bnhd/schema` | Bean-Hoarder 도메인 스키마 — 원두 필드의 단일 소스(single source of truth). |
+
+**테스트** — 단위 테스트는 각 패키지 안에 두고, 사용자 동선은 e2e가 실제 서버를 띄워 검증한다.
+
+| 경로 | 역할 |
+|---|---|
+| `e2e/smoke.spec.ts` | 스모크 e2e — 서비스의 핵심 동선이 실제 브라우저에서 끝까지 동작하는지 확인한다. |
+
+**저장소 유지보수** — 문서를 코드에서 파생시키고, 어긋나면 잡아내는 스크립트.
+
+| 경로 | 역할 |
+|---|---|
+| `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
+| `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
+
+**API 라우트** — 모두 `/api` 접두. 표시가 없으면 인증 없이 열려 있다.
+
+| 메서드 | 경로 | 인증 |
+|---|---|---|
+| POST | `/signup` | 공개 |
+| POST | `/login` | 공개 |
+| DELETE | `/session` | 필요 |
+| POST | `/recover` | 공개 |
+| GET | `/bean/:key` | 공개 |
+| PUT | `/bean/:key` | 필요 |
+| DELETE | `/bean/:key` | 필요 |
+| PATCH | `/bean/:key/archive` | 필요 |
+| POST | `/beans` | 필요 |
+| GET | `/beans` | 필요 |
+| GET | `/export.csv` | 필요 |
+| POST | `/import` | 필요 |
+| GET | `/logos` | 필요 |
+| PUT | `/logos` | 필요 |
+| DELETE | `/logos` | 필요 |
+| POST | `/fetch` | 필요 |
+
+**D1 테이블** (`bnhd-v2`)
+
+| 테이블 | 컬럼 |
+|---|---|
+| `users` | `usercode`, `pass_hash`, `recovery_hash`, `created_at` |
+| `beans` | `key`, `usercode`, `roastery`, `origin`, `region`, `producer`, `lot`, `washing_station`, `variety`, `process`, `altitude`, `harvest`, `roast_date`, `package_date`, `net_weight`, `agtron`, `tasting_note`, `memo`, `source_url`, `coffee_name`, `archived`, `created_at` |
+| `logos` | `usercode`, `roastery`, `data_url`, `content_type`, `updated_at` |
+| `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at` |
+| `auth_attempts` | `bucket`, `count`, `reset_at` |
+| `r2_usage` | `id`, `month`, `write_count` |
+
+<!-- gen:structure:end -->
 
 - 쓰기(등록·수정·삭제·백업·복원·로고)는 **세션 토큰** 인증(`POST /api/login`으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 `Bearer 유저코드:암호` 인증도 이행기 동안 동작.
 - 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드). **인증 실패는 D1 기반 rate limit**(유저코드당 10회/10분, IP당 30회/10분 — 초과 시 429)으로 4자리 암호 전수 대입을 차단
@@ -93,9 +156,16 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 ```
 
 - 데모 계정: 유저코드 `DEMO` / 암호 `0000`
-- 테스트: 저장소 루트에서 `npm ci` 후 `npm test` (Vitest — 서버 헬퍼·라벨 엔진·파서 단위 테스트, Node 20+), 린트는 `npm run lint` (Biome)
+- 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
+  **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
+- 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
+  `npm run e2e`는 Playwright가 wrangler를 직접 띄우므로 별도 서버 기동이 필요 없다.
 
 ## 진행 기록
+
+이 표는 지나간 사실의 기록이라 **지워진 파일을 일부러 언급한다** — 아래 마커로 경로 검증에서 제외한다.
+
+<!-- check-docs:ignore-start -->
 
 | 날짜 | 내용 |
 |---|---|
@@ -120,6 +190,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 | 2026-07-12 | **실서비스 전환 마이그레이션 Phase 2 (인증)** — ① **세션 토큰 도입**: `POST /api/login` → `bhs_` 토큰 발급(90일 만료, 서버엔 SHA-256 해시만 저장, `DELETE /api/session`으로 폐기), 가입·복구 응답에도 토큰 포함(즉시 로그인). 브라우저는 더 이상 **암호(PIN)를 저장·전송하지 않음** — 공용 `session.js`가 lab/deck에서 세션을 관리하고, 구버전이 저장해 둔 PIN은 첫 방문 시 세션으로 자동 교환 후 삭제. 레거시 `Bearer 유저코드:암호`도 이행기 동안 유지 ② **D1 기반 인증 rate limit**: 실패 유저코드당 10회/10분·IP당 30회/10분 초과 시 429 — 4자리 암호 전수 대입 차단(한도 초과 시 정답도 차단, 세션 인증은 무관), 초대코드 추측(가입)·복구키 추측도 IP 단위 제한 ③ `migrate_sessions.sql`(sessions·auth_attempts), 세션·rate limit 통합 테스트 8종 추가(총 71 tests). 패스키(WebAuthn)는 후속 라운드로 분리 |
 | 2026-07-12 | **실서비스 전환 마이그레이션 Phase 0·1** ([MIGRATION_PLAN.md](MIGRATION_PLAN.md)) — ① npm workspaces 모노레포 + TypeScript + Biome + Vitest 도입, 기존 테스트 Vitest 이식 ② **API를 Hono(TS)로 이식**: `packages/api`(라우트·인증·SSRF 가드) + `packages/schema`(원두 필드 단일 소스 — CSV 헤더·필수 규칙·Zod 스키마 파생), Pages Functions는 5줄 어댑터(`[[path]].ts`)만 남김 ③ **Drizzle ORM** 도입(테이블 구조 변경 없음, 스키마 드리프트 가드 테스트) ④ **workerd+D1 통합 테스트 19종** — 가입/복구/CRUD/보관/백업·복원/로고/SSRF 계약 전 구간 검증(63 tests) ⑤ CI에 lint+typecheck 추가, 배포 잡에 npm ci. API 계약(경로·상태코드·메시지)은 완전 동일 — 프론트 무수정, 라이브 무중단 |
 | 2026-07-10 | **필수 정보 재정의 라운드** — 싱글오리진 원두 기준 필수 항목을 **[로스터리·국가(산지)·품종·가공방식·로스팅일·패키징일]** 로 확정하고, 기존엔 선택이었던 **품종·가공방식을 필수로 승격**(클라이언트 `missingRequiredFields`·서버 `REQUIRED_LABELS` 동시 반영) — 품종 입력에도 가공방식과 동일한 방식으로 **"블렌드 (여러 품종 혼합)" 데이터리스트 옵션**을 추가해, 특정하기 어려운 블렌드 원두는 이 옵션 선택만으로 필수 조건을 만족(값이 채워짐)하고 라벨 인쇄 시에는 `stripParen`으로 괄호 설명이 잘려 "블렌드"만 짧게 표시됨. 플레이버 노트는 필수는 아니되 **"권장" 배지**(포인트 컬러 테두리)를 달아 반필수 수준으로 입력을 유도, 라벨도 "Flavor Notes (플레이버 노트)" → **"플레이버 노트"** 로 간결하게 정리 |
+
+<!-- check-docs:ignore-end -->
 
 ## 로드맵 / 남은 작업
 
