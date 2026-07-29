@@ -3,30 +3,29 @@
 //
 // 내용의 정확성은 판단하지 않는다 — "가리키는 대상이 실재하는가"만 본다.
 // 파일을 지우거나 옮겼는데 문서를 안 고친 경우(문서가 조용히 낡는 가장 흔한 유형)를 잡는 게 목적.
-// 일부러 지워진 파일을 언급해야 하는 구간(이력 기록 등)은 아래 IGNORE 마커로 감싼다.
+//
+// 검사 대상은 저장소 루트의 모든 `*.md`다 — 목록을 손으로 유지하다가 DESIGN.md가 빠져
+// 낡은 라우트 목록을 오래 방치한 전례가 있어 자동 수집으로 바꿨다. 생성물인 STRUCTURE.md도
+// 포함한다: 생성기가 소스 주석을 그대로 실어 나르므로, 주석이 지워진 파일을 가리키면 여기서 잡힌다.
 //
 // 실행: npm run check:docs
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-// 생성되지 않는(= 손으로 쓰는) 문서 전부. DESIGN.md가 빠져 있어 낡은 라우트 목록을
-// 오래 방치한 전례가 있다 — 새 문서를 만들면 여기에 추가한다.
-const DOCS = ["CLAUDE.md", "README.md", "DESIGN.md"];
-
 const IGNORE_START = "<!-- check-docs:ignore-start -->";
 const IGNORE_END = "<!-- check-docs:ignore-end -->";
 
 // 저장소에 없지만 문서가 정당하게 가리키는 이름 (빌드 산출물·실행 중 생기는 것)
-const GENERATED_DIRS = [
+const GENERATED = new Set([
   "public/admin", // 랩 빌드 산출물 — CI가 배포 직전 생성
   ".wrangler-e2e", // e2e 전용 로컬 D1/R2 persist
-];
+]);
 const EXTERNAL_FILES = new Set([
   "bnhd-v2-backup.sql", // backup.yml이 만드는 Actions artifact
 ]);
 
-// 확장자가 붙은 이름은 단독으로도 경로 후보로 본다 — README "구조" 트리가 이 형식이다.
+// 확장자가 붙은 이름은 단독으로도 경로 후보로 본다.
 // .csv 등 데이터 확장자는 API 라우트(export.csv)와 구분되지 않아 제외.
 const FILE_EXT = /\.(?:js|mjs|cjs|ts|tsx|jsx|sql|css|html|json|ya?ml|md|toml)$/;
 
@@ -38,20 +37,35 @@ const SPLIT = /[\s`(),"'|·→←—–…?!;=ㄱ-ㆎ가-힣]+/;
 const MD_LINK = /\[([^\]]*)\]\(([^)]*)\)/g;
 const NPM_RUN = /\bnpm run ([A-Za-z0-9:_-]+)(?:\s+(?:-w|--workspace)[=\s]([^\s`]+))?/g;
 
+function git(args) {
+  return execFileSync("git", args, { encoding: "utf8" }).split("\n").filter(Boolean);
+}
+
+// 커밋될 내용만 본다 — 워킹트리의 임시 파일이 검증 결과를 흔들지 않게.
 function repoIndex() {
-  // --others --exclude-standard: 아직 커밋 안 된 새 파일도 포함하고 gitignore 대상은 뺀다.
-  const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
-    encoding: "utf8",
-  });
-  const files = new Set(out.split("\n").filter(Boolean));
-  const dirs = new Set(GENERATED_DIRS);
+  const files = new Set(git(["ls-files", "--cached"]));
+  const dirs = new Set(GENERATED);
   for (const f of files) {
     const parts = f.split("/");
     for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join("/"));
   }
   const topLevel = new Set();
   for (const p of [...files, ...dirs]) topLevel.add(p.split("/")[0]);
-  return { files, dirs, topLevel };
+
+  // 파일명만 적힌 참조를 풀기 위한 역인덱스. 후보가 둘 이상이면 모호한 것으로 본다.
+  const byBasename = new Map();
+  for (const f of files) {
+    const base = f.slice(f.lastIndexOf("/") + 1);
+    if (!byBasename.has(base)) byBasename.set(base, []);
+    byBasename.get(base).push(f);
+  }
+  return { files, dirs, topLevel, byBasename };
+}
+
+function docs() {
+  return git(["ls-files", "--cached", "*.md"])
+    .filter((f) => !f.includes("/"))
+    .sort();
 }
 
 function workspaceScripts() {
@@ -59,10 +73,7 @@ function workspaceScripts() {
   const byName = new Map([[null, new Set(Object.keys(root.scripts ?? {}))]]);
   for (const glob of root.workspaces ?? []) {
     const base = glob.replace(/\/\*$/, "");
-    const found = execFileSync("git", ["ls-files", `${base}/*/package.json`], { encoding: "utf8" })
-      .split("\n")
-      .filter(Boolean);
-    for (const p of found) {
+    for (const p of git(["ls-files", `${base}/*/package.json`])) {
       const pkg = JSON.parse(readFileSync(p, "utf8"));
       if (pkg.name) byName.set(pkg.name, new Set(Object.keys(pkg.scripts ?? {})));
     }
@@ -85,26 +96,30 @@ function isPathCandidate(token, topLevel) {
   return token.includes("/") && topLevel.has(token.split("/")[0]);
 }
 
-function resolves(candidate, { files, dirs }) {
+// 디렉터리를 포함해 적었으면 위치를 주장한 것이므로 정확히 일치해야 한다.
+// 파일명만 적은 건 산문의 축약이므로, 저장소에서 유일하게 풀릴 때만 통과시킨다.
+function resolve(candidate, index) {
   const c = candidate.replace(/\/+$/, "");
-  if (EXTERNAL_FILES.has(c)) return true;
-  if (files.has(c) || dirs.has(c)) return true;
-  // migrate_logos.sql(= db/ 기준)처럼 상대 참조도 흔하다 — 경로 접미사 일치를 허용한다.
-  const suffix = `/${c}`;
-  for (const f of files) if (f.endsWith(suffix)) return true;
-  for (const d of dirs) if (d.endsWith(suffix)) return true;
-  return false;
+  if (EXTERNAL_FILES.has(c) || index.files.has(c) || index.dirs.has(c)) return { ok: true };
+  if (c.includes("/")) return { ok: false, why: "그런 경로가 없다" };
+
+  const hits = index.byBasename.get(c) ?? [];
+  if (hits.length === 1) return { ok: true };
+  if (hits.length > 1) return { ok: false, why: `이름이 겹친다 (${hits.join(", ")}) — 전체 경로로 적을 것` };
+  return { ok: false, why: "그런 파일이 없다" };
 }
 
 function checkDoc(doc, index, scripts) {
   const problems = [];
   const lines = readFileSync(doc, "utf8").split("\n");
   let ignoring = false;
+  let ignoreOpenedAt = 0;
 
   lines.forEach((raw, i) => {
     const trimmed = raw.trim();
     if (trimmed === IGNORE_START) {
       ignoring = true;
+      ignoreOpenedAt = i + 1;
       return;
     }
     if (trimmed === IGNORE_END) {
@@ -118,34 +133,51 @@ function checkDoc(doc, index, scripts) {
     for (const token of line.split(SPLIT)) {
       const cleaned = token.replace(/[.,:;]+$/, "");
       if (!isPathCandidate(cleaned, index.topLevel)) continue;
-      if (!resolves(cleaned, index)) problems.push({ line: i + 1, kind: "경로", ref: cleaned });
+      const r = resolve(cleaned, index);
+      if (!r.ok) problems.push({ line: i + 1, kind: "경로", ref: cleaned, why: r.why });
     }
 
     for (const m of line.matchAll(NPM_RUN)) {
       const [, name, workspace] = m;
       const known = scripts.get(workspace ?? null);
       if (!known) {
-        problems.push({ line: i + 1, kind: "워크스페이스", ref: workspace });
+        problems.push({ line: i + 1, kind: "워크스페이스", ref: workspace, why: "그런 워크스페이스가 없다" });
       } else if (!known.has(name)) {
         const where = workspace ? ` (${workspace})` : "";
-        problems.push({ line: i + 1, kind: "npm 스크립트", ref: `npm run ${name}${where}` });
+        problems.push({
+          line: i + 1,
+          kind: "npm 스크립트",
+          ref: `npm run ${name}${where}`,
+          why: "package.json에 없다",
+        });
       }
     }
   });
+
+  // 여는 마커만 있으면 그 아래 전부가 조용히 검사에서 빠진다 — 침묵 대신 실패로 알린다.
+  if (ignoring) {
+    problems.push({
+      line: ignoreOpenedAt,
+      kind: "마커",
+      ref: IGNORE_START,
+      why: `닫는 ${IGNORE_END}가 없어 이 아래 전부가 검사에서 빠졌다`,
+    });
+  }
 
   return problems;
 }
 
 const index = repoIndex();
 const scripts = workspaceScripts();
+const targets = docs();
 let failed = 0;
 
-for (const doc of DOCS) {
+for (const doc of targets) {
   const problems = checkDoc(doc, index, scripts);
   if (problems.length === 0) continue;
   failed += problems.length;
-  console.error(`\n${doc} — 실재하지 않는 참조 ${problems.length}건`);
-  for (const p of problems) console.error(`  ${doc}:${p.line}  ${p.kind}  ${p.ref}`);
+  console.error(`\n${doc} — 문제 ${problems.length}건`);
+  for (const p of problems) console.error(`  ${doc}:${p.line}  ${p.kind}  ${p.ref} — ${p.why}`);
 }
 
 if (failed > 0) {
@@ -156,4 +188,4 @@ if (failed > 0) {
   process.exit(1);
 }
 
-console.log(`check:docs — ${DOCS.join(", ")}의 경로·npm 스크립트 참조 이상 없음`);
+console.log(`check:docs — ${targets.join(", ")}의 경로·npm 스크립트 참조 이상 없음`);

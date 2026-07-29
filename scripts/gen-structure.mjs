@@ -103,8 +103,10 @@ function sh(cmd, args) {
   return execFileSync(cmd, args, { encoding: "utf8" });
 }
 
+// 커밋될 내용(인덱스)만 본다. 워킹트리의 임시 파일까지 넣으면 생성물이 사람마다 달라져
+// 다른 환경에서 check:structure가 실패한다. 새 파일은 `git add` 후에 목록에 들어온다.
 function tracked() {
-  return sh("git", ["ls-files", "--cached", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  return sh("git", ["ls-files", "--cached"]).split("\n").filter(Boolean);
 }
 
 // 파일 머리의 첫 주석 블록을 설명으로 쓴다 — 설명이 코드 옆에 있으면 같이 낡지 않는다.
@@ -153,8 +155,20 @@ function describe(path) {
   return firstSentence(out.replace(/^Bean-Hoarder\s*[—–-]\s*/i, ""));
 }
 
+// 첫 문장만 남긴다. 마침표를 무조건 문장 끝으로 보면 버전 표기(`wrangler 4. x`)나
+// 약어(`예: A. B.`)에서 잘리므로, 앞 글자가 숫자이거나 홀로 선 대문자면 건너뛴다.
 function firstSentence(text) {
-  const cut = text.search(/\.(?:\s|$)/);
+  let cut = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== ".") continue;
+    const next = text[i + 1];
+    if (next !== undefined && !/\s/.test(next)) continue; // "Node.js"
+    const prev = text[i - 1] ?? "";
+    if (/[0-9]/.test(prev)) continue; // "4."
+    if (/[A-Z]/.test(prev) && !/[A-Za-z]/.test(text[i - 2] ?? "")) continue; // "A."
+    cut = i;
+    break;
+  }
   const out = cut > 0 ? text.slice(0, cut + 1) : text;
   return out.length > 140 ? `${out.slice(0, 137)}…` : out;
 }
@@ -179,21 +193,49 @@ function workspaces() {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-function routes() {
-  if (!existsSync(APP_TS)) return [];
-  const src = readFileSync(APP_TS, "utf8");
-  const out = [];
-  for (const m of src.matchAll(/app\.(get|post|put|patch|delete)\(\s*"([^"]+)"([^\n]*)/g)) {
-    const [, method, path, rest] = m;
-    const comment = rest.match(/\/\/\s*(.+)$/);
-    out.push({
-      method: method.toUpperCase(),
-      path,
-      auth: rest.includes("authRequired"),
-      note: comment ? comment[1].trim() : "",
-    });
+// 호출 전체(여는 괄호부터 짝이 맞는 닫는 괄호까지)를 잘라낸다.
+// 첫 줄만 보면 여러 줄로 쓴 라우트에서 authRequired를 놓쳐 "공개"로 잘못 표시된다.
+function callSpan(src, openParenIndex) {
+  let depth = 0;
+  for (let i = openParenIndex; i < src.length; i++) {
+    const c = src[i];
+    if (c === "(") depth++;
+    else if (c === ")") {
+      depth--;
+      if (depth === 0) return src.slice(openParenIndex + 1, i);
+    }
   }
-  return out;
+  return src.slice(openParenIndex + 1);
+}
+
+function routes() {
+  if (!existsSync(APP_TS)) return { list: [], unparsed: [] };
+  const src = readFileSync(APP_TS, "utf8");
+
+  // app.use("/prefix/*", authRequired) 로 건 보호는 개별 라우트 줄에 나타나지 않는다.
+  const guardedPrefixes = [];
+  for (const m of src.matchAll(/app\.use\(\s*"([^"]+)"/g)) {
+    const body = callSpan(src, src.indexOf("(", m.index));
+    if (body.includes("authRequired")) guardedPrefixes.push(m[1].replace(/\*+$/, ""));
+  }
+
+  const list = [];
+  const unparsed = [];
+  for (const m of src.matchAll(/app\.(get|post|put|patch|delete)\(/g)) {
+    const method = m[1].toUpperCase();
+    const open = m.index + m[0].length - 1;
+    const body = callSpan(src, open);
+    const literal = body.match(/^\s*"([^"]+)"/);
+    if (!literal) {
+      // 경로가 문자열 리터럴이 아니면 목록에서 조용히 빠진다 — 침묵 대신 알린다.
+      unparsed.push(`${method} ${body.slice(0, 40).replace(/\s+/g, " ").trim()}`);
+      continue;
+    }
+    const path = literal[1];
+    const auth = body.includes("authRequired") || guardedPrefixes.some((p) => path.startsWith(p));
+    list.push({ method, path, auth });
+  }
+  return { list, unparsed };
 }
 
 function tables() {
@@ -212,8 +254,40 @@ function tables() {
   return out;
 }
 
+// 표시 정책(GROUPS)이 경로 접두 목록이라, 새 최상위 디렉터리가 생기면 조용히 빠진다.
+// "구조는 생성되니 낡지 않는다"는 전제가 거기서 깨지므로, 어디에도 안 잡힌 파일이 있으면
+// 생성을 실패시켜 정책을 갱신하게 만든다. 아래는 일부러 표에 넣지 않는 것들이다.
+const UNLISTED = [
+  /^\.github\//,
+  /^\.git(ignore|attributes)$/,
+  /^[A-Z][A-Z_]*\.md$/, // 루트 문서 (README·CLAUDE·STRUCTURE 등)
+  /^LICENSE$/,
+  /^HOW_IT_WORKS\.html$/,
+  /^package(-lock)?\.json$/,
+  /^(biome|tsconfig\.base)\.json$/,
+  /^wrangler\.toml$/,
+  /^(vitest|playwright)\.config\.ts$/,
+];
+
+function uncovered(files) {
+  const root = JSON.parse(readFileSync("package.json", "utf8"));
+  const prefixes = GROUPS.filter((g) => g.prefix).map((g) => g.prefix);
+  for (const glob of root.workspaces ?? []) prefixes.push(`${glob.replace(/\*$/, "")}`);
+  return files.filter((f) => !prefixes.some((p) => f.startsWith(p)) && !UNLISTED.some((re) => re.test(f)));
+}
+
 function buildModel() {
   const files = tracked();
+
+  const orphans = uncovered(files);
+  if (orphans.length) {
+    console.error("어느 그룹에도 잡히지 않는 파일이 있다 — 구조 문서에서 통째로 빠진다:");
+    for (const f of orphans.slice(0, 20)) console.error(`  ${f}`);
+    if (orphans.length > 20) console.error(`  … 외 ${orphans.length - 20}건`);
+    console.error("scripts/gen-structure.mjs의 GROUPS에 그룹을 추가하거나, UNLISTED에 예외를 적을 것.");
+    process.exit(1);
+  }
+
   const groups = GROUPS.map((g) => {
     if (g.kind === "workspaces") {
       return { title: g.title, hint: g.hint, rows: workspaces() };
@@ -225,7 +299,16 @@ function buildModel() {
     rows.sort((a, b) => a.path.localeCompare(b.path));
     return { title: g.title, hint: g.hint, rows };
   });
-  return { groups, routes: routes(), tables: tables() };
+
+  const { list, unparsed } = routes();
+  if (unparsed.length) {
+    console.error("경로가 문자열 리터럴이 아니라 라우트 목록에서 빠지는 정의가 있다:");
+    for (const u of unparsed) console.error(`  ${u}`);
+    console.error(`${APP_TS}에서 경로를 리터럴로 적을 것.`);
+    process.exit(1);
+  }
+
+  return { groups, routes: list, tables: tables() };
 }
 
 const HEADER = [

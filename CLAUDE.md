@@ -33,6 +33,7 @@ npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
 npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
 npm run check          # lint + typecheck + test + 문서 검증 — 커밋 전 필수
 npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
+npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler 설정)를 건드렸다면 이걸로
 
 # 로컬 개발 서버 (저장소 루트에서)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
@@ -73,7 +74,9 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   README 운영 섹션에 기록한다 — 원격 D1에 미적용 마이그레이션이 남아 조용히 깨진 전례가 있다.
 - `public/`의 브라우저 JS는 Biome·tsc 대상에서 빠져 있다 — 손대면 검증 없이 배포된다.
 - `deploy` 브랜치는 linear history를 요구하므로 `main → deploy` 승격 PR은 **Squash and merge**.
-- 커밋 전 `npm run check` 통과 확인.
+- **새 파일은 `git add` 후에 `npm run gen:structure`를 돌린다** — 생성기는 인덱스(커밋될 내용)만
+  보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.
+- 커밋 전 `npm run check` 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 `npm run check:full`.
 
 ## 문서 관리 원칙
 
