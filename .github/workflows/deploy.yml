@@ -22,8 +22,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
+      # lint + typecheck + test + check:docs — 커밋 전 게이트와 같은 명령
+      - run: npm run check
       - run: npm run build --workspace @bnhd/lab
 
   e2e:
@@ -51,7 +51,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # 랩(React) 빌드 산출물(v2/public/admin)은 gitignore — 배포 직전에 생성한다
+      # 랩(React) 빌드 산출물(public/admin)은 gitignore — 배포 직전에 생성한다
       - run: npm run build --workspace @bnhd/lab
       # deploy 브랜치 → Cloudflare Pages 'main'(프로덕션, bnhd.pages.dev)
       # main 브랜치    → Cloudflare Pages 'preview'(프리뷰, preview.bnhd.pages.dev)
@@ -68,5 +68,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: v2
           command: pages deploy public --project-name=bnhd --branch=${{ steps.cf.outputs.branch }}

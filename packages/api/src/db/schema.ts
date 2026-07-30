@@ -1,4 +1,4 @@
-// Drizzle 스키마 — 기존 D1 테이블(v2/schema.sql)과 1:1 대응. DDL은 여전히 schema.sql이
+// Drizzle 스키마 — 기존 D1 테이블(db/schema.sql)과 1:1 대응. DDL은 여전히 schema.sql이
 // 소스이며(마이그레이션은 migrate_*.sql), 이 파일은 쿼리 타입 안전성용이다.
 // beans의 자유 필드 컬럼은 @bnhd/schema BEAN_FIELDS와 반드시 일치해야 한다
 // — schema-drift.test.ts가 기계적으로 검증한다.

@@ -296,7 +296,7 @@ const stripParen = (s) => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
 // 장소 앵커 우선순위(가장 구체적 순): 워싱스테이션 > 생산자 > 지역. 랏(LOT)은 번호만으론 단독
 // 식별이 어려워 앵커 뒤에 보조로만 덧붙인다. 시그니쳐/블렌드명(COFFEE_NAME)이 있으면 그대로 대체.
 // 국가·장소엔 stripParen을 적용 — "블렌드 (여러 원산지 혼합)" → "블렌드".
-// deck.html·index.html의 bhHeadline(v2/public/headline.js)이 이 규칙과 동일해야 한다.
+// deck.html·index.html의 bhHeadline(public/headline.js)이 이 규칙과 동일해야 한다.
 export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"];
 
 function headlinePlaceKey(row) {

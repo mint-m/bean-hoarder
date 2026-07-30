@@ -1,5 +1,5 @@
 // 스모크 e2e — 서비스의 핵심 동선이 실제 브라우저에서 끝까지 동작하는지 확인한다.
-// DB는 e2e 전용 persist 디렉터리(v2/.wrangler-e2e)라 라이브·로컬 개발 데이터와 격리된다.
+// DB는 e2e 전용 persist 디렉터리(.wrangler-e2e)라 라이브·로컬 개발 데이터와 격리된다.
 import { expect, test } from "@playwright/test";
 
 test("공개 조회: QR 상세 카드가 렌더링된다", async ({ page }) => {

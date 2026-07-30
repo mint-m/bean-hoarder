@@ -1,4 +1,4 @@
-// 세션 저장·이행 (v2/public/session.js의 TS 이식 — localStorage 키 동일해 구 admin과 상호 호환).
+// 세션 저장·이행 (public/session.js의 TS 이식 — localStorage 키 동일해 구 admin과 상호 호환).
 export interface Account {
   usercode: string;
   token: string;

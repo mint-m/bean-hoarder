@@ -27,16 +27,16 @@
 
 | 영역 | 대상 파일 | 비고 |
 |---|---|---|
-| 조회 페이지 | `v2/public/index.html` | 라이브 트래픽 있음 — QR 스캔 진입점 |
-| 덱 | `v2/public/deck.html` | 라이브 트래픽 있음 |
-| 공유 스타일 | `v2/public/theme.css`, `v2/public/lab.css` | 디자인 토큰 정의부 |
+| 조회 페이지 | `public/index.html` | 라이브 트래픽 있음 — QR 스캔 진입점 |
+| 덱 | `public/deck.html` | 라이브 트래픽 있음 |
+| 공유 스타일 | `public/theme.css`, `public/lab.css` | 디자인 토큰 정의부 |
 | 랩(`/admin`) | `apps/lab/` — `components/*.tsx`, `Workspace.tsx`, `AuthView.tsx` 등 | React, 빌드 필요 |
 | 라벨 SVG (`packages/label`) | **스코프 제외 대기** | §5-3 결정 후 확정 |
 
 ## 4. 진행 상황
 
-> 이 섹션은 각 Phase 완료 시 갱신한다. 형식은 [MIGRATION_PLAN.md](MIGRATION_PLAN.md) §3
-> 상단의 진행 상황 로그를 따른다.
+> 이 섹션은 각 Phase 완료 시 갱신한다. Phase별로 무엇이 끝났고 무엇이 보류인지를
+> 날짜와 함께 한 줄로 남긴다.
 
 - Phase 0 (계획 문서 초안) — ⏳ 진행 중 (이 커밋)
 - Phase 1 (디자인 토큰 확정) — 미착수
@@ -74,7 +74,7 @@
 
 ## 6. 디자인 토큰 — 현재 상태 스냅샷 (틀만, 값은 미확정)
 
-`v2/public/theme.css`에 정의된 현재 토큰 카테고리. Phase 1에서 이 표를 기준으로
+`public/theme.css`에 정의된 현재 토큰 카테고리. Phase 1에서 이 표를 기준으로
 "유지 / 값 조정 / 폐기·대체"를 채워 넣는다.
 
 | 카테고리 | 현재 변수 | 현재 값(라이트) | 처리 방향 |
@@ -106,8 +106,8 @@
 
 ### Phase 2 — 정적 페이지 (index / deck)
 
-- [ ] `v2/public/index.html` 레이아웃·타이포 조정
-- [ ] `v2/public/deck.html` 레이아웃·타이포 조정
+- [ ] `public/index.html` 레이아웃·타이포 조정
+- [ ] `public/deck.html` 레이아웃·타이포 조정
 - [ ] 두 페이지 모두 라이트/다크 모드 육안 확인
 
 ### Phase 3 — 랩 (`/admin`)
