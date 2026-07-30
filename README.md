@@ -44,9 +44,32 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR을 **Squash and merge**로 승격)
   - 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
   - 최초 1회 리포 secret 등록 필요: `CLOUDFLARE_API_TOKEN`(Pages 편집 권한), `CLOUDFLARE_ACCOUNT_ID` — 둘 중 하나라도 누락되면 배포 잡이 실패한다(테스트 잡은 별개로 통과).
+- **프로덕션 승격 절차** — `main`을 `deploy`로 올릴 때 순서를 지킨다. 배포가 먼저 나가면 스키마가 없어 깨진다.
+  1. **원격 D1에 미적용 마이그레이션이 있는지 먼저 확인한다.** 아래 "스키마" 항목의 목록과 대조:
+     `npx wrangler d1 execute bnhd-v2 --remote --command "PRAGMA table_info(beans);"`,
+     `npx wrangler d1 execute bnhd-v2 --remote --command "SELECT name FROM sqlite_master WHERE type='table';"`
+     — v1.2.0 승격 때 `r2_usage`·`coffee_name` 둘 다 빠져 있었다. 마이그레이션은 전부 비파괴라
+     **배포 전에 미리 적용해도 안전하다** (구 코드는 새 컬럼·테이블을 모르고도 동작한다).
+  2. 승격 → `deploy` 푸시가 프로덕션 배포를 트리거한다.
+  3. 배포된 커밋에 **버전 태그**를 달고 **릴리스 노트**를 쓴다 (아래 "릴리스").
+  4. 라이브에서 조회·로그인·등록·로고 저장을 한 번씩 확인한다.
+- **릴리스** — 버전은 **프로덕션에 나간 단위**다. `main` 병합이 아니라 `deploy` 승격 시점에 붙으므로
+  한 릴리스가 여러 변경을 묶는다. semver를 쓰되 판단 기준은 **사용자·API 관점**이다 —
+  필드나 기능 추가는 minor, API 계약 파괴는 major(QR 호환 때문에 사실상 없다), 저장소 구조 변경만으로는
+  올리지 않는다. 태그는 실제 배포된 커밋에 달고(`git tag -a vX.Y.Z <sha>`), 노트는 GitHub Releases에 쓴다
+  (README "주요 변경" 표에는 한 줄만 남기고 전문은 릴리스로). 버전을 코드에 적지는 않는다 —
+  루트 `package.json`은 `private`이고 태그가 단일 소스다.
 - **브랜치 보호 규칙** (GitHub Settings > Rules > Rulesets):
   - `main` — PR 없이 직접 push 허용, 삭제만 방지(Restrict deletions).
   - `deploy` — PR 필수(Require a pull request before merging) + Require linear history + 삭제 방지. Linear history 요구 때문에 `main → deploy` 승격 PR은 반드시 **Squash and merge**(또는 Rebase)로 병합한다 — 일반 merge commit은 거부된다.
+  - ⚠️ **squash·rebase 승격은 계보 드리프트를 만든다.** 둘 다 `main`의 커밋을 `deploy`의 조상으로
+    남기지 않으므로, 승격을 반복하면 두 브랜치의 merge-base가 옛날에 묶인 채 굳고 다음 승격 PR이
+    **내용 다툼이 아닌 `add/add` 충돌 수십 건**으로 막힌다. v1.2.0 승격 때 충돌 36건으로 실제로 겪었고,
+    `deploy`를 `main`과 같은 커밋으로 맞춰(계보 리셋) 풀었다. 근본 해결은 승격을
+    **fast-forward push**로 바꾸는 것이다 — `deploy`에서 PR 요구를 빼면 `git push origin main:deploy`가
+    fast-forward로 통과하고(`non_fast_forward` 규칙은 그대로 두어 이력 삭제·되감기는 계속 막는다),
+    `deploy`가 `main`과 항상 같은 커밋을 가리켜 드리프트가 사라진다. 배포 게이트는 어차피
+    `deploy.yml`의 lint·test·e2e다.
 - **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
@@ -86,16 +109,19 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 
 세부 이력은 커밋 히스토리를 본다. 여기에는 서비스의 성격이 바뀐 지점만 남긴다.
 
-| 시기 | 무엇이 달라졌나 |
-|---|---|
-| 2026-07-03 | **v1 첫 배포** — 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지 |
-| 2026-07-07 | **v2 제로베이스 재설계·교체** — Cloudflare D1 + Pages Functions로 재구축. 인증을 유저코드+4자리 암호로, 라벨 렌더러를 단일화하고 jsQR 브라우저 검증 도입 |
-| 2026-07-08 | **개인 서비스로서의 기본기** — 오프라인 복구키, 라벨 3사이즈, 로스터리 로고 서버 저장, CSV 백업·복원, PBKDF2 해시, SSRF 가드, 단위 테스트 + CI, `deploy` 브랜치 승격 방식 |
-| 2026-07-09~10 | **라벨·카드 표시 체계 확립** — 표시 우선순위(부제목 > 스펙 > 노트)와 자동 드롭 규칙, 감열 인쇄 가독성 대응, 덱을 월렛 카드 인터랙션으로 재구현, 보관(숨기기) 기능 |
-| 2026-07-12~13 | **실서비스 전환 (Phase 0~4)** — 모노레포 + TypeScript + Hono + Drizzle 이식, 세션 토큰 인증과 D1 rate limit, 랩을 React로 재작성해 `/admin` 교체, 로고를 R2로 이전, 구조화 로깅, D1 자동 백업, Playwright e2e를 배포 게이트로 |
-| 2026-07-19 | **원두 식별자 체계** — 헤드라인을 국가 + 최세부 장소로 조합하고, 시그니쳐·블렌드명을 위한 `coffee_name` 필드 신설 |
-| 2026-07-24 | **R2 요금 백스톱** — 로고 저장에 서비스 전역 물리 상한을 걸어 무료 티어 초과 과금을 코드 레벨에서 차단 |
-| 2026-07-29 | **문서 체계 정리** — 저장소 구조를 코드에서 생성([STRUCTURE.md](STRUCTURE.md))하고 문서 참조를 자동 검증. v1 잔재를 걷어내고 `v2/` 디렉터리를 루트로 평탄화 |
+**버전**은 프로덕션에 실제로 나간 단위다 — `main`에 병합된 시점이 아니라 `deploy`로 승격된
+시점에 붙으므로, 한 릴리스가 여러 행을 묶기도 한다. 전문은 [릴리스 노트](../../releases)에 있다.
+
+| 버전 | 시기 | 무엇이 달라졌나 |
+|---|---|---|
+| [v0.1.0](../../releases/tag/v0.1.0) | 2026-07-03 | **v1 첫 배포** — 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지 |
+| [v0.2.0](../../releases/tag/v0.2.0) | 2026-07-07 | **v2 제로베이스 재설계·교체** — Cloudflare D1 + Pages Functions로 재구축. 인증을 유저코드+4자리 암호로, 라벨 렌더러를 단일화하고 jsQR 브라우저 검증 도입 |
+| [v1.0.0](../../releases/tag/v1.0.0) | 2026-07-08 | **개인 서비스로서의 기본기** — 오프라인 복구키, 라벨 3사이즈, 로스터리 로고 서버 저장, CSV 백업·복원, PBKDF2 해시, SSRF 가드, 단위 테스트 + CI, `deploy` 브랜치 승격 방식 |
+| [v1.0.0](../../releases/tag/v1.0.0) | 2026-07-09~10 | **라벨·카드 표시 체계 확립** — 표시 우선순위(부제목 > 스펙 > 노트)와 자동 드롭 규칙, 감열 인쇄 가독성 대응, 덱을 월렛 카드 인터랙션으로 재구현, 보관(숨기기) 기능 |
+| [v1.1.0](../../releases/tag/v1.1.0) | 2026-07-12~13 | **실서비스 전환 (Phase 0~4)** — 모노레포 + TypeScript + Hono + Drizzle 이식, 세션 토큰 인증과 D1 rate limit, 랩을 React로 재작성해 `/admin` 교체, 로고를 R2로 이전, 구조화 로깅, D1 자동 백업, Playwright e2e를 배포 게이트로 |
+| [v1.2.0](../../releases/tag/v1.2.0) | 2026-07-19 | **원두 식별자 체계** — 헤드라인을 국가 + 최세부 장소로 조합하고, 시그니쳐·블렌드명을 위한 `coffee_name` 필드 신설 |
+| [v1.2.0](../../releases/tag/v1.2.0) | 2026-07-24 | **R2 요금 백스톱** — 로고 저장에 서비스 전역 물리 상한을 걸어 무료 티어 초과 과금을 코드 레벨에서 차단 |
+| [v1.2.0](../../releases/tag/v1.2.0) | 2026-07-29~30 | **문서 체계 정리** — 저장소 구조를 코드에서 생성([STRUCTURE.md](STRUCTURE.md))하고 문서 참조를 자동 검증. v1 잔재를 걷어내고 `v2/` 디렉터리를 루트로 평탄화 |
 
 ## 로드맵 / 남은 작업
 

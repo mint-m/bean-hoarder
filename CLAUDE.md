@@ -89,7 +89,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 | 각 파일이 무엇인가 | **그 파일의 머리 주석** — 생성기가 읽어 간다 |
 | 서비스 소개·사용법·로컬 개발 | [README.md](README.md) |
 | 배포·백업·마이그레이션 절차 | [README.md](README.md) "운영" |
-| 변경 이력 | [README.md](README.md) "진행 기록" |
+| 변경 이력 (한 줄 요약) | [README.md](README.md) "주요 변경" |
+| 릴리스 노트 (전문) | GitHub Releases — 태그가 버전의 단일 소스 |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
 | 설계 근거 | [DESIGN.md](DESIGN.md) |
 | 원칙·금지 사항·함정 | 이 문서 |
@@ -112,4 +113,8 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - 생성되지 않는 구간(운영 절차, 이 문서)이 가리키는 경로는 `npm run check:docs`
   (`scripts/check-docs.mjs`)가 실존만 검사한다 — 내용의 옳고 그름은 판단하지 않는다.
 - 이력처럼 **지워진 파일을 일부러 언급해야 하는 구간**은 `check-docs:ignore-start` /
-  `check-docs:ignore-end` HTML 주석으로 감싼다 (README "진행 기록"이 그 예).
+  `check-docs:ignore-end` HTML 주석으로 감싼다. 지금은 쓰는 곳이 없다 — 이력에서 삭제된 파일
+  언급을 걷어냈기 때문이고, 다시 필요해지면 이 마커를 쓴다.
+- **버전은 코드에 적지 않는다.** 루트 `package.json`은 `private`이라 `version`이 없고, 태그가
+  단일 소스다. 버전이 붙는 시점은 `main` 병합이 아니라 **`deploy` 승격**이다 — 절차는
+  README "운영"의 "프로덕션 승격 절차"·"릴리스".
