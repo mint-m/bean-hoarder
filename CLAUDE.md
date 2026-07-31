@@ -73,7 +73,9 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 - D1 스키마 변경은 **새 `migrate_*.sql` 파일 추가** (기존 파일 수정 금지). 적용 순서는
   README 운영 섹션에 기록한다 — 원격 D1에 미적용 마이그레이션이 남아 조용히 깨진 전례가 있다.
 - `public/`의 브라우저 JS는 Biome·tsc 대상에서 빠져 있다 — 손대면 검증 없이 배포된다.
-- `deploy` 브랜치는 linear history를 요구하므로 `main → deploy` 승격 PR은 **Squash and merge**.
+- `main → deploy` 승격 PR은 반드시 **Create a merge commit** — Squash·Rebase는 규칙이 막는다.
+  둘은 `main`의 커밋을 `deploy`의 조상으로 남기지 않아 다음 승격을 `add/add` 충돌로 막는다
+  (v1.2.0 때 36건). 이유는 README "운영"의 브랜치 보호 규칙 항목에 있다.
 - **새 파일은 `git add` 후에 `npm run gen:structure`를 돌린다** — 생성기는 인덱스(커밋될 내용)만
   보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.
 - 커밋 전 `npm run check` 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 `npm run check:full`.

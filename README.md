@@ -41,7 +41,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 
 - **배포(자동)**: `main`과 `deploy` 푸시 모두 GitHub Actions(`.github/workflows/deploy.yml`)가 lint·테스트(Vitest)·랩 빌드 + **Playwright e2e 통과**를 게이트로 `wrangler pages deploy`를 실행하되, 도착지가 다르다.
   - `main` 푸시 → **프리뷰** `preview.bnhd.pages.dev` (개발 중 확인용)
-  - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR을 **Squash and merge**로 승격)
+  - `deploy` 푸시 → **프로덕션** `bnhd.pages.dev` (실 서비스 — `main → deploy` PR을 **Create a merge commit**으로 승격)
   - 필요 시 Actions 탭에서 `workflow_dispatch`로 수동 재배포도 가능.
   - 최초 1회 리포 secret 등록 필요: `CLOUDFLARE_API_TOKEN`(Pages 편집 권한), `CLOUDFLARE_ACCOUNT_ID` — 둘 중 하나라도 누락되면 배포 잡이 실패한다(테스트 잡은 별개로 통과).
 - **프로덕션 승격 절차** — `main`을 `deploy`로 올릴 때 순서를 지킨다. 배포가 먼저 나가면 스키마가 없어 깨진다.
@@ -61,15 +61,23 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   루트 `package.json`은 `private`이고 태그가 단일 소스다.
 - **브랜치 보호 규칙** (GitHub Settings > Rules > Rulesets):
   - `main` — PR 없이 직접 push 허용, 삭제만 방지(Restrict deletions).
-  - `deploy` — PR 필수(Require a pull request before merging) + Require linear history + 삭제 방지. Linear history 요구 때문에 `main → deploy` 승격 PR은 반드시 **Squash and merge**(또는 Rebase)로 병합한다 — 일반 merge commit은 거부된다.
-  - ⚠️ **squash·rebase 승격은 계보 드리프트를 만든다.** 둘 다 `main`의 커밋을 `deploy`의 조상으로
-    남기지 않으므로, 승격을 반복하면 두 브랜치의 merge-base가 옛날에 묶인 채 굳고 다음 승격 PR이
-    **내용 다툼이 아닌 `add/add` 충돌 수십 건**으로 막힌다. v1.2.0 승격 때 충돌 36건으로 실제로 겪었고,
-    `deploy`를 `main`과 같은 커밋으로 맞춰(계보 리셋) 풀었다. 근본 해결은 승격을
-    **fast-forward push**로 바꾸는 것이다 — `deploy`에서 PR 요구를 빼면 `git push origin main:deploy`가
-    fast-forward로 통과하고(`non_fast_forward` 규칙은 그대로 두어 이력 삭제·되감기는 계속 막는다),
-    `deploy`가 `main`과 항상 같은 커밋을 가리켜 드리프트가 사라진다. 배포 게이트는 어차피
-    `deploy.yml`의 lint·test·e2e다.
+  - `deploy` — PR 필수 + **병합 방식은 merge commit만** + 필수 검사(`unit`·`e2e`) + 삭제·강제푸시 방지.
+    승격 PR은 반드시 **Create a merge commit**으로 병합한다 — Squash·Rebase는 규칙이 막는다.
+  - **왜 merge commit인가 (Squash를 쓰면 안 되는 이유).** squash와 rebase는 새 커밋 객체를 만들어
+    `main`의 커밋을 `deploy`의 조상으로 남기지 않는다. 그래서 승격을 반복하면 두 브랜치의
+    merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 **내용 다툼이 아닌 `add/add` 충돌 수십 건**으로
+    막힌다 — v1.2.0 승격 때 충돌 36건으로 실제로 겪었고 `deploy`를 `main`과 같은 커밋으로 맞춰
+    (계보 리셋) 풀어야 했다. merge commit은 부모가 둘이라 `main`의 HEAD가 그대로 조상이 되고,
+    다음 승격의 merge-base가 이번 릴리스 지점이 되어 새 변경만 깔끔하게 보인다.
+    릴리스마다 커밋이 하나씩 찍히므로 `git log deploy --first-parent`가 곧 릴리스 목록이다.
+    `deploy`는 rebase·bisect 대상이 아니라 "지금 라이브가 무엇인가"를 가리키는 포인터라
+    선형 이력이 사줄 게 없다.
+  - ⚠️ **필수 검사의 "Require branches to be up to date before merging"은 켜지 않는다.**
+    켜면 승격이 영구히 막힌다 — merge commit 방식에서는 병합 후 `deploy`에 `main`에 없는 병합
+    커밋이 생기는데, 이 옵션은 head(`main`)가 base(`deploy`)의 최신 상태를 포함할 것을 요구하므로
+    매번 `deploy`를 `main`으로 역병합해야 하고 그게 방금 없앤 계보 꼬임을 되살린다.
+  - 승인 수는 0이다. 1인 저장소라 올릴 수 없다 — GitHub은 자기 PR 자가승인을 허용하지 않아
+    1로 두면 승격 자체가 불가능해진다.
 - **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
