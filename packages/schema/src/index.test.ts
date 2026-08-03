@@ -10,6 +10,7 @@ import {
   logoPutBodySchema,
   MAX_FIELD_LEN,
   missingRequired,
+  parseArchivedCell,
   pickFields,
   REQUIRED_LABELS,
 } from "./index";
@@ -54,6 +55,7 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     "MEMO",
     "SOURCE_URL",
     "COFFEE_NAME",
+    "ARCHIVED", // 보관 상태 — 고정 후미 열 (BEAN_FIELDS 파생이 아니다)
   ]);
   assert.deepEqual(REQUIRED_LABELS, {
     origin: "국가(산지)",
@@ -67,6 +69,16 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     roast_date: "로스팅일",
     package_date: "패키징일",
   });
+});
+
+test("parseArchivedCell: 0/1과 엑셀이 만든 TRUE/FALSE를 모두 받는다", () => {
+  for (const yes of ["1", "true", "TRUE", "True", "y", "YES", " 1 "]) {
+    assert.ok(parseArchivedCell(yes), `${yes} 는 보관으로 읽혀야 한다`);
+  }
+  // 빈 칸·미지정은 "보관 아님" — 옛 백업의 없는 열이 여기로 온다
+  for (const no of ["0", "false", "FALSE", "", "  ", "n", "아니오", "2"]) {
+    assert.ok(!parseArchivedCell(no), `${no} 는 보관이 아니어야 한다`);
+  }
 });
 
 test("로고 로스터리명: 대문자 정규화 + 경로 구분자 제거 (R2 키 안전)", () => {

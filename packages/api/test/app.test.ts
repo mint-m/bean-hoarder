@@ -306,6 +306,57 @@ test("import: 내 KEY 복원(덮어쓰기), 타인 KEY·형식 오류는 skipped
   expect(againResult.updated).toBe(1);
 });
 
+// 백업의 목적은 "실수 삭제·악의적 변조를 백업 시점으로 되돌림"이다. 그런데 ARCHIVED가 CSV에
+// 아예 없어서 보관 상태만 그 규칙 밖에 있었다 — 빈 DB에 복원하면 접어둔 원두가 전부 되살아났다.
+test("export/import: 보관(archived) 상태가 백업을 통과한다", async () => {
+  const user = await signupUser();
+  const { data } = await addBean(user.auth);
+  const setArchived = (archived: boolean) =>
+    api(`/bean/${data.key}/archive`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+      headers: user.auth,
+    });
+
+  await setArchived(true);
+  const backup = await (await api("/export.csv", { headers: user.auth })).text();
+  expect(backup).toContain("COFFEE_NAME,ARCHIVED"); // 고정 후미 열
+  expect(backup).toContain(`${data.key},`);
+  expect(backup.trimEnd().endsWith(",1")).toBe(true); // boolean이 아니라 0/1 (엑셀 왕복 대비)
+
+  // 보관을 해제해 두고 백업으로 복원 → 백업 시점(보관됨)으로 돌아와야 한다
+  await setArchived(false);
+  const res = await api("/import", { method: "POST", body: backup, headers: user.auth });
+  expect(((await res.json()) as { updated: number }).updated).toBe(1);
+
+  const bean = (await (await api(`/bean/${data.key}`)).json()) as { bean: { ARCHIVED: boolean } };
+  expect(bean.bean.ARCHIVED).toBe(true);
+});
+
+// ARCHIVED 열이 생기기 전에 받아둔 백업 파일은 보관 상태를 "활성"이라 말하는 게 아니라
+// 모르는 것이다 — 없는 정보로 덮어쓰면 접어둔 원두가 옛 파일 한 번에 전부 되살아난다.
+test("import: ARCHIVED 열이 없는 옛 백업은 보관 상태를 덮어쓰지 않는다", async () => {
+  const user = await signupUser();
+  const { data } = await addBean(user.auth);
+  await api(`/bean/${data.key}/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived: true }),
+    headers: user.auth,
+  });
+
+  // 열 매핑은 위치가 아니라 이름 기준이라, 옛 형식은 부분 열로 재현할 수 있다
+  const legacy =
+    `KEY,ROASTERY,ORIGIN,ROAST_DATE,PACKAGE_DATE\r\n` + `${data.key},NEW ROASTERY,KENYA,26.06.28,26.07.03`;
+  const res = await api("/import", { method: "POST", body: legacy, headers: user.auth });
+  expect(((await res.json()) as { updated: number }).updated).toBe(1);
+
+  const bean = (await (await api(`/bean/${data.key}`)).json()) as {
+    bean: { ARCHIVED: boolean; ROASTERY: string };
+  };
+  expect(bean.bean.ROASTERY).toBe("NEW ROASTERY"); // 복원 자체는 확실히 일어났고
+  expect(bean.bean.ARCHIVED).toBe(true); // 보관 상태만 건드리지 않았다
+});
+
 test("import: 크기·행수·헤더 검증", async () => {
   const user = await signupUser();
 
