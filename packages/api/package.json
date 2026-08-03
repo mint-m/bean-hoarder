@@ -12,7 +12,7 @@
   "dependencies": {
     "@bnhd/schema": "*",
     "drizzle-orm": "^0.44.0",
-    "hono": "^4.0.0",
+    "hono": "^4.12.33",
     "zod": "^4.0.0"
   }
 }
