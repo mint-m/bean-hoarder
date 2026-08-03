@@ -78,6 +78,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
     매번 `deploy`를 `main`으로 역병합해야 하고 그게 방금 없앤 계보 꼬임을 되살린다.
   - 승인 수는 0이다. 1인 저장소라 올릴 수 없다 — GitHub은 자기 PR 자가승인을 허용하지 않아
     1로 두면 승격 자체가 불가능해진다.
+- **의존성 갱신**: `.github/dependabot.yml`이 매주 월요일 `main`으로 PR을 연다(액션은 월 1회). 자동 병합은 켜지 않는다 — `main` 푸시가 프리뷰 배포를 트리거하므로 사람이 검사 결과를 보고 병합한다. Cloudflare 툴체인(`wrangler`·`miniflare`·`@cloudflare/*`)은 한 PR로 묶여 오고, `hono`·`drizzle-orm`·`zod` 같은 런타임 의존성은 API 계약에 닿으므로 개별 PR로 온다.
 - **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
