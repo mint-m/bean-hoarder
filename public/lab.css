@@ -41,6 +41,12 @@ details.adv summary { font-size: 12px; color: var(--sub); cursor: pointer; user-
 .auth-hero .beanmark { width: 40px; height: 40px; color: var(--accent); }
 .auth-hero h1 { margin: 4px 0 6px; font-family: var(--display); font-weight: 800; font-size: 26px; }
 .auth-hero p { margin: 0; font-size: 13.5px; color: var(--sub); }
+/* 세션 만료 등 "여기로 돌아온 이유" — 오류가 아니라 안내라 --bad 대신 은은한 강조 배경을 쓴다 */
+.auth-notice {
+  margin: 0 0 14px; padding: 10px 14px; border-radius: 10px;
+  background: var(--accent-soft); border: 1px solid var(--line);
+  font-size: 13px; line-height: 1.5; text-align: center;
+}
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
 .tabs button {
   border: 0; background: none; border-radius: 8px 8px 0 0; padding: 8px 14px;

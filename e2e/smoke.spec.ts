@@ -32,3 +32,23 @@ test("랩: 로그인 → 라벨 QR 검증 → 등록 → 덱에서 카드 확인
   await page.goto("/deck");
   await expect(page.locator(".wcard").first()).toBeVisible();
 });
+
+// 세션 토큰은 90일 고정 만료라, 실서비스 전환 시점에 로그인한 세션들이 한꺼번에 만료된다.
+// 예전엔 랩에 401 처리 경로가 없어 목록이 조용히 비고 저장 때마다 "인증 실패 — 유저코드와
+// 암호를 확인하세요"만 떴다(덱은 처리하는데 랩만 빠져 있었다).
+test("랩: 세션이 만료되면 안내와 함께 로그인 화면으로 돌아간다", async ({ page }) => {
+  await page.goto("/admin/");
+  await page.getByPlaceholder("ABCD").fill("DEMO");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  // 형식은 맞지만 서버가 모르는 토큰 — 만료됐거나 다른 기기에서 로그아웃해 폐기된 상태와 같다
+  await page.evaluate(() => localStorage.setItem("bh_session", `bhs_${"0".repeat(32)}`));
+  await page.reload();
+
+  await expect(page.locator(".auth-notice")).toContainText("로그인이 만료되었습니다");
+  await expect(page.getByRole("button", { name: "이 브라우저에 로그인" })).toBeVisible();
+  // 죽은 토큰이 남아 있으면 다음 방문에도 같은 일이 반복된다
+  expect(await page.evaluate(() => localStorage.getItem("bh_session"))).toBeNull();
+});

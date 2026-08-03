@@ -85,7 +85,14 @@ function RecoveryModal({
   );
 }
 
-export default function AuthView({ onSignedIn }: { onSignedIn: (account: Account) => void }) {
+export default function AuthView({
+  onSignedIn,
+  notice = "",
+}: {
+  onSignedIn: (account: Account) => void;
+  /** 로그인 화면으로 돌아온 이유 (세션 만료 등) — 비어 있으면 표시하지 않는다 */
+  notice?: string;
+}) {
   const [tab, setTab] = useState<Tab>("login");
   const [status, setStatus] = useState<{ msg: string; ok: boolean }>({ msg: "", ok: true });
   const [fields, setFields] = useState({ usercode: "", pin: "", invite: "", recovery: "" });
@@ -189,6 +196,8 @@ export default function AuthView({ onSignedIn }: { onSignedIn: (account: Account
           QR 스캔 조회는 로그인 없이 누구나 가능합니다.
         </p>
       </div>
+      {/* 탭 전환·입력 오류로 지워지는 status-line과 달리, 여기 온 이유는 로그인에 성공할 때까지 남긴다 */}
+      {notice && <p className="auth-notice">{notice}</p>}
       <div className="card">
         <div className="tabs" id="auth-tabs">
           {(
