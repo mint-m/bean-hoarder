@@ -1,0 +1,70 @@
+version: 2
+
+# 의존성 갱신 자동화. 여기서 여는 것은 PR뿐이고, 판단과 병합은 사람이 한다.
+#
+# 이 저장소에서 특히 필요한 이유: 런타임이 Cloudflare Workers라 wrangler·miniflare·workerd가
+# 날짜 붙은 버전을 주 단위로 낸다. 로컬 workerd가 뒤처지면 workers 통합 테스트가 도는
+# 런타임과 실제 프로덕션 런타임이 벌어져 "테스트는 통과하는데 배포에서 깨지는" 상태가 된다.
+#
+# 자동 PR을 받아도 안전한 이유: test.yml이 모든 PR에서 npm run check + 랩 빌드 + Playwright
+# e2e를 돌린다. 사람이 볼 근거가 PR에 자동으로 붙는다.
+updates:
+  # ── npm ────────────────────────────────────────────────────────────────────
+  # npm workspaces라 루트 하나로 apps/*·packages/* 전체가 잡힌다 (lock이 루트에만 있다).
+  - package-ecosystem: npm
+    directory: "/"
+    # deploy는 프로덕션 포인터이고 승격 PR은 merge commit만 허용되는 브랜치다
+    # (README "운영 > 브랜치 보호 규칙"). Dependabot이 거기에 PR을 열면 계보가 꼬여
+    # 다음 승격이 add/add 충돌로 막힌다 — 반드시 main으로만 연다.
+    target-branch: main
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    # 1인 저장소다. 읽히지 않는 PR 더미는 없느니만 못하므로 동시에 열리는 수를 묶어둔다.
+    open-pull-requests-limit: 4
+    groups:
+      # 함께 움직여야 하는 것들만 묶는다. 아래 그룹에 안 걸리는 것(hono, drizzle-orm, zod
+      # 같은 런타임 의존성)은 개별 PR로 열린다 — API 계약에 닿으므로 하나씩 본다.
+      cloudflare:
+        # wrangler가 miniflare를, miniflare가 workerd를 끌고 온다. 따로 올리면
+        # 버전이 어긋나 pages dev나 workers 테스트가 그 자리에서 깨진다.
+        patterns:
+          - "wrangler"
+          - "miniflare"
+          - "@cloudflare/*"
+      react:
+        # react와 react-dom은 버전이 맞아야 하고, 타입·플러그인이 그 뒤를 따른다.
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@vitejs/plugin-react"
+      dev-tooling:
+        # 검증 도구들. 깨져도 프로덕션이 아니라 CI에서 먼저 걸린다.
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "vite"
+          - "@biomejs/*"
+          - "typescript"
+          - "@playwright/*"
+          - "@types/node"
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  # 워크플로의 액션 버전(actions/checkout, setup-node, upload-artifact,
+  # cloudflare/wrangler-action)은 지금 전부 손으로 고정돼 있다. 자주 움직이지 않으므로
+  # 월 1회로 충분하고, 한 PR로 묶어 받는다.
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: monthly
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns:
+          - "*"
