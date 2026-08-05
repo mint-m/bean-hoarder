@@ -29,7 +29,13 @@ export interface LogoState {
   source: "server" | "manual" | null;
 }
 
-export default function Workspace({ account }: { account: Account }) {
+export default function Workspace({
+  account,
+  onSessionExpired,
+}: {
+  account: Account;
+  onSessionExpired: () => void;
+}) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [design, setDesignRaw] = useState<LabelDesign>(loadDesign);
   const [mode, setMode] = useState<"new" | "edit">("new");
@@ -44,9 +50,16 @@ export default function Workspace({ account }: { account: Account }) {
   const [autofillText, setAutofillText] = useState("");
   const [verify, setVerify] = useState<{ text: string; cls: string }>({ text: "", cls: "" });
 
+  // 인증 호출의 단일 통로 — 자식 카드(BeanFormCard·DesignCard)에도 prop으로 내려가므로
+  // 세션 만료 감지를 여기 한 곳에 둔다. 401은 "토큰이 더 이상 유효하지 않다"는 뜻만 가진다:
+  // rate limit은 429, 네트워크 끊김은 api()가 status 0으로 돌려주므로 여기 걸리지 않는다.
   const call = useCallback(
-    <T = Record<string, unknown>>(path: string, opts: RequestInit = {}) => api<T>(path, account.token, opts),
-    [account.token],
+    async <T = Record<string, unknown>>(path: string, opts: RequestInit = {}) => {
+      const res = await api<T>(path, account.token, opts);
+      if (res.status === 401) onSessionExpired();
+      return res;
+    },
+    [account.token, onSessionExpired],
   );
 
   const setDesign = useCallback((updater: (d: LabelDesign) => LabelDesign) => {
@@ -334,7 +347,12 @@ export default function Workspace({ account }: { account: Account }) {
 
   // ── CSV 백업/복원 ───────────────────────────────────────────
   async function exportCsv() {
+    // CSV는 JSON이 아니라 파일이라 call() 래퍼를 쓰지 않는 유일한 인증 호출 — 401을 직접 본다
     const res = await fetch("/api/export.csv", { headers: { Authorization: `Bearer ${account.token}` } });
+    if (res.status === 401) {
+      onSessionExpired();
+      return;
+    }
     if (!res.ok) {
       setStatus({ msg: "내보내기 실패", cls: "error" });
       return;
