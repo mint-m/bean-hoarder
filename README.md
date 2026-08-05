@@ -99,6 +99,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 
 **Node 22 이상**이 필요하다 (루트 `package.json`의 `engines`) — wrangler가 Node 20에서
 실행을 거부해 아래 `wrangler` 명령과 `npm run e2e`가 모두 시작하지 못한다.
+nvm을 쓴다면 저장소 루트에서 `nvm use`로 맞춘다.
 
 ```bash
 npm ci                                                        # 루트에서 1회 (npm workspaces)

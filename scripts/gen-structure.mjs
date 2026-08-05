@@ -260,6 +260,7 @@ function tables() {
 const UNLISTED = [
   /^\.github\//,
   /^\.git(ignore|attributes)$/,
+  /^\.nvmrc$/, // 주석을 넣을 수 없는 파일 — 설명은 README "로컬 개발"에 있다
   /^[A-Z][A-Z_]*\.md$/, // 루트 문서 (README·CLAUDE·STRUCTURE 등)
   /^LICENSE$/,
   /^HOW_IT_WORKS\.html$/,
