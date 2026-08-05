@@ -8,6 +8,7 @@ import {
   IMPORT_REQUIRED_LABELS,
   KEY_RE,
   missingRequired,
+  parseArchivedCell,
   pickFields,
   ROASTERY_MAX_LEN,
 } from "@bnhd/schema";
@@ -30,7 +31,9 @@ export async function exportCsv(c: Context<AppEnv>): Promise<Response> {
   const lines = [CSV_HEADERS.join(",")];
   for (const r of rows) {
     const p = beanToPublic(r as BeanRow) as unknown as Record<string, unknown>;
-    lines.push(CSV_HEADERS.map((h) => csvField(p[h])).join(","));
+    // ARCHIVED만 boolean이라 그대로 넘기면 "true"/"false"로 나간다 — 엑셀을 거치면 표기가
+    // 또 달라지므로 0/1로 고정한다 (복원 쪽 parseArchivedCell은 양쪽을 다 받는다).
+    lines.push(CSV_HEADERS.map((h) => csvField(h === "ARCHIVED" ? (p.ARCHIVED ? 1 : 0) : p[h])).join(","));
   }
   // BOM(\uFEFF) 접두 — 엑셀에서 한글이 깨지지 않도록 UTF-8 명시
   return new Response(`\uFEFF${lines.join("\r\n")}`, {
@@ -77,6 +80,11 @@ export async function importCsv(c: Context<AppEnv>): Promise<Response> {
   // upsert 시 excluded.* 참조 — 필드 목록은 스키마에서 파생
   const excludedSet: Record<string, unknown> = { roastery: sql.raw("excluded.roastery") };
   for (const f of FIELDS) excludedSet[f] = sql.raw(`excluded.${f}`);
+  // ARCHIVED 열이 생기기 전(라이브 v1.2.0까지)에 받아둔 백업도 복원할 수 있어야 한다. 그 파일은 보관
+  // 상태를 "활성"이라고 말하는 게 아니라 아예 모르는 것이므로, upsert 대상에서 빼 기존 값을
+  // 보존한다 — 넣으면 접어둔 원두가 옛 백업 한 번에 전부 되살아난다.
+  const hasArchived = header.includes("ARCHIVED");
+  if (hasArchived) excludedSet.archived = sql.raw("excluded.archived");
 
   let added = 0;
   let updated = 0;
@@ -103,10 +111,13 @@ export async function importCsv(c: Context<AppEnv>): Promise<Response> {
       skipped.push({ key, reason: `필수 항목 누락: ${missing.join(", ")}` });
       continue;
     }
+    // 열이 없으면 0 — 신규 행에 한해서다(스키마 기본값과 같다). 기존 행은 위 excludedSet에서
+    // archived를 빼뒀으므로 이 값이 쓰이지 않고 원래 보관 상태가 남는다.
+    const archived = hasArchived && parseArchivedCell(col(row, "ARCHIVED")) ? 1 : 0;
     stmts.push(
       db
         .insert(schema.beans)
-        .values({ key, usercode: user.usercode, roastery, ...vals })
+        .values({ key, usercode: user.usercode, roastery, ...vals, archived })
         .onConflictDoUpdate({ target: schema.beans.key, set: excludedSet }),
     );
     if (existing.has(key)) updated++;
