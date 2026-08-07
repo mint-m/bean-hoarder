@@ -345,8 +345,7 @@ test("import: ARCHIVED 열이 없는 옛 백업은 보관 상태를 덮어쓰지
   });
 
   // 열 매핑은 위치가 아니라 이름 기준이라, 옛 형식은 부분 열로 재현할 수 있다
-  const legacy =
-    `KEY,ROASTERY,ORIGIN,ROAST_DATE,PACKAGE_DATE\r\n` + `${data.key},NEW ROASTERY,KENYA,26.06.28,26.07.03`;
+  const legacy = `KEY,ROASTERY,ORIGIN,ROAST_DATE,PACKAGE_DATE\r\n${data.key},NEW ROASTERY,KENYA,26.06.28,26.07.03`;
   const res = await api("/import", { method: "POST", body: legacy, headers: user.auth });
   expect(((await res.json()) as { updated: number }).updated).toBe(1);
 

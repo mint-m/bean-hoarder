@@ -16,7 +16,7 @@ jobs:
       - run: npm ci
       # lint + typecheck + test + check:docs — 커밋 전 게이트와 같은 명령
       - run: npm run check
-      - run: npm run build --workspace @bnhd/lab
+      - run: npm run build
 
   e2e:
     runs-on: ubuntu-latest

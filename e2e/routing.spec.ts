@@ -44,11 +44,22 @@ test("라우팅 계약: /deck 이 확장자 없이 덱 페이지로 해석된다
 });
 
 // 조회 페이지가 실제로 동작하려면 함께 딸려오는 자산도 서빙돼야 한다.
-// MPA 전환 시 이 경로들은 번들러 산출물로 대체되므로, 그때 이 목록도 함께 갱신한다.
-test("라우팅 계약: 조회 페이지가 참조하는 자산이 서빙된다", async ({ request }) => {
-  for (const path of ["/theme.css", "/headline.js", "/origin-color.js"]) {
-    const res = await request.get(path);
-    expect(res.status(), path).toBe(200);
+//
+// ⚠️ 여기서 상태 코드만 보면 안 된다. 없는 경로는 폴백으로 index.html이 200으로 나가므로,
+// 번들 경로가 틀려도 "200"이라 통과해 버린다(실제로 MPA 전환 때 이 함정에 걸렸다).
+// 그래서 content-type까지 확인하고, 번들 경로는 하드코딩하지 않고 HTML에서 뽑아 쓴다.
+test("라우팅 계약: 조회 페이지가 참조하는 자산이 실제로 서빙된다", async ({ request }) => {
+  const css = await request.get("/theme.css");
+  expect(css.status()).toBe(200);
+  expect(css.headers()["content-type"]).toMatch(/text\/css/);
+
+  const html = await (await request.get("/")).text();
+  const srcs = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1] as string);
+  expect(srcs.length, "조회 페이지가 스크립트를 하나도 참조하지 않는다").toBeGreaterThan(0);
+  for (const src of srcs) {
+    const res = await request.get(src);
+    expect(res.status(), src).toBe(200);
+    expect(res.headers()["content-type"], src).toMatch(/javascript/);
   }
 });
 

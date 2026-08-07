@@ -38,7 +38,8 @@ npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler �
 # 로컬 개발 서버 (저장소 루트에서)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
-npx wrangler pages dev public --binding INVITE_CODE=test \
+npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
+npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -60,19 +61,26 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
 
 ## 걸려 넘어지기 쉬운 것
 
-- **헤드라인 조합 규칙이 두 곳에 있다**: `public/headline.js`(브라우저 전역 `bhHeadline`)와
+- **헤드라인 조합 규칙이 두 곳에 있다**: `apps/web/src/lib/headline.ts`(조회·덱)와
   `@bnhd/label`의 `buildHeadline`(번들). 한쪽만 고치면 라벨·카드·조회 제목이 어긋난다 —
   반드시 함께 고친다. 구조상 중복이 남은 유일한 지점이라 특히 주의할 것.
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.
-- **`/admin`은 빌드 산출물**: `public/admin`은 gitignore이고 CI가 배포 직전에 만든다.
-  로컬에서 `/admin`을 보려면 먼저 `npm run build -w @bnhd/lab`.
+- **배포물은 전부 빌드 산출물**: `dist/`는 gitignore이고 `npm run build`가 만든다 —
+  `@bnhd/web`(조회·덱)이 먼저 `dist/`를 비우고 채운 뒤 `@bnhd/lab`이 `dist/admin`에 얹힌다.
+  **순서를 바꾸면 랩이 지워진다.** wrangler는 `dist`만 서빙하므로 빌드 전에는 아무것도 안 뜬다.
 - **필드 추가 = `packages/schema`의 BEAN_FIELDS 한 줄 + D1 마이그레이션 SQL.**
   CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되므로 다른 곳은 손댈 필요가 없다.
 - D1 스키마 변경은 **새 `migrate_*.sql` 파일 추가** (기존 파일 수정 금지). 적용 순서는
   README 운영 섹션에 기록한다 — 원격 D1에 미적용 마이그레이션이 남아 조용히 깨진 전례가 있다.
-- `public/`의 브라우저 JS는 Biome·tsc 대상에서 빠져 있다 — 손대면 검증 없이 배포된다.
+<!-- check-docs:ignore-start -->
+- **`404.html`을 만들지 말 것.** Pages는 매치되는 파일이 없는 경로에 `index.html`을 준다 —
+  인쇄된 QR `/{KEY}`가 조회 페이지로 떨어지는 이유가 그것뿐이다. `404.html`이 있으면 그 폴백이
+  꺼져 **인쇄된 라벨이 전부 죽는다.** `_redirects` 캐치올로는 되돌릴 수 없다(`/* /index.html 200`은
+  무한 루프로 거부되고, 통과하는 `/* / 200`은 CSS·JS까지 삼킨다). 미등록 KEY 안내는 이미 조회
+  페이지 안에 있으므로 별도 404 페이지는 위험할 뿐 아니라 중복이다. `e2e/routing.spec.ts`가 지킨다.
+<!-- check-docs:ignore-end -->
 - `main → deploy` 승격 PR은 반드시 **Create a merge commit** — Squash·Rebase는 규칙이 막는다.
   둘은 `main`의 커밋을 `deploy`의 조상으로 남기지 않아 다음 승격을 `add/add` 충돌로 막는다
   (v1.2.0 때 36건). 이유는 README "운영"의 브랜치 보호 규칙 항목에 있다.
@@ -108,7 +116,7 @@ npx wrangler pages dev public --binding INVITE_CODE=test \
   옮겨 적으면 낡기만 한다. `gen-structure.mjs`가 `git ls-files`·`app.ts`·`schema.sql`에서
   직접 읽어 생성하고, `npm run check`가 재생성 결과와 커밋된 내용이 같은지 검사한다.
 - **파일의 설명을 바꾸려면 그 파일의 머리 주석을 고친다.** 설명이 코드 옆에 있으면 코드를
-  고칠 때 같이 눈에 들어온다 — 이 규칙 덕에 `session.js`의 낡은 주석이 실제로 잡혔다.
+  고칠 때 같이 눈에 들어온다 — 이 규칙 덕에 세션 모듈의 낡은 주석이 실제로 잡혔다.
   새 파일에는 "무엇이고 왜 있는지" 한두 줄 주석을 단다. 안 달면 표에 `—`로 남는다.
 - **이 문서에는 구조를 쓰지 않는다.** 저장소를 봐도 알 수 없는 것만 쓴다 — 왜 그래야 하는지,
   무엇을 건드리면 깨지는지.

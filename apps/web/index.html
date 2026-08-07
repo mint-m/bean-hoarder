@@ -13,9 +13,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
-<script src="/vendor/jsQR.js"></script>
-<script src="/origin-color.js"></script>
-<script src="/headline.js"></script>
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
   main { width: 100%; max-width: 430px; flex: 1; }
@@ -79,6 +76,7 @@
 
   .pass-stub { padding: 4px 22px 20px; }
   .stub-grid { display: flex; align-items: center; gap: 22px; margin: 0; }
+  /* biome-ignore lint/style/noDescendingSpecificity: 기존 캐스케이드 — 순서를 바꾸면 표시가 달라질 수 있어 이전 단계에서 건드리지 않는다 */
   .stub-grid > div { display: flex; flex-direction: column; }
   .stub-grid dd { margin: 2px 0 0; font-family: var(--mono); font-size: 13.5px; font-weight: 700; }
   .dday {
@@ -183,6 +181,7 @@
     <div class="pass-main">
       <div id="f-preview-badge" class="preview-badge hidden"></div>
       <div class="eyebrow" id="f-roastery"></div>
+      <!-- biome-ignore lint/a11y/useHeadingContent: 내용은 render()가 채운다 (조회 결과가 와야 제목이 정해짐) -->
       <h1 class="origin" id="f-origin"></h1>
       <p class="subline hidden" id="f-subline"></p>
       <ul class="chips hidden" id="f-chips"></ul>
@@ -201,245 +200,15 @@
         <div class="memo-label">OTHER INFO</div>
         <div class="memo-body" id="f-memo-body"></div>
       </div>
-      <div class="srcline hidden" id="f-srcline"><a id="f-source" target="_blank" rel="noopener">원본 페이지 ↗</a></div>
+      <div class="srcline hidden" id="f-srcline">
+        <!-- biome-ignore lint/a11y/useValidAnchor: href는 render()가 원두의 SOURCE_URL로 채운다 -->
+        <a id="f-source" target="_blank" rel="noopener">원본 페이지 ↗</a>
+      </div>
     </div>
   </article>
 </main>
 <footer>BEAN-HOARDER — 원두 소분 라벨 아카이브</footer>
 
-<script>
-const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
-// 지역·생산자는 서브라인, 날짜·용량은 하단 스텁에 표시하므로 스펙 그리드에서 제외
-const SPEC_FIELDS = [
-  ["PROCESS", "PROCESS"], ["VARIETY", "VARIETY"], ["AGTRON", "ROAST PT"],
-  ["ALTITUDE", "ALTITUDE"], ["HARVEST", "HARVEST"], ["LOT", "LOT"], ["WASHING_STATION", "WASH STN"],
-];
-
-function getCode() {
-  const q = new URLSearchParams(location.search).get("c");
-  if (q) return q.trim().toUpperCase();
-  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, "");
-  return path && path !== "index.html" ? path.toUpperCase() : null;
-}
-
-function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-function hideAll() {
-  ["status", "landing", "bean"].forEach(id => document.getElementById(id).classList.add("hidden"));
-}
-function show(msg) {
-  hideAll();
-  const el = document.getElementById("status");
-  el.innerHTML = msg;
-  el.classList.remove("hidden");
-}
-function showLanding() {
-  hideAll();
-  document.getElementById("landing").classList.remove("hidden");
-  document.getElementById("top-brand").classList.add("hidden");
-  document.getElementById("code-form").addEventListener("submit", e => {
-    e.preventDefault();
-    const v = document.getElementById("code-input").value.trim().toUpperCase();
-    if (v) location.href = "/" + encodeURIComponent(v);
-  });
-  setupScanner();
-}
-
-// ── 카메라 QR 스캔 ──
-// 스캔된 QR은 라벨 URL(HTTPS://BNHD.PAGES.DEV/{KEY})이므로 KEY만 뽑아 이동한다.
-function keyFromScan(data) {
-  if (!data) return null;
-  let s = data.trim();
-  try { const u = new URL(s); s = new URLSearchParams(u.search).get("c") || u.pathname; } catch (e) { /* URL 아니면 원문 */ }
-  s = s.replace(/^\/+|\/+$/g, "").toUpperCase();
-  return KEY_RE.test(s) ? s : null;
-}
-
-function setupScanner() {
-  const btn = document.getElementById("scan-btn");
-  // 카메라(getUserMedia)를 쓸 수 있고 안전 컨텍스트일 때만 버튼 노출
-  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || typeof jsQR !== "function") return;
-  btn.classList.remove("hidden");
-
-  const scanner = document.getElementById("scanner");
-  const video = document.getElementById("scan-video");
-  const canvas = document.getElementById("scan-canvas");
-  const hint = document.getElementById("scan-hint");
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  let stream = null, raf = 0;
-
-  async function open() {
-    scanner.classList.remove("hidden");
-    hint.textContent = "카메라를 준비하는 중…";
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-    } catch (e) {
-      hint.textContent = "카메라를 열 수 없습니다. 권한을 허용했는지 확인해 주세요.";
-      return;
-    }
-    video.srcObject = stream;
-    await video.play().catch(() => {});
-    hint.textContent = "라벨의 QR을 사각형 안에 맞춰 주세요";
-    raf = requestAnimationFrame(tick);
-  }
-  function close() {
-    cancelAnimationFrame(raf);
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null;
-    scanner.classList.add("hidden");
-  }
-  function tick() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const result = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
-      const key = result && keyFromScan(result.data);
-      if (key) {
-        hint.textContent = `${key} 조회 중…`;
-        close();
-        location.href = "/" + encodeURIComponent(key);
-        return;
-      }
-      if (result) hint.textContent = "이 QR은 Bean-Hoarder 라벨이 아닙니다.";
-    }
-    raf = requestAnimationFrame(tick);
-  }
-  btn.addEventListener("click", open);
-  document.getElementById("scan-close").addEventListener("click", close);
-}
-
-function parseDot(d) {
-  const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(d || "");
-  return m ? new Date(2000 + +m[1], +m[2] - 1, +m[3]) : null;
-}
-
-function render(row, isPreview) {
-  const g = k => (row[k] || "").trim();
-  hideAll();
-  document.getElementById("bean").classList.remove("hidden");
-  document.getElementById("top-brand").classList.add("hidden");  // 패스 헤더에 브랜드가 있으므로 중복 제거
-
-  const badge = document.getElementById("f-preview-badge");
-  badge.classList.toggle("hidden", !isPreview);
-  if (isPreview) badge.textContent = "초안 미리보기 · 아직 등록되지 않음";
-
-  document.getElementById("f-key").textContent = g("KEY");
-  document.getElementById("f-roastery").textContent = g("ROASTERY");
-  // 메인 식별자: 국가+세부지역 조합(또는 시그니쳐/블렌드명). 라벨·카드와 동일 규칙(headline.js).
-  const usedInHead = typeof bhHeadlineUsedFields === "function" ? bhHeadlineUsedFields(row) : [];
-  const headline = (typeof bhHeadline === "function" ? bhHeadline(row) : g("ORIGIN")) || g("KEY");
-  document.getElementById("f-origin").textContent = headline;
-
-  // 산지별 색상 코딩: 상단 스트립을 산지 해시 색으로 (라벨 물리 인쇄 색과는 무관, 조회 화면 전용)
-  const originColor = typeof bhOriginColor === "function" ? bhOriginColor(g("ORIGIN")) : null;
-  document.getElementById("bean").style.borderTopColor = originColor || "";
-
-  // 시그니쳐명일 땐 국가를 서브라인에 보존, 헤드라인이 이미 쓴 지역·생산자는 제외(중복 방지)
-  const subParts = [];
-  if (g("COFFEE_NAME") && g("ORIGIN")) subParts.push(g("ORIGIN"));
-  for (const k of ["REGION", "PRODUCER"]) {
-    if (!usedInHead.includes(k) && g(k)) subParts.push(g(k));
-  }
-  const sub = document.getElementById("f-subline");
-  sub.classList.toggle("hidden", !subParts.length);
-  sub.innerHTML = subParts.map(v => `<span>${escapeHtml(v)}</span>`).join('<span class="sep">·</span>');
-
-  // 테이스팅 노트: 짧은 항목들이면 칩으로, 긴 문장이면 이탤릭 문단으로
-  const chips = document.getElementById("f-chips");
-  const note = document.getElementById("f-note");
-  chips.classList.add("hidden"); note.classList.add("hidden");
-  const noteRaw = g("TASTING_NOTE");
-  if (noteRaw) {
-    const segs = noteRaw.split(/[,·]/).map(s => s.trim()).filter(Boolean);
-    if (segs.length && segs.every(s => s.length <= 28)) {
-      chips.innerHTML = segs.map(s => `<li>${escapeHtml(s)}</li>`).join("");
-      chips.classList.remove("hidden");
-    } else {
-      note.textContent = noteRaw;
-      note.classList.remove("hidden");
-    }
-  }
-
-  const dl = document.getElementById("f-specs");
-  dl.innerHTML = "";
-  for (const [col, label] of SPEC_FIELDS) {
-    if (usedInHead.includes(col)) continue; // 헤드라인에 이미 표시된 필드(워싱스테이션·랏)는 제외
-    const v = g(col);
-    if (!v) continue;
-    const div = document.createElement("div");
-    div.innerHTML = `<dt>${label}</dt><dd>${escapeHtml(v)}</dd>`;
-    dl.appendChild(div);
-  }
-
-  // 스텁: 로스팅/소분/용량 + D+N
-  const setStub = (boxId, valId, v) => {
-    document.getElementById(boxId).classList.toggle("hidden", !v);
-    if (v) document.getElementById(valId).textContent = v;
-  };
-  const rd = g("ROAST_DATE");
-  setStub("f-roasted-box", "f-roasted", rd);
-  setStub("f-packed-box", "f-packed", g("PACKAGE_DATE"));
-  setStub("f-net-box", "f-net", g("NET_WEIGHT"));
-  const dday = document.getElementById("f-dday");
-  const d = parseDot(rd);
-  const n = d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null;
-  const showDday = n != null && n >= 0 && !isPreview;
-  dday.classList.toggle("hidden", !showDday);
-  if (showDday) dday.textContent = `D+${n}`;
-
-  const memo = document.getElementById("f-memo");
-  memo.classList.toggle("hidden", !g("MEMO"));
-  if (g("MEMO")) document.getElementById("f-memo-body").textContent = g("MEMO");
-
-  document.getElementById("f-srcline").classList.toggle("hidden", !g("SOURCE_URL"));
-  if (g("SOURCE_URL")) document.getElementById("f-source").href = g("SOURCE_URL");
-
-  document.title = `${headline} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
-}
-
-function b64DecodeUnicode(str) {
-  return decodeURIComponent(atob(str).split("").map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
-}
-
-async function main() {
-  const previewParam = new URLSearchParams(location.search).get("preview");
-  if (previewParam) {
-    try {
-      render(JSON.parse(b64DecodeUnicode(previewParam)), true);
-    } catch (e) {
-      show("미리보기 데이터를 해석하지 못했습니다.");
-    }
-    return;
-  }
-  const code = getCode();
-  if (!code) { showLanding(); return; }
-  if (!KEY_RE.test(code)) {
-    show(`올바른 코드 형식이 아닙니다.<br><span class="code">${escapeHtml(code)}</span><br><br><a href="/">처음으로 ←</a>`);
-    return;
-  }
-  let res;
-  try {
-    res = await fetch(`/api/bean/${encodeURIComponent(code)}`, { cache: "no-store" });
-  } catch (e) {
-    show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
-    return;
-  }
-  if (res.status === 404) {
-    show(`등록되지 않은 코드입니다.<br><span class="code">${escapeHtml(code)}</span><br><br><a href="/">처음으로 ←</a>`);
-    return;
-  }
-  if (!res.ok) {
-    show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
-    return;
-  }
-  const { bean } = await res.json();
-  render(bean, false);
-}
-main();
-</script>
+<script type="module" src="/src/viewer.ts"></script>
 </body>
 </html>
