@@ -1,6 +1,6 @@
+import { type Account, clearSession, migrateLegacyPin } from "@bnhd/session";
 import { useCallback, useEffect, useState } from "react";
 import AuthView from "./AuthView";
-import { type Account, clearSession, migrateLegacyPin } from "./lib/session";
 import Workspace from "./Workspace";
 
 const EXPIRED_NOTICE = "로그인이 만료되었습니다. 다시 로그인해 주세요.";

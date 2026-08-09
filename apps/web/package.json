@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@bnhd/schema": "*",
+    "@bnhd/session": "*",
     "jsqr": "^1.4.0"
   },
   "devDependencies": {

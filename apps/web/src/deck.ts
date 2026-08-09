@@ -1,11 +1,11 @@
 // 내 원두 덱(/deck) 진입점 — 구 public/deck.html 인라인 스크립트의 이식.
 // 로그인한 사용자의 원두를 월렛 카드처럼 쌓아 보여주고, 카드 메뉴로 보관·삭제를 처리한다.
 import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { type Account, loadSession, migrateLegacyPin } from "@bnhd/session";
 import { daysSince, el, escapeHtml } from "./lib/dom";
 import { originColor } from "./lib/origin-color";
-import { type Account, load, migrateLegacyPin } from "./lib/session";
 
-let account: Account = load();
+let account: Account = loadSession();
 let allBeans: HeadlineRow[] = [];
 // 카드에 테이스팅 노트 미리보기를 표시할지 — 기본 켜짐, 사용자가 끄면 기억
 let notesEnabled = localStorage.getItem("bh_deck_notes") !== "0";

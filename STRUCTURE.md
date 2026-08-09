@@ -29,6 +29,7 @@
 | `packages/autofill/`<br>`@bnhd/autofill` | 붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서. |
 | `packages/label/`<br>`@bnhd/label` | 라벨 렌더러 단일 모듈 (@bnhd/label) 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거). |
 | `packages/schema/`<br>`@bnhd/schema` | Bean-Hoarder 도메인 스키마 — 원두 필드의 단일 소스(single source of truth). |
+| `packages/session/`<br>`@bnhd/session` | 세션 저장·이행 — 조회·덱(@bnhd/web)과 랩(@bnhd/lab)이 공유하는 단일 소스. |
 
 **D1 스키마** — 새 환경은 schema.sql 하나로 만들고, 기존 DB에는 migrate_*.sql을 순서대로 적용한다.
 
