@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@bnhd/schema": "*",
     "jsqr": "^1.4.0"
   },
   "devDependencies": {

@@ -2,9 +2,9 @@
 //
 // 이 페이지는 파일이 아닌 경로(/{KEY})로도 열린다 — Pages가 매치 없는 경로에 index.html을 주고,
 // 여기서 location.pathname을 읽어 KEY를 뽑는다. 그 계약은 e2e/routing.spec.ts가 지킨다.
+import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import { daysSince, el, escapeHtml } from "./lib/dom";
-import { type BeanRow, buildHeadline, headlineUsedFields } from "./lib/headline";
 import { originColor } from "./lib/origin-color";
 
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
@@ -126,7 +126,7 @@ function setupScanner(): void {
   el("scan-close").addEventListener("click", close);
 }
 
-function render(row: BeanRow, isPreview: boolean): void {
+function render(row: HeadlineRow, isPreview: boolean): void {
   const g = (k: string) => String(row[k] ?? "").trim();
   hideAll();
   el("bean").classList.remove("hidden");
@@ -225,7 +225,7 @@ async function main(): Promise<void> {
   const previewParam = new URLSearchParams(location.search).get("preview");
   if (previewParam) {
     try {
-      render(JSON.parse(b64DecodeUnicode(previewParam)) as BeanRow, true);
+      render(JSON.parse(b64DecodeUnicode(previewParam)) as HeadlineRow, true);
     } catch (_e) {
       show("미리보기 데이터를 해석하지 못했습니다.");
     }
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
     show("데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.");
     return;
   }
-  const { bean } = (await res.json()) as { bean: BeanRow };
+  const { bean } = (await res.json()) as { bean: HeadlineRow };
   render(bean, false);
 }
 

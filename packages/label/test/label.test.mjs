@@ -3,16 +3,7 @@
 // (renderCanvas/verifyQr는 브라우저 전용 — 라이브에서 렌더링 때마다 자동 실행됨).
 
 import assert from "node:assert/strict";
-import {
-  BASE_URL,
-  buildHeadline,
-  buildLabelSVG,
-  DEFAULT_DESIGN,
-  headlineUsedFields,
-  SIZE_SPECS,
-  SPEC_POOL,
-  SUB_POOL,
-} from "@bnhd/label";
+import { BASE_URL, buildLabelSVG, DEFAULT_DESIGN, SIZE_SPECS, SPEC_POOL, SUB_POOL } from "@bnhd/label";
 import { test } from "vitest";
 
 const ROW = {
@@ -141,31 +132,16 @@ test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮
   }
 });
 
-test("헤드라인 조합: 국가+가장 세부 장소, LOT은 보조로 덧붙임, 시그니쳐명은 대체", () => {
-  // 장소 앵커 우선순위: 워싱스테이션 > 생산자 > 지역
-  assert.equal(buildHeadline({ ORIGIN: "ETHIOPIA", REGION: "Yirgacheffe" }), "ETHIOPIA YIRGACHEFFE");
-  assert.equal(
-    buildHeadline({ ORIGIN: "ETHIOPIA", REGION: "Sidama", WASHING_STATION: "Gara Agena" }),
-    "ETHIOPIA GARA AGENA",
-  );
-  // LOT은 단독 앵커가 아니라 장소 뒤 보조
-  assert.equal(
-    buildHeadline({ ORIGIN: "COLOMBIA", PRODUCER: "El Paraiso", LOT: "Lot 12" }),
-    "COLOMBIA EL PARAISO · LOT 12",
-  );
-  // 시그니쳐/블렌드명 오버라이드
-  assert.equal(
-    buildHeadline({ ORIGIN: "블렌드", COFFEE_NAME: "푸루티 봉봉", REGION: "무시됨" }),
-    "푸루티 봉봉".toUpperCase(),
-  );
-  // 블렌드 원산지는 stripParen으로 축약 (#9 흡수분)
-  assert.equal(buildHeadline({ ORIGIN: "블렌드 (여러 원산지 혼합)" }), "블렌드");
-  // 헤드라인이 소비한 필드 목록 (부제목 중복 방지)
-  assert.deepEqual(headlineUsedFields({ ORIGIN: "ETHIOPIA", WASHING_STATION: "Gara Agena", LOT: "Lot 1" }), [
-    "WASHING_STATION",
-    "LOT",
-  ]);
-  assert.deepEqual(headlineUsedFields({ ORIGIN: "ETHIOPIA", COFFEE_NAME: "봉봉", REGION: "X" }), []);
+// 헤드라인 조합 규칙 단위 테스트는 @bnhd/schema/headline로 이동(단일 소스). 여기서는 그 규칙이
+// 라벨 SVG에 대문자로 렌더되는지(라벨 측 .toUpperCase())를 buildLabelSVG 테스트가 지킨다.
+
+test("헤드라인은 라벨 SVG에 대문자로 렌더된다 (라벨 측 toUpperCase 적용점)", () => {
+  const d = designFor("40x20");
+  const { svg } = buildLabelSVG(Object.assign({}, ROW, { COFFEE_NAME: "푸루티 봉봉" }), d);
+  assert.ok(svg.includes("푸루티 봉봉"), "COFFEE_NAME 오버라이드가 헤드라인으로 렌더");
+  const { svg: svg2 } = buildLabelSVG({ ...ROW, COFFEE_NAME: "", ORIGIN: "colombia", REGION: "" }, d);
+  assert.ok(svg2.includes("COLOMBIA"), "국가 헤드라인은 대문자로 렌더");
+  assert.ok(!svg2.includes(">colombia<"), "원본 소문자는 라벨에 남지 않음");
 });
 
 test("노트 렌더링 보장: 스펙이 많아도 테이스팅 노트는 드롭되지 않는다", () => {

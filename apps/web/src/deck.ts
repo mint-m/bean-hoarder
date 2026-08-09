@@ -1,12 +1,12 @@
 // 내 원두 덱(/deck) 진입점 — 구 public/deck.html 인라인 스크립트의 이식.
 // 로그인한 사용자의 원두를 월렛 카드처럼 쌓아 보여주고, 카드 메뉴로 보관·삭제를 처리한다.
+import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { daysSince, el, escapeHtml } from "./lib/dom";
-import { type BeanRow, buildHeadline, headlineUsedFields } from "./lib/headline";
 import { originColor } from "./lib/origin-color";
 import { type Account, load, migrateLegacyPin } from "./lib/session";
 
 let account: Account = load();
-let allBeans: BeanRow[] = [];
+let allBeans: HeadlineRow[] = [];
 // 카드에 테이스팅 노트 미리보기를 표시할지 — 기본 켜짐, 사용자가 끄면 기억
 let notesEnabled = localStorage.getItem("bh_deck_notes") !== "0";
 
@@ -16,7 +16,7 @@ function showStatus(html: string): void {
   node.classList.remove("hidden");
 }
 
-function cardHTML(b: BeanRow): string {
+function cardHTML(b: HeadlineRow): string {
   const g = (k: string) => String(b[k] ?? "").trim();
   const n = daysSince(g("ROAST_DATE"));
   const dday = n != null ? `<span class="dday">D+${n}</span>` : "";
@@ -53,14 +53,14 @@ function cardHTML(b: BeanRow): string {
 }
 
 /** 보관(archived) 카드는 덱 최하단으로, 나머지는 최신 KEY 먼저 */
-function sortBeans(beans: BeanRow[]): BeanRow[] {
+function sortBeans(beans: HeadlineRow[]): HeadlineRow[] {
   return beans.slice().sort((a, b) => {
     if (!!a.ARCHIVED !== !!b.ARCHIVED) return a.ARCHIVED ? 1 : -1;
     return String(b.KEY ?? "").localeCompare(String(a.KEY ?? ""));
   });
 }
 
-function renderDeck(beans: BeanRow[]): void {
+function renderDeck(beans: HeadlineRow[]): void {
   const deck = el("deck");
   if (!beans.length) {
     deck.innerHTML = "";
@@ -115,7 +115,7 @@ function closeSheet(): void {
 
 interface ApiResult {
   res: { status: number };
-  body: { ok?: boolean; error?: string; beans?: BeanRow[] } | null;
+  body: { ok?: boolean; error?: string; beans?: HeadlineRow[] } | null;
 }
 
 async function apiCall(path: string, opts: RequestInit = {}): Promise<ApiResult> {

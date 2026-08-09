@@ -12,8 +12,6 @@
 | 경로 | 역할 |
 |---|---|
 | `public/admin/` | 랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다. |
-| `public/admin/assets/index-rRXmEFtD.js` | — |
-| `public/admin/index.html` | LAB |
 
 **서버** — Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.
 

@@ -61,9 +61,11 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 
 ## 걸려 넘어지기 쉬운 것
 
-- **헤드라인 조합 규칙이 두 곳에 있다**: `apps/web/src/lib/headline.ts`(조회·덱)와
-  `@bnhd/label`의 `buildHeadline`(번들). 한쪽만 고치면 라벨·카드·조회 제목이 어긋난다 —
-  반드시 함께 고친다. 구조상 중복이 남은 유일한 지점이라 특히 주의할 것.
+- **헤드라인 조합 규칙은 `@bnhd/schema/headline` 한 곳뿐**(조회·덱·라벨이 함께 import). 두 가지가
+  얽혀 있으니 주의: (1) 반드시 **서브패스** `@bnhd/schema/headline`로 가져온다 — 인덱스
+  `@bnhd/schema`를 import하면 zod가 딸려와 조회·덱 번들이 부푼다(이 격리가 서브패스로 나눈 이유다).
+  (2) 이 함수는 **대문자화를 하지 않는다** — 조회·덱은 CSS `text-transform`으로, 라벨은 SVG라
+  호출부에서 `.toUpperCase()`를 직접 건다. 공유 함수에 대문자를 넣으면 화면이 이중으로 처리된다.
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.
