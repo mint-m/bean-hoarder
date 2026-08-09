@@ -8,6 +8,14 @@ test("공개 조회: QR 상세 카드가 렌더링된다", async ({ page }) => {
   await expect(page.locator("body")).toContainText("DANCHE");
 });
 
+// 경로(/{KEY}) 외에 쿼리(?c={KEY})로도 조회할 수 있다 — 랩의 링크·수동 입력이 쓰는 진입.
+// viewer.getCode()의 별도 분기라 경로 진입 테스트로는 덮이지 않는다.
+test("공개 조회: ?c= 쿼리 진입도 같은 카드를 연다", async ({ page }) => {
+  await page.goto("/?c=DEMO26-001");
+  await expect(page.locator("body")).toContainText("ETHIOPIA");
+  await expect(page.locator("body")).toContainText("DANCHE");
+});
+
 test("랩: 로그인 → 라벨 QR 검증 → 등록 → 덱에서 카드 확인", async ({ page }) => {
   await page.goto("/admin/");
 

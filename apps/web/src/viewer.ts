@@ -3,9 +3,13 @@
 // 이 페이지는 파일이 아닌 경로(/{KEY})로도 열린다 — Pages가 매치 없는 경로에 index.html을 주고,
 // 여기서 location.pathname을 읽어 KEY를 뽑는다. 그 계약은 e2e/routing.spec.ts가 지킨다.
 import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
-import jsQR from "jsqr";
 import { daysSince, el, escapeHtml } from "./lib/dom";
 import { originColor } from "./lib/origin-color";
+
+// jsQR 디코더(~130KB)는 타입만 정적으로 참조하고 런타임 코드는 스캔을 처음 열 때 지연 로드한다
+// (setupScanner의 open 참조). type-only import라 번들에는 들어가지 않는다 — 조회 진입(QR로
+// 도착하는 대부분의 트래픽)의 초기 번들에서 디코더를 뺀다.
+type JsQR = typeof import("jsqr").default;
 
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
 // 지역·생산자는 서브라인, 날짜·용량은 하단 스텁에 표시하므로 스펙 그리드에서 제외
@@ -77,10 +81,20 @@ function setupScanner(): void {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   let stream: MediaStream | null = null;
   let raf = 0;
+  let jsQR: JsQR | null = null; // 최초 스캔 시 1회 지연 로드 후 캐시 (open 참조)
 
   async function open(): Promise<void> {
     scanner.classList.remove("hidden");
     hint.textContent = "카메라를 준비하는 중…";
+    // 디코더는 스캔을 처음 열 때만 받는다 — 카메라 권한을 얻기 전에 확보해 tick 루프가 바로 쓴다
+    if (!jsQR) {
+      try {
+        jsQR = (await import("jsqr")).default;
+      } catch (_e) {
+        hint.textContent = "QR 인식기를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        return;
+      }
+    }
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -104,7 +118,8 @@ function setupScanner(): void {
   }
 
   function tick(): void {
-    if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+    // jsQR은 open()이 로드를 마친 뒤에만 tick을 스케줄하므로 여기선 항상 준비돼 있다(가드는 타입용).
+    if (ctx && jsQR && video.readyState === video.HAVE_ENOUGH_DATA) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
