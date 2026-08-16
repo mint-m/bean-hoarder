@@ -3,12 +3,88 @@
 //
 // 동작 원리:
 // 1. GitHub API를 통해 PR 메타데이터와 diff를 가져온다.
-// 2. 프로젝트 특화 규칙(SSOT, Cloudflare Pages 폴백, XSS/SQLi 보안)을 주입한 프롬프트로 Gemini API를 호출한다(모델은 동적 선택).
-// 3. 생성된 리뷰를 PR 코멘트로 등록하거나 기존 리뷰 코멘트를 갱신한다.
-
-import { execFileSync } from "node:child_process";
+// 2. 프로젝트 특화 규칙(SSOT, Cloudflare Pages 폴백, XSS/SQLi 보안)을 주입한 프롬프트로 Gemini API를 호출한다(모델 동적 선택).
+//    출력은 responseSchema로 강제한 구조화 JSON(판정·요약·강점·findings)을 받는다.
+// 3. 구조화 결과를 마크다운으로 렌더해 PR 코멘트로 등록하거나 기존 코멘트를 갱신한다(파싱 실패 시 원문 폴백).
 
 const BOT_SIGNATURE = "<!-- ai-pr-review-bot -->";
+
+// 심각도는 코드랩(Antigravity)의 구조화 findings에서 따온 축 — 렌더 정렬·집계에 쓴다.
+const SEV_ORDER = ["critical", "high", "medium", "low", "nit"];
+const SEV_LABEL = {
+  critical: "🔴 CRITICAL",
+  high: "🟠 HIGH",
+  medium: "🟡 MEDIUM",
+  low: "🔵 LOW",
+  nit: "⚪ NIT",
+};
+const VERDICT_LABEL = {
+  APPROVE: "✅ 승인 권고",
+  COMMENT: "💬 참고 의견",
+  REQUEST_CHANGES: "🛑 보완 요청",
+};
+
+// Gemini 구조화 출력 스키마 (OpenAPI 서브셋). 자유 텍스트 대신 이 모양을 강제해 심각도·위치를 얻는다.
+const REVIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    verdict: { type: "string", enum: ["APPROVE", "COMMENT", "REQUEST_CHANGES"] },
+    strengths: { type: "array", items: { type: "string" } },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          file: { type: "string" },
+          line: { type: "integer", nullable: true },
+          severity: { type: "string", enum: SEV_ORDER },
+          category: { type: "string" },
+          description: { type: "string" },
+          suggestion: { type: "string", nullable: true },
+        },
+        required: ["file", "severity", "category", "description"],
+        propertyOrdering: ["file", "line", "severity", "category", "description", "suggestion"],
+      },
+    },
+  },
+  required: ["summary", "verdict", "findings"],
+  propertyOrdering: ["summary", "verdict", "strengths", "findings"],
+};
+
+/** 구조화 리뷰 객체 → PR 코멘트 마크다운. 심각도순 정렬 + 집계 한 줄. */
+function renderReview(review) {
+  const findings = Array.isArray(review.findings) ? review.findings : [];
+  const tally = SEV_ORDER.map((s) => {
+    const n = findings.filter((f) => f.severity === s).length;
+    return n ? `${SEV_LABEL[s]} ${n}` : null;
+  }).filter(Boolean);
+
+  const out = [`**판정: ${VERDICT_LABEL[review.verdict] || review.verdict || "—"}**`];
+  if (tally.length) out.push(tally.join(" · "));
+  if (review.summary) out.push(`\n> ${review.summary}`);
+
+  if (Array.isArray(review.strengths) && review.strengths.length) {
+    out.push("\n#### 잘된 점");
+    out.push(review.strengths.map((s) => `- ${s}`).join("\n"));
+  }
+
+  out.push("\n#### 개선 제안 및 주의사항");
+  if (!findings.length) {
+    out.push("특이사항 없음.");
+  } else {
+    const sorted = [...findings].sort(
+      (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
+    );
+    for (const f of sorted) {
+      const loc = f.line != null ? `\`${f.file}:${f.line}\`` : `\`${f.file || "?"}\``;
+      const cat = f.category ? ` · _${f.category}_` : "";
+      out.push(`\n**${SEV_LABEL[f.severity] || f.severity || ""}** ${loc}${cat}\n${f.description || ""}`);
+      if (f.suggestion) out.push(`> 제안: ${f.suggestion}`);
+    }
+  }
+  return out.join("\n");
+}
 
 async function main() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -148,14 +224,19 @@ ${prData.body || "(설명 없음)"}
 ${cleanDiff}
 \`\`\`
 
-## 리뷰 출력 형식 가이드
-마크다운 형식으로 아래 섹션을 포함하여 작성해 주세요:
-1. **요약**: PR이 해결하고자 하는 문제와 변경 핵심 (1~3줄)
-2. **잘된 점 (Strengths)**: 구조적 개선, 성능 최적화, 테스트 보강 등 긍정적 측면
-3. **개선 제안 및 주의사항 (Suggestions & Risks)**: 잠재적 버그, 보안 취약점, 프로젝트 규칙 위반, 엣지 케이스 등 (없다면 "특이사항 없음" 명시)
-4. **종합 의견**: LGTM / Approval 권고 또는 보완 요청
+## 출력 (JSON 스키마로 강제됨 — 자유 텍스트가 아니라 지정된 필드를 채운다)
+- summary: PR이 해결하는 문제와 변경 핵심 (1~3문장)
+- verdict: APPROVE(문제 없음) / COMMENT(참고 의견) / REQUEST_CHANGES(보완 필요) 중 하나
+- strengths: 구조 개선·성능·테스트 보강 등 긍정적 측면 (문자열 배열, 없으면 빈 배열)
+- findings: 잠재 버그·보안 취약점·프로젝트 규칙 위반·엣지 케이스. 없으면 빈 배열. 각 항목:
+    - file: 파일 경로 (diff에 나온 경로 그대로)
+    - line: 관련 라인 번호 (모르면 null)
+    - severity: critical / high / medium / low / nit
+    - category: 예) correctness, security, ssot, bundle-size, xss, routing, test
+    - description: 무엇이 왜 문제인지 한국어로
+    - suggestion: 구체적 수정 제안 (없으면 null)
 
-리뷰는 친절하고 전문적인 톤으로 작성해 주세요.`;
+설명은 친절하고 전문적인 한국어로 작성한다.`;
 
   const candidateModels = [
     targetModel,
@@ -185,6 +266,8 @@ ${cleanDiff}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
+          responseMimeType: "application/json",
+          responseSchema: REVIEW_SCHEMA,
         },
       }),
     });
@@ -213,10 +296,18 @@ ${cleanDiff}
     throw new Error("Gemini로부터 응답 텍스트를 받지 못했습니다.");
   }
 
+  // responseSchema로 강제한 JSON을 파싱해 렌더한다. 스키마가 깨진 응답(구형 모델 등)은 원문 그대로 싣는다.
+  let reviewMarkdown = reviewText;
+  try {
+    reviewMarkdown = renderReview(JSON.parse(reviewText));
+  } catch (_e) {
+    console.warn("⚠️ 구조화 응답 파싱 실패 — 원문을 그대로 싣습니다.");
+  }
+
   const commentBody = `${BOT_SIGNATURE}
 ### 🤖 Gemini AI Automated PR Review
 
-${reviewText}
+${reviewMarkdown}
 
 ---
 *이 리뷰는 GitHub Actions 워크플로를 통해 \`${targetModel}\` 모델로 자동 생성되었습니다.*`;
