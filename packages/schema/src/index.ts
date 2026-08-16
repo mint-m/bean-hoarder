@@ -48,7 +48,7 @@ export const BEAN_FIELDS = [
   { column: "memo", csv: "MEMO" },
   { column: "source_url", csv: "SOURCE_URL" },
   // 시그니쳐·블렌드 네이밍(예: "푸루티 봉봉") — 값이 있으면 라벨/카드 헤드라인의 국가+지역 자동
-  // 조합을 대체한다(@bnhd/label buildHeadline). 선택 항목이라 required 없음. CSV 하위호환을 위해
+  // 조합을 대체한다(./headline buildHeadline). 선택 항목이라 required 없음. CSV 하위호환을 위해
   // 배열 맨 끝에 둔다(기존 백업엔 이 열이 없어도 import가 이름 기준 매핑으로 빈 값 처리).
   { column: "coffee_name", csv: "COFFEE_NAME" },
 ] as const satisfies readonly BeanFieldDef[];

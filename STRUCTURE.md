@@ -12,14 +12,6 @@
 | 경로 | 역할 |
 |---|---|
 | `public/admin/` | 랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다. |
-| `public/deck.html` | 내 원두 덱 |
-| `public/headline.js` | 카드/조회 헤드라인(메인 식별자) 조합. |
-| `public/index.html` | 원두 조회 |
-| `public/lab.css` | Bean-Hoarder LAB(스튜디오) 전용 스타일 — 공용 토큰은 theme.css |
-| `public/origin-color.js` | 산지(ORIGIN)별 카드 색상 코딩. |
-| `public/session.js` | 세션 저장·이행 공용 모듈 (deck.html과 랩이 공유 — 일반 스크립트, window.bhSession 노출). |
-| `public/theme.css` | 공용 디자인 토큰 & 기본 컴포넌트 (index / admin 공유) 컨셉: 모바일 보딩패스/월렛 — 화이트·블랙 베이스 + 포인트 컬러 하나 |
-| `public/vendor/jsQR.js` | 카메라 QR 디코딩 라이브러리 (서드파티 — CDN 대신 저장소에 포함). |
 
 **서버** — Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.
 
@@ -32,10 +24,12 @@
 | 경로 | 역할 |
 |---|---|
 | `apps/lab/`<br>`@bnhd/lab` | 랩(등록·관리 화면)의 React 진입점 — base /admin/으로 빌드되어 public/admin에 올라간다. |
+| `apps/web/`<br>`@bnhd/web` | — |
 | `packages/api/`<br>`@bnhd/api` | Bean-Hoarder v2 API — Hono 앱 (Cloudflare Pages Functions에 마운트). |
 | `packages/autofill/`<br>`@bnhd/autofill` | 붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서. |
 | `packages/label/`<br>`@bnhd/label` | 라벨 렌더러 단일 모듈 (@bnhd/label) 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거). |
 | `packages/schema/`<br>`@bnhd/schema` | Bean-Hoarder 도메인 스키마 — 원두 필드의 단일 소스(single source of truth). |
+| `packages/session/`<br>`@bnhd/session` | 세션 저장·이행 — 조회·덱(@bnhd/web)과 랩(@bnhd/lab)이 공유하는 단일 소스. |
 
 **D1 스키마** — 새 환경은 schema.sql 하나로 만들고, 기존 DB에는 migrate_*.sql을 순서대로 적용한다.
 
@@ -58,6 +52,7 @@
 
 | 경로 | 역할 |
 |---|---|
+| `e2e/routing.spec.ts` | 배포 산출물의 라우팅 계약 — 인쇄된 라벨의 QR이 향하는 경로가 살아 있는지 검증한다. |
 | `e2e/smoke.spec.ts` | 스모크 e2e — 서비스의 핵심 동선이 실제 브라우저에서 끝까지 동작하는지 확인한다. |
 
 **저장소 유지보수** — 문서를 코드에서 파생시키고, 어긋나면 잡아내는 스크립트.

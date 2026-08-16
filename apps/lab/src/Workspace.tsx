@@ -1,6 +1,7 @@
 // 랩 본 화면 — 폼·라벨 디자인·로고·목록·백업의 상태 허브 (구 lab.js의 React 이식).
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
 import { buildLabelSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
+import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BeanFormCard from "./components/BeanFormCard";
 import BeanListCard from "./components/BeanListCard";
@@ -10,7 +11,6 @@ import { api } from "./lib/api";
 import { insertByPriority, loadDesign, saveDesign } from "./lib/design";
 import { capitalizeNoteSegments, dotToIso, download, isoToDot, withUnit } from "./lib/format";
 import { geminiExtract } from "./lib/gemini";
-import type { Account } from "./lib/session";
 import { type BeanPublicRow, emptyForm, type FormKey, type FormState, type StatusLine } from "./types";
 
 const SITE = "https://bnhd.pages.dev";

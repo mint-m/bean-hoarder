@@ -17,6 +17,7 @@ export default defineConfig({
             "packages/label/test/**/*.test.mjs",
             "packages/autofill/test/**/*.test.mjs",
             "packages/schema/src/**/*.test.ts",
+            "packages/session/src/**/*.test.ts",
             "packages/api/src/**/*.test.ts",
           ],
         },

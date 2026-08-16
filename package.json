@@ -19,8 +19,9 @@
     "check:docs": "node scripts/check-docs.mjs",
     "check": "npm run lint && npm run typecheck && npm run test && npm run check:structure && npm run check:docs",
     "check:full": "npm run check && npm run e2e",
-    "e2e": "npm run build --workspace @bnhd/lab && playwright test",
-    "e2e:server": "npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql --persist-to .wrangler-e2e && npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql --persist-to .wrangler-e2e && npx wrangler pages dev public --binding INVITE_CODE=e2e-invite --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 --r2 LOGOS=bnhd-logos --port 8788 --persist-to .wrangler-e2e"
+    "e2e": "npm run build && playwright test",
+    "e2e:server": "npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql --persist-to .wrangler-e2e && npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql --persist-to .wrangler-e2e && npx wrangler pages dev dist --binding INVITE_CODE=e2e-invite --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 --r2 LOGOS=bnhd-logos --port 8788 --persist-to .wrangler-e2e",
+    "build": "npm run build -w @bnhd/web && npm run build -w @bnhd/lab"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

@@ -1,0 +1,34 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# 같은 PR에 연속 push가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# PR 코멘트는 issues API를 쓰지만 PR 대상이면 pull-requests:write로 충분하다 (issues:write 불필요).
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Dependabot 등의 자동 PR은 필요에 따라 건너뛰거나 실행할 수 있음
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Run AI Review
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # 비워 두면 스크립트가 ListModels로 사용 가능한 모델을 동적 탐색한다 (vars.GEMINI_MODEL로 고정 가능).
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node .github/scripts/ai-review.mjs

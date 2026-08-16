@@ -1,5 +1,8 @@
 // Bean-Hoarder — 라벨 렌더러 단일 모듈 (@bnhd/label)
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
+// 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다 —
+// 라벨은 SVG라 대소문자 CSS가 없으므로 렌더 시점에 직접 .toUpperCase()를 건다.
+import { buildHeadline, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
 //
@@ -287,48 +290,6 @@ function specCell(S, x, y, label, value, size, ink) {
   );
 }
 
-// 라벨 인쇄용 축약: 괄호 속 상세 설명("Washed (36 hours ...)" 등)은
-// QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
-const stripParen = (s) => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
-
-// ── 헤드라인(메인 식별자) 조합 ─────────────────────────────
-// 국가만으로는 비슷한 원두 구분이 어려워, 국가 + 가장 세부 장소 1개를 조합해 변별력을 높인다.
-// 장소 앵커 우선순위(가장 구체적 순): 워싱스테이션 > 생산자 > 지역. 랏(LOT)은 번호만으론 단독
-// 식별이 어려워 앵커 뒤에 보조로만 덧붙인다. 시그니쳐/블렌드명(COFFEE_NAME)이 있으면 그대로 대체.
-// 국가·장소엔 stripParen을 적용 — "블렌드 (여러 원산지 혼합)" → "블렌드".
-// deck.html·index.html의 bhHeadline(public/headline.js)이 이 규칙과 동일해야 한다.
-export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"];
-
-function headlinePlaceKey(row) {
-  for (const k of HEADLINE_PLACE_ORDER) {
-    if (stripParen((row[k] || "").trim())) return k;
-  }
-  return null;
-}
-
-export function buildHeadline(row) {
-  const g = (k) => stripParen((row[k] || "").trim());
-  const name = (row.COFFEE_NAME || "").trim();
-  if (name) return name.toUpperCase();
-  const pk = headlinePlaceKey(row);
-  const parts = [g("ORIGIN"), pk ? g(pk) : ""].filter(Boolean);
-  let head = parts.join(" ");
-  const lot = g("LOT");
-  if (lot) head = head ? `${head} · ${lot}` : lot;
-  return head.toUpperCase();
-}
-
-// 헤드라인이 이미 소비한 부제목 후보 필드 — 중복 표시를 막는다.
-// COFFEE_NAME 오버라이드 시엔 장소·랏을 헤드라인이 쓰지 않으므로 빈 배열(부제목에 그대로 노출).
-export function headlineUsedFields(row) {
-  if ((row.COFFEE_NAME || "").trim()) return [];
-  const used = [];
-  const pk = headlinePlaceKey(row);
-  if (pk) used.push(pk);
-  if (stripParen((row.LOT || "").trim())) used.push("LOT");
-  return used;
-}
-
 // 스펙 그리드를 줄 단위로 배치: 값이 칸 절반 폭에 들어가면 2열 한 줄, 넘치면 그 항목만
 // 전체 폭으로 단독 줄(최대 2줄 랩)을 차지한다 — 말줄임(…)으로 잘리는 대신 줄바꿈으로 전문을 보존한다.
 function layoutSpecRows(list, specValueSize, S, fullMaxW) {
@@ -415,7 +376,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
   // 국가 단독이 아니라 국가+세부장소[+랏] 조합(또는 시그니쳐/블렌드명)으로 변별력을 높인다.
   let yCur;
-  const origin = buildHeadline(row);
+  const origin = buildHeadline(row).toUpperCase();
   if (portrait) {
     const headLines = wrapN(origin, headlineSize, 0.68, headMax, S.headMaxLines || 2);
     let hy = S.headY;

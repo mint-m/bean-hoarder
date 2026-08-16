@@ -1,7 +1,8 @@
 // 인증 화면 — 로그인 / 가입 / 계정 복구 + 복구키 1회 표시 모달.
+
+import { type Account, saveSession } from "@bnhd/session";
 import { useState } from "react";
 import { copyText, download } from "./lib/format";
-import { type Account, saveSession } from "./lib/session";
 
 type Tab = "login" | "signup" | "recover";
 
