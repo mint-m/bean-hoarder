@@ -3,7 +3,7 @@
 //
 // 동작 원리:
 // 1. GitHub API를 통해 PR 메타데이터와 diff를 가져온다.
-// 2. 프로젝트 특화 규칙(SSOT, Cloudflare Pages 폴백, XSS/SQLi 보안)을 주입한 프롬프트로 Gemini 2.5 Flash를 호출한다.
+// 2. 프로젝트 특화 규칙(SSOT, Cloudflare Pages 폴백, XSS/SQLi 보안)을 주입한 프롬프트로 Gemini API를 호출한다(모델은 동적 선택).
 // 3. 생성된 리뷰를 PR 코멘트로 등록하거나 기존 리뷰 코멘트를 갱신한다.
 
 import { execFileSync } from "node:child_process";
@@ -70,7 +70,9 @@ async function main() {
         !header.includes("vendor/")
       );
     })
-    .join("diff --git ");
+    // split이 떼어낸 "diff --git " 접두를 각 청크에 도로 붙인다 — 첫 파일도 접두를 잃지 않도록.
+    .map((chunk) => `diff --git ${chunk}`)
+    .join("");
 
   if (cleanDiff.length > 25000) {
     cleanDiff = cleanDiff.slice(0, 25000) + "\n\n...(diff가 길어 주요 파일 내용만 요약 전달되었습니다)...";
@@ -82,10 +84,10 @@ async function main() {
 
   if (!targetModel) {
     try {
-      const listRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-        { headers: { "User-Agent": "bean-hoarder-ai-reviewer" } },
-      );
+      // 키는 URL 쿼리(?key=) 대신 헤더로 보낸다 — URL이 에러 텍스트·프록시 로그로 새지 않도록.
+      const listRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+        headers: { "x-goog-api-key": apiKey, "User-Agent": "bean-hoarder-ai-reviewer" },
+      });
       if (listRes.ok) {
         const listData = await listRes.json();
         const available = (listData.models || [])
@@ -175,10 +177,10 @@ ${cleanDiff}
 
   for (const model of modelsToTry) {
     console.log(`🤖 Gemini API (${model}) 호출 시도 중...`);
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const res = await fetch(geminiUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -221,13 +223,17 @@ ${reviewText}
 
   // 3. 기존 코멘트 검색 후 갱신(Update) 또는 신규 등록(Create)
   console.log("💬 PR 코멘트 등록/갱신 중...");
-  const commentsRes = await fetch(`https://api.github.com/repos/${repo}/issues/${prNumber}/comments`, {
-    headers: {
-      Authorization: `Bearer ${githubToken}`,
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "bean-hoarder-ai-reviewer",
+  // per_page=100: 봇의 기존 코멘트가 첫 페이지(기본 30개) 밖으로 밀려 중복 생성되는 것을 줄인다.
+  const commentsRes = await fetch(
+    `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`,
+    {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "bean-hoarder-ai-reviewer",
+      },
     },
-  });
+  );
 
   let existingCommentId = null;
   if (commentsRes.ok) {
@@ -270,7 +276,9 @@ ${reviewText}
 }
 
 main().catch((err) => {
-  console.warn("⚠️ AI PR Review 실행 중 오류 발생 (키 권한/쿼터 확인 필요):", err.message || err);
-  // CI 전체가 깨지지 않도록 정상 종료 처리
+  const msg = (err?.message || String(err)).replace(/\r?\n/g, " ");
+  // 리뷰는 보조 기능이라 CI를 깨뜨리진 않되, 침묵하지 않도록 Actions 요약에 경고를 남긴다.
+  // (전면 실패가 exit 0으로 조용히 묻히면 리뷰가 멈춘 것을 아무도 모른다.)
+  console.log(`::warning title=AI PR Review 실패::${msg} — 키 권한/쿼터/모델명을 확인하세요.`);
   process.exit(0);
 });

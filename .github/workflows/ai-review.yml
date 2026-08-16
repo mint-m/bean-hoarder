@@ -4,10 +4,15 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# 같은 PR에 연속 push가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# PR 코멘트는 issues API를 쓰지만 PR 대상이면 pull-requests:write로 충분하다 (issues:write 불필요).
 permissions:
   contents: read
   pull-requests: write
-  issues: write
 
 jobs:
   review:
@@ -21,7 +26,8 @@ jobs:
       - name: Run AI Review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.7-flash' }}
+          # 비워 두면 스크립트가 ListModels로 사용 가능한 모델을 동적 탐색한다 (vars.GEMINI_MODEL로 고정 가능).
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
