@@ -9,7 +9,6 @@
 import { execFileSync } from "node:child_process";
 
 const BOT_SIGNATURE = "<!-- ai-pr-review-bot -->";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
 async function main() {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -63,7 +62,35 @@ async function main() {
     diff = diff.slice(0, 60000) + "\n\n...(diff가 너무 길어 뒷부분이 생략되었습니다)...";
   }
 
-  // 2. Gemini API 호출
+  // 2. 사용할 Gemini 모델 결정 (ListModels API로 지원 모델 동적 탐색)
+  console.log("🤖 사용할 Gemini 모델 확인 중...");
+  let targetModel = process.env.GEMINI_MODEL;
+
+  if (!targetModel) {
+    try {
+      const listRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+        { headers: { "User-Agent": "bean-hoarder-ai-reviewer" } },
+      );
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const available = (listData.models || [])
+          .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+          .map((m) => m.name.replace(/^models\//, ""));
+
+        console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
+        // flash 계열 우선, 없으면 첫 번째 지원 모델
+        const flashModel = available.find((m) => m.includes("flash") && !m.includes("vision"));
+        targetModel = flashModel || available[0];
+      }
+    } catch (e) {
+      console.warn("⚠️ 모델 목록 조회 실패, 기본 fallback 사용:", e);
+    }
+  }
+
+  targetModel = targetModel || "gemini-1.5-flash-latest";
+  console.log(`🎯 선택된 모델: ${targetModel}`);
+
   console.log("🤖 Gemini API에 코드 리뷰 요청 중...");
   const prompt = `당신은 Bean-Hoarder 프로젝트의 시니어 풀스택 코드 리뷰어입니다.
 제출된 Pull Request의 제목, 설명, git diff를 분석하고 건설적이고 명확한 한국어 코드 리뷰를 작성해 주세요.
@@ -98,7 +125,7 @@ ${diff}
 
 리뷰는 친절하고 전문적인 톤으로 작성해 주세요.`;
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
   const aiRes = await fetch(geminiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -126,7 +153,7 @@ ${diff}
 ${reviewText}
 
 ---
-*이 리뷰는 GitHub Actions 워크플로를 통해 \`${GEMINI_MODEL}\` 모델로 자동 생성되었습니다.*`;
+*이 리뷰는 GitHub Actions 워크플로를 통해 \`${targetModel}\` 모델로 자동 생성되었습니다.*`;
 
   // 3. 기존 코멘트 검색 후 갱신(Update) 또는 신규 등록(Create)
   console.log("💬 PR 코멘트 등록/갱신 중...");
