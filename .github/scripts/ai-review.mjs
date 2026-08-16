@@ -79,9 +79,20 @@ async function main() {
           .map((m) => m.name.replace(/^models\//, ""));
 
         console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // flash 계열 우선, 없으면 첫 번째 지원 모델
-        const flashModel = available.find((m) => m.includes("flash") && !m.includes("vision"));
-        targetModel = flashModel || available[0];
+        // 최신 Flash 모델 우선순위
+        const preferredModels = [
+          "gemini-3.7-flash",
+          "gemini-flash-latest",
+          "gemini-3.6-flash",
+          "gemini-3.5-flash",
+        ];
+        targetModel = preferredModels.find((m) => available.includes(m));
+        if (!targetModel) {
+          targetModel = available.find(
+            (m) => m.includes("flash") && !m.includes("2.5") && !m.includes("vision"),
+          );
+        }
+        targetModel = targetModel || available[0];
       }
     } catch (e) {
       console.warn("⚠️ 모델 목록 조회 실패, 기본 fallback 사용:", e);
