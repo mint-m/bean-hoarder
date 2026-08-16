@@ -171,23 +171,25 @@ async function main() {
           .map((m) => m.name.replace(/^models\//, ""));
 
         console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // 모델 탐색 우선순위 (gemini-3.7-flash 최우선)
+        // 모델 탐색 우선순위 — 코드 리뷰 품질을 위해 고성능(pro)을 먼저, 가용성 폴백으로 flash를 뒤에 둔다.
         const preferredModels = [
+          "gemini-3.1-pro-preview",
+          "gemini-pro-latest",
+          "gemini-2.5-pro",
           "gemini-3.7-flash",
           "gemini-3.6-flash",
           "gemini-3.5-flash",
           "gemini-flash-latest",
-          "gemini-3.1-pro-preview",
           "gemini-2.5-flash-lite",
-          "gemini-3.5-flash-lite",
-          "gemini-3.1-flash-lite",
           "gemini-flash-lite-latest",
         ];
         targetModel = preferredModels.find((m) => available.includes(m));
         if (!targetModel) {
-          targetModel = available.find(
-            (m) => m.includes("flash") && !m.includes("2.5-flash") && !m.includes("vision"),
-          );
+          // 목록에 없으면 pro > flash 순으로, 이미지·비전 전용 모델은 제외하고 고른다.
+          const usable = (m) => !m.includes("image") && !m.includes("vision");
+          targetModel =
+            available.find((m) => m.includes("pro") && usable(m)) ||
+            available.find((m) => m.includes("flash") && usable(m));
         }
         targetModel = targetModel || available[0];
       }
@@ -196,7 +198,7 @@ async function main() {
     }
   }
 
-  targetModel = targetModel || "gemini-3.7-flash";
+  targetModel = targetModel || "gemini-3.1-pro-preview";
   console.log(`🎯 선택된 모델: ${targetModel}`);
 
   console.log("🤖 Gemini API에 코드 리뷰 요청 중...");
@@ -238,16 +240,17 @@ ${cleanDiff}
 
 설명은 친절하고 전문적인 한국어로 작성한다.`;
 
+  // targetModel(고성능 우선 선택) 먼저, 이후 pro > flash 순 폴백 — 하나가 5xx/429여도 다음으로 넘어간다.
   const candidateModels = [
     targetModel,
+    "gemini-3.1-pro-preview",
+    "gemini-pro-latest",
+    "gemini-2.5-pro",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-3.1-pro-preview",
     "gemini-2.5-flash-lite",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
     "gemini-flash-lite-latest",
   ];
   const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
