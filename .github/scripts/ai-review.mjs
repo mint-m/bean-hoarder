@@ -93,14 +93,17 @@ async function main() {
           .map((m) => m.name.replace(/^models\//, ""));
 
         console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // flash-lite 및 가벼운 flash 모델 우선순위 (무료 티어 토큰 한도 준수)
+        // 모델 탐색 우선순위 (gemini-3.7-flash 최우선)
         const preferredModels = [
+          "gemini-3.7-flash",
+          "gemini-3.6-flash",
+          "gemini-3.5-flash",
+          "gemini-flash-latest",
+          "gemini-3.1-pro-preview",
           "gemini-2.5-flash-lite",
           "gemini-3.5-flash-lite",
           "gemini-3.1-flash-lite",
           "gemini-flash-lite-latest",
-          "gemini-3.5-flash",
-          "gemini-flash-latest",
         ];
         targetModel = preferredModels.find((m) => available.includes(m));
         if (!targetModel) {
@@ -115,7 +118,7 @@ async function main() {
     }
   }
 
-  targetModel = targetModel || "gemini-1.5-flash-latest";
+  targetModel = targetModel || "gemini-3.7-flash";
   console.log(`🎯 선택된 모델: ${targetModel}`);
 
   console.log("🤖 Gemini API에 코드 리뷰 요청 중...");
@@ -154,12 +157,15 @@ ${cleanDiff}
 
   const candidateModels = [
     targetModel,
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-pro-preview",
     "gemini-2.5-flash-lite",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
     "gemini-flash-lite-latest",
-    "gemini-3.5-flash",
-    "gemini-flash-latest",
   ];
   const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
 
