@@ -136,21 +136,51 @@ ${diff}
 
 리뷰는 친절하고 전문적인 톤으로 작성해 주세요.`;
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
-  const aiRes = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-      },
-    }),
-  });
+  const candidateModels = [
+    targetModel,
+    "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-pro-latest",
+    "gemma-4-31b-it",
+  ];
+  const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
 
-  if (!aiRes.ok) {
-    throw new Error(`Gemini API 호출 실패: ${aiRes.status} ${await aiRes.text()}`);
+  let aiRes = null;
+  let usedModel = null;
+  let lastError = null;
+
+  for (const model of modelsToTry) {
+    console.log(`🤖 Gemini API (${model}) 호출 시도 중...`);
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const res = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+        },
+      }),
+    });
+
+    if (res.ok) {
+      aiRes = res;
+      usedModel = model;
+      console.log(`✅ ${model} 모델로 성공적인 응답을 받았습니다.`);
+      break;
+    } else {
+      const errText = await res.text();
+      console.warn(`⚠️ 모델 ${model} 실패 (${res.status}): ${errText}`);
+      lastError = `${res.status} ${errText}`;
+    }
   }
+
+  if (!aiRes || !usedModel) {
+    throw new Error(`모든 Gemini 모델 호출 실패. 마지막 오류: ${lastError}`);
+  }
+
+  targetModel = usedModel;
 
   const aiData = await aiRes.json();
   const reviewText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
