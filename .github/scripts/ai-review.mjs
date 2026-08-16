@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 
 const BOT_SIGNATURE = "<!-- ai-pr-review-bot -->";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
 async function main() {
   const apiKey = process.env.GEMINI_API_KEY;
