@@ -264,6 +264,7 @@ ${reviewText}
 }
 
 main().catch((err) => {
-  console.error("❌ AI PR Review 실행 중 오류 발생:", err);
-  process.exit(1);
+  console.warn("⚠️ AI PR Review 실행 중 오류 발생 (키 권한/쿼터 확인 필요):", err.message || err);
+  // CI 전체가 깨지지 않도록 정상 종료 처리
+  process.exit(0);
 });
