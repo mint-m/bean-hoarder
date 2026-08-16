@@ -57,9 +57,23 @@ async function main() {
   }
   let diff = await diffRes.text();
 
-  // 너무 거대한 diff는 적정선(60KB)으로 자르고 요약 안내 첨부
-  if (diff.length > 60000) {
-    diff = diff.slice(0, 60000) + "\n\n...(diff가 너무 길어 뒷부분이 생략되었습니다)...";
+  // lockfile, 거대 삭제 청크 등 불필요한 diff 제외 및 크기 축소 (무료 티어 토큰 한도 보호)
+  let cleanDiff = diff
+    .split(/^diff --git /m)
+    .filter((chunk) => {
+      if (!chunk) return false;
+      const header = chunk.split("\n")[0] || "";
+      return (
+        !header.includes("package-lock.json") &&
+        !header.includes("pnpm-lock.yaml") &&
+        !header.includes("yarn.lock") &&
+        !header.includes("vendor/")
+      );
+    })
+    .join("diff --git ");
+
+  if (cleanDiff.length > 25000) {
+    cleanDiff = cleanDiff.slice(0, 25000) + "\n\n...(diff가 길어 주요 파일 내용만 요약 전달되었습니다)...";
   }
 
   // 2. 사용할 Gemini 모델 결정 (ListModels API로 지원 모델 동적 탐색)
@@ -79,17 +93,19 @@ async function main() {
           .map((m) => m.name.replace(/^models\//, ""));
 
         console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // 최신 Flash 모델 우선순위
+        // flash-lite 및 가벼운 flash 모델 우선순위 (무료 티어 토큰 한도 준수)
         const preferredModels = [
-          "gemini-3.7-flash",
-          "gemini-flash-latest",
-          "gemini-3.6-flash",
+          "gemini-2.5-flash-lite",
+          "gemini-3.5-flash-lite",
+          "gemini-3.1-flash-lite",
+          "gemini-flash-lite-latest",
           "gemini-3.5-flash",
+          "gemini-flash-latest",
         ];
         targetModel = preferredModels.find((m) => available.includes(m));
         if (!targetModel) {
           targetModel = available.find(
-            (m) => m.includes("flash") && !m.includes("2.5") && !m.includes("vision"),
+            (m) => m.includes("flash") && !m.includes("2.5-flash") && !m.includes("vision"),
           );
         }
         targetModel = targetModel || available[0];
@@ -124,7 +140,7 @@ ${prData.body || "(설명 없음)"}
 
 ## Git Diff
 \`\`\`diff
-${diff}
+${cleanDiff}
 \`\`\`
 
 ## 리뷰 출력 형식 가이드
@@ -138,11 +154,12 @@ ${diff}
 
   const candidateModels = [
     targetModel,
-    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-3.5-flash",
-    "gemini-3.6-flash",
-    "gemini-pro-latest",
-    "gemma-4-31b-it",
+    "gemini-flash-latest",
   ];
   const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
 
