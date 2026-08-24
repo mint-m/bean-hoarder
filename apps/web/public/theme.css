@@ -86,6 +86,11 @@ body {
   background: var(--bg);
   color: var(--ink);
   line-height: 1.55;
+  /* 한국어는 어절 단위로 끊는다. 브라우저 기본값(word-break: normal)은 한글을 글자 단위로 끊어
+     "커뮤니티"가 "커 / 뮤니티"로 갈라진다 — 읽는 리듬이 깨지므로 keep-all이 맞다.
+     대신 한 덩어리가 줄보다 길면(긴 URL·KEY 등) 넘치지 않게 그때만 강제로 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 a {

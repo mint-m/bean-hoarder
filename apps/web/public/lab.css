@@ -6,10 +6,23 @@
 
 body {
   padding: 0 var(--sp-4) 96px;
+  /* 톱바 아래 남는 공간을 본문이 차지해야 세로 위치를 잡을 수 있다 */
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+/* React 마운트 지점 — 여기서 높이를 끊으면 아래 본문이 남는 공간을 물려받지 못한다 */
+#root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
   max-width: 640px;
+  /* body가 flex 컨테이너라 auto 여백이 stretch를 이긴다 — width를 주지 않으면 내용 너비로 줄어
+     본문과 좌우가 어긋난다 */
+  width: 100%;
   margin: 0 auto;
   padding: 18px 2px 14px;
   display: flex;
@@ -121,10 +134,25 @@ body {
 /* ---- 화면(스테이지): 한 번에 한 맥락만 ---- */
 .flow {
   max-width: 640px;
+  width: 100%;
   margin: 0 auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+}
+/* 본문을 세로 40% 지점에 — 정확히 가운데보다 살짝 위가 시선에 안정적이다(조회 페이지와 같은 규칙).
+   위:아래 = 2:3 스페이서. 내용이 길어지면 스페이서가 0으로 줄어 그냥 아래로 자라므로 잘리지 않는다.
+   덱은 예외다 — 카드가 쌓이는 목록이라 상단 정렬이 자연스럽다. */
+.flow::before,
+.auth-view::before {
+  content: "";
+  flex: 2;
+}
+.flow::after,
+.auth-view::after {
+  content: "";
+  flex: 3;
 }
 /* 화면 머리의 되돌아가기 — 브라우저 뒤로가기와 같은 곳으로 간다 */
 .stage-head {
@@ -762,7 +790,11 @@ input.upper {
 /* 로그인·가입·복구 — 입력이 두어 칸뿐이라 본 화면(640px)만큼 넓으면 가로로 늘어져 보인다 */
 .auth-view {
   max-width: 400px;
-  margin: 24px auto 0;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 /* 좁은 폭에서는 두 칸을 나란히 두면 각 칸이 너무 좁아진다 — 세로로 쌓는다 */
 .auth-view .row2 {

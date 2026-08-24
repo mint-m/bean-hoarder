@@ -23,7 +23,12 @@
 <link rel="stylesheet" href="/theme.css">
 <style>
   body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 22px 16px 32px; }
-  main { width: 100%; max-width: 430px; flex: 1; }
+  /* 카드를 세로 40% 지점에 — 정확히 가운데보다 살짝 위가 시선에 안정적이다.
+     위:아래 = 2:3 스페이서로 남는 공간을 나눈다. 콘텐츠가 화면보다 길어지면 스페이서가 0으로
+     줄어들어 그냥 아래로 자란다 — 가운데 정렬에서 흔한 "위가 잘리는" 문제가 생기지 않는다. */
+  main { width: 100%; max-width: 430px; flex: 1; display: flex; flex-direction: column; }
+  main::before { content: ""; flex: 2; }
+  main::after { content: ""; flex: 3; }
   .brand {
     display: inline-block; font-family: var(--display); font-weight: 700; font-size: 12px;
     letter-spacing: .22em; color: var(--sub); text-decoration: none; margin: 0 0 14px 2px;
@@ -78,6 +83,8 @@
   /* 부가 스펙(가공·품종·고도…)은 행이 아니라 한 줄 텍스트로 — 티켓 행과 위계를 가른다 */
   .specline { margin: 12px 0 0; font-size: 12.5px; color: var(--sub); line-height: 1.7; }
   .specline b { color: var(--ink); font-weight: 600; }
+  /* 라벨+값을 한 덩어리로 — 줄바꿈은 항목과 항목 사이(·)에서만 일어난다 */
+  .spec-pair { white-space: nowrap; }
   .specline .sep { padding: 0 6px; }
 
   /* 절취선 + 노치 */

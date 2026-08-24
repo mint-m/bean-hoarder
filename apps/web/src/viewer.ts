@@ -229,7 +229,8 @@ function render(row: HeadlineRow, isPreview: boolean): void {
   for (const [col, label] of SPEC_FIELDS) {
     if (usedInHead.includes(col)) continue;
     const v = g(col);
-    if (v) specParts.push(`<b>${label}</b> ${escapeHtml(v)}`);
+    // 라벨과 값은 한 덩어리다 — 묶지 않으면 "ALTITUDE"와 "2100m"이 서로 다른 줄로 갈린다
+    if (v) specParts.push(`<span class="spec-pair"><b>${label}</b> ${escapeHtml(v)}</span>`);
   }
   const specline = el("f-specline");
   specline.classList.toggle("hidden", !specParts.length);
