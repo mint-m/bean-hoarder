@@ -561,6 +561,55 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   return { svg, content, moduleCount: n, W, H };
 }
 
+// ── QR 단독 (라벨 없이 QR만) ──────────────────────────────────
+// 라벨 레이아웃은 쓰는 사람마다 다르고 프린터 호환도 보장할 수 없다. 그래서 서비스가 책임지는 산출물은
+// "어떤 라벨 소프트웨어에 얹어도 스캔되는 QR"이고, 그 인쇄 기하를 여기서 라벨과 같은 근거로 만든다.
+// (랩에 복제하지 않는 이유 — BASE_URL·DOT·인코딩 모드가 갈라지면 인쇄된 라벨과 어긋난다.)
+
+/** 모듈당 도트 수 선택지 — DOT의 정수배라야 203dpi에서 모듈 경계가 픽셀에 정확히 떨어진다. */
+export const QR_DOT_OPTIONS = [3, 4, 5];
+
+/**
+ * 콰이엇존(여백) 모듈 수.
+ *
+ * QR 규격(ISO/IEC 18004)은 4모듈을 요구하지만, 이 이미지는 **라벨 위에 얹는 부품**이다 —
+ * 라벨의 흰 바탕이 나머지 여백을 대신해 주므로 이미지 자체는 2모듈만 갖는다. 4모듈로 내보내면
+ * 배치할 때 눈에 보이는 여백이 과해 라벨 레이아웃이 불편해진다.
+ * **전제**: QR 주변은 흰색이어야 한다. 어두운 배경·테두리에 바로 붙이면 스캔이 깨질 수 있다.
+ */
+const QR_QUIET_MODULES = 2;
+
+/**
+ * 인쇄용 QR 단독 SVG.
+ * @param {string} key 라벨 KEY (`{유저코드4}{연도2}-{순번3}`)
+ * @param {number} dots 모듈당 도트 수 (QR_DOT_OPTIONS)
+ * @returns {{svg:string, content:string, moduleCount:number, codeSize:number, size:number}}
+ *   codeSize = QR 자체 한 변(mm), size = 콰이엇존 포함 전체(mm)
+ */
+export function buildQrSVG(key, dots = 3) {
+  const k = String(key || "").toUpperCase();
+  const content = `${BASE_URL}/${k}`;
+  const qr = qrcode(0, "M");
+  qr.addData(content, "Alphanumeric");
+  qr.make();
+  const n = qr.getModuleCount();
+  const module = dots * DOT;
+  const quiet = QR_QUIET_MODULES * module;
+  const codeSize = module * n;
+  const size = codeSize + quiet * 2;
+
+  let rects = "";
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (qr.isDark(r, c)) {
+        rects += `<rect x="${(quiet + c * module).toFixed(4)}" y="${(quiet + r * module).toFixed(4)}" width="${module.toFixed(4)}" height="${module.toFixed(4)}" fill="#000"/>`;
+      }
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}mm" height="${size}mm" viewBox="0 0 ${size} ${size}">\n<rect width="${size}" height="${size}" fill="#fff"/>\n${rects}\n</svg>`;
+  return { svg, content, moduleCount: n, codeSize, size };
+}
+
 function b64EncodeUnicode(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(`0x${p1}`)));
 }

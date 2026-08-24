@@ -3,7 +3,16 @@
 // (renderCanvas/verifyQr는 브라우저 전용 — 라이브에서 렌더링 때마다 자동 실행됨).
 
 import assert from "node:assert/strict";
-import { BASE_URL, buildLabelSVG, DEFAULT_DESIGN, SIZE_SPECS, SPEC_POOL, SUB_POOL } from "@bnhd/label";
+import {
+  BASE_URL,
+  buildLabelSVG,
+  buildQrSVG,
+  DEFAULT_DESIGN,
+  QR_DOT_OPTIONS,
+  SIZE_SPECS,
+  SPEC_POOL,
+  SUB_POOL,
+} from "@bnhd/label";
 import { test } from "vitest";
 
 const ROW = {
@@ -267,4 +276,55 @@ test("노트 우선: 스펙이 공간을 다 채워도 노트(2순위)는 보장
   const { svg } = buildLabelSVG(row, d);
   assert.ok(/font-style="italic"/.test(svg), "공간이 빡빡해도 노트는 항상 표시된다");
   assert.ok(svg.includes("Jasmine"), "노트 내용이 라벨에 존재");
+});
+
+// ── QR 단독(buildQrSVG) ──────────────────────────────────────
+// 인쇄 정합이 이 함수의 존재 이유다: 모듈 경계가 203dpi 도트 격자(0.125mm)에 정확히 떨어져야
+// 감열 출력에서 모듈이 뭉개지지 않는다. 실제 디코드(verifyQr)는 캔버스가 필요해 브라우저에서 돈다.
+const DOT = 0.125;
+
+test("QR 단독: 내용은 라벨과 같은 규칙(BASE_URL/KEY, 대문자)", () => {
+  const { content } = buildQrSVG("test26-001");
+  assert.equal(content, `${BASE_URL}/TEST26-001`, "소문자로 넣어도 대문자 경로형 URL");
+  const fromLabel = buildLabelSVG(ROW, designFor("40x20")).content;
+  assert.equal(buildQrSVG(ROW.KEY).content, fromLabel, "라벨이 굽는 QR과 같은 내용");
+});
+
+test("QR 단독: 모든 모듈이 도트 격자(0.125mm)에 정렬된다", () => {
+  for (const dots of QR_DOT_OPTIONS) {
+    const { svg } = buildQrSVG("TEST26-001", dots);
+    const coords = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/g)];
+    assert.ok(coords.length > 0, `dots=${dots}: 모듈이 그려짐`);
+    for (const [, x, y, w] of coords) {
+      for (const v of [x, y, w]) {
+        const ratio = Number(v) / DOT;
+        assert.ok(
+          Math.abs(ratio - Math.round(ratio)) < 1e-6,
+          `dots=${dots}: ${v}mm 가 도트 격자의 정수배가 아님`,
+        );
+      }
+    }
+  }
+});
+
+test("QR 단독: 콰이엇존 2모듈이 이미지에 포함된다 (나머지는 라벨의 흰 바탕이 맡는다)", () => {
+  for (const dots of QR_DOT_OPTIONS) {
+    const { svg, codeSize, size, moduleCount } = buildQrSVG("TEST26-001", dots);
+    const module = dots * DOT;
+    assert.equal(codeSize, module * moduleCount, `dots=${dots}: QR 한 변 = 모듈 × 개수`);
+    assert.equal(size, codeSize + 2 * (2 * module), `dots=${dots}: 전체 = QR + 콰이엇존 양쪽 2모듈`);
+    assert.ok(svg.includes(`viewBox="0 0 ${size} ${size}"`), `dots=${dots}: viewBox가 전체 크기`);
+    // 첫 모듈(항상 좌상단 파인더 패턴)이 콰이엇존만큼 안쪽에서 시작해야 한다
+    const first = /<rect x="([\d.]+)" y="([\d.]+)"/.exec(svg);
+    assert.equal(Number(first[1]), 2 * module, `dots=${dots}: 좌측 콰이엇존 확보`);
+    assert.equal(Number(first[2]), 2 * module, `dots=${dots}: 상단 콰이엇존 확보`);
+  }
+});
+
+test("QR 단독: 도트 옵션이 커질수록 인쇄 크기가 커진다 (선택지가 실제로 다른 크기)", () => {
+  const sizes = QR_DOT_OPTIONS.map((d) => buildQrSVG("TEST26-001", d).codeSize);
+  for (let i = 1; i < sizes.length; i++) {
+    assert.ok(sizes[i] > sizes[i - 1], `${sizes[i]} > ${sizes[i - 1]}`);
+  }
+  assert.ok(sizes[0] > 8 && sizes[0] < 11, `기본 3도트는 스캔 안정 크기대(약 9.4mm) — 실제 ${sizes[0]}`);
 });
