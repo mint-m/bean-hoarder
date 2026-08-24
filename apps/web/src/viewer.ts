@@ -52,7 +52,12 @@ function showLanding(): void {
   el("code-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const v = el<HTMLInputElement>("code-input").value.trim().toUpperCase();
-    if (v) location.href = `/${encodeURIComponent(v)}`;
+    if (v) {
+      location.href = `/${encodeURIComponent(v)}`;
+    } else {
+      // 입력이 비어있을 때 데모 원두 페이지로 이동
+      location.href = `/DEMO26-001`;
+    }
   });
   setupScanner();
 }
