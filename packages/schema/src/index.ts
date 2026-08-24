@@ -155,9 +155,14 @@ export const signupBodySchema = z
   .object({ invite: z.unknown().optional(), password: looseString.catch("") })
   .catch({ invite: undefined, password: "" });
 
+// admin_key는 데모 관리자 로그인 전용 선택 필드 — 없으면 지금까지와 완전히 같게 동작한다.
 export const loginBodySchema = z
-  .object({ usercode: looseString.catch(""), password: looseString.catch("") })
-  .catch({ usercode: "", password: "" });
+  .object({
+    usercode: looseString.catch(""),
+    password: looseString.catch(""),
+    admin_key: looseString.catch(""),
+  })
+  .catch({ usercode: "", password: "", admin_key: "" });
 
 export const recoverBodySchema = z
   .object({ recovery_key: looseString.catch(""), password: looseString.catch("") })

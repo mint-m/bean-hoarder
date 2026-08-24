@@ -16,6 +16,7 @@ export default defineConfig({
         r2Buckets: ["LOGOS"],
         bindings: {
           INVITE_CODE: "TEST-INVITE",
+          DEMO_ADMIN_KEY: "TEST-DEMO-ADMIN-KEY",
           TEST_SCHEMA_SQL: schemaSql,
         },
       },

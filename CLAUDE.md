@@ -37,7 +37,7 @@ npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler �
 
 # 로컬 개발 서버 (저장소 루트에서)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
@@ -55,7 +55,6 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **API 계약 불변**: 기존 엔드포인트의 요청/응답 형태를 바꾸지 않는다 — 라이브 프론트가 그대로
   동작해야 한다. `packages/api/test/app.test.ts`가 **계약 문서**이므로 상태 코드나 메시지를
   바꾸는 변경은 그 자체로 계약 파괴다. 필요하면 먼저 계획 문서에 기록한다.
-- `db/migrate_drop.sql`은 초기 재생성용 기록 — **실행 금지**.
 - 루트 package.json에는 `"type"`을 선언하지 않는다 — 각 패키지가 자신의 package.json에
   type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루트에 type을 올리려면
   전체 check + e2e로 검증한 뒤에만.)
@@ -76,6 +75,13 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **`db/seed.sql`에는 쓰기 제한이 없는 `TEST` 계정이 있다 — 원격 D1에 실행하지 말 것.** 공개된 `DEMO`는
   서버가 쓰기를 403으로 막지만(`packages/api/src/app.ts`의 `writeAllowed`), TEST는 e2e가 등록 동선을
   끝까지 검증하려고 둔 것이라 제한이 없다. 로컬·e2e DB 전용이다.
+- **데모 카드는 관리자 키로만 고친다.** DEMO는 쓰기가 막혀 있어 평범한 로그인으로는 등록·수정 UI가
+  통하지 않는다. 랩 로그인에서 유저코드 `DEMO`를 넣으면 나타나는 "관리자 키" 칸에 `DEMO_ADMIN_KEY`
+  (Cloudflare secret)를 넣은 세션만 쓰기가 열린다 — 승격은 `packages/api/src/routes/auth.ts`의
+  `login`에서 일어나고 `writeAllowed`가 `user.admin`을 본다. 키가 배포에 없으면 기능 자체가 꺼진다.
+  **공개된 `DEMO`/`0000`만으로는 절대 열리지 않아야 한다** — `packages/api/test/app.test.ts`의
+  "데모 관리자" 테스트 3건이 그 경계를 지킨다. `db/seed.sql`의 데모 원두는 로컬·e2e 전용이라
+  라이브에 반영되지 않는다(원격에 실행 금지 — 위 TEST 계정 항목).
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.
@@ -84,8 +90,12 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   **순서를 바꾸면 랩이 지워진다.** wrangler는 `dist`만 서빙하므로 빌드 전에는 아무것도 안 뜬다.
 - **필드 추가 = `packages/schema`의 BEAN_FIELDS 한 줄 + D1 마이그레이션 SQL.**
   CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되므로 다른 곳은 손댈 필요가 없다.
-- D1 스키마 변경은 **새 `migrate_*.sql` 파일 추가** (기존 파일 수정 금지). 적용 순서는
-  README 운영 섹션에 기록한다 — 원격 D1에 미적용 마이그레이션이 남아 조용히 깨진 전례가 있다.
+- D1 스키마 변경은 **새 `migrate_*.sql` 파일 추가** (기존 파일 수정 금지). 같은 변경을
+  `db/schema.sql`에도 반영한다 — 새 환경은 그 파일 하나로 생성되고, `CREATE TABLE IF NOT EXISTS`는
+  이미 있는 테이블에 컬럼을 더해 주지 않으므로 둘 다 필요하다.
+  **원격에 적용이 끝난 마이그레이션 파일은 지운다**(이력은 git에 남는다) — `db/`에 `migrate_*.sql`이
+  보인다는 것이 곧 "아직 원격에 안 넣었다"는 신호가 되게 한다. 원격 D1에 미적용 마이그레이션이
+  남아 조용히 깨진 전례가 있어, 남아 있는 파일 자체를 그 경보로 쓴다.
 <!-- check-docs:ignore-start -->
 - **`404.html`을 만들지 말 것.** Pages는 매치되는 파일이 없는 경로에 `index.html`을 준다 —
   인쇄된 QR `/{KEY}`가 조회 페이지로 떨어지는 이유가 그것뿐이다. `404.html`이 있으면 그 폴백이
@@ -136,8 +146,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - 생성되지 않는 구간(운영 절차, 이 문서)이 가리키는 경로는 `npm run check:docs`
   (`scripts/check-docs.mjs`)가 실존만 검사한다 — 내용의 옳고 그름은 판단하지 않는다.
 - 이력처럼 **지워진 파일을 일부러 언급해야 하는 구간**은 `check-docs:ignore-start` /
-  `check-docs:ignore-end` HTML 주석으로 감싼다. 지금은 쓰는 곳이 없다 — 이력에서 삭제된 파일
-  언급을 걷어냈기 때문이고, 다시 필요해지면 이 마커를 쓴다.
+  `check-docs:ignore-end` HTML 주석으로 감싼다. 위의 "404 페이지를 만들지 말 것" 항목이 그 예다 —
+  만들면 안 되는 파일이라 실존하지 않는 경로를 일부러 적고 있다.
 - **버전은 코드에 적지 않는다.** 루트 `package.json`은 `private`이라 `version`이 없고, 태그가
   단일 소스다. 버전이 붙는 시점은 `main` 병합이 아니라 **`deploy` 승격**이다 — 절차는
   README "운영"의 "프로덕션 승격 절차"·"릴리스".

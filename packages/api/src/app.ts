@@ -23,7 +23,7 @@
 // 환경변수: INVITE_CODE는 Cloudflare secret으로 관리 (wrangler pages secret put INVITE_CODE)
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { authenticate } from "./auth";
+import { authenticate, DEMO_USERCODE } from "./auth";
 import type { AppEnv } from "./env";
 import { json } from "./lib/http";
 import { login, logout, recoverAccount, signup } from "./routes/auth";
@@ -50,11 +50,14 @@ const authRequired = createMiddleware<AppEnv>(async (c, next) => {
  * 쓰기를 열어 두면 사실상 인증 없는 무제한 계정이 되므로 **둘러보기 전용**으로 막는다.
  * (읽기·목록·백업 내려받기는 그대로 두어 데모의 목적은 유지한다.)
  * 자동 테스트는 이 제한에 걸리면 안 되므로 별도 시드 계정(TEST)을 쓴다 — db/seed.sql 참고.
+ *
+ * 예외는 관리자 세션 하나뿐이다. 운영자가 데모 카드를 앱에서 고칠 수 있어야 하므로,
+ * 로그인 때 DEMO_ADMIN_KEY(Cloudflare secret)를 함께 낸 세션은 통과시킨다 — 공개된 0000으로
+ * 얻은 세션은 admin이 서지 않는다(routes/auth.ts의 login).
  */
-const DEMO_USERCODE = "DEMO";
-
 const writeAllowed = createMiddleware<AppEnv>(async (c, next) => {
-  if (c.get("user").usercode === DEMO_USERCODE) {
+  const user = c.get("user");
+  if (user.usercode === DEMO_USERCODE && !user.admin) {
     return json(
       { ok: false, error: "데모 계정은 둘러보기 전용입니다. 가입하면 바로 등록할 수 있어요." },
       403,

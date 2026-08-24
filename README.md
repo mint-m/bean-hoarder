@@ -95,11 +95,17 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   3. **사용자 셀프 백업** — 각자 랩에서 CSV 내보내기/복원.
   (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
 - **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
-- **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
-  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql` → `migrate_logos_r2.sql` → `migrate_r2_usage.sql` → `migrate_coffee_name.sql` → `migrate_ai_usage.sql`
-  (`migrate_drop.sql`은 초기 재생성용 기록 — 실행 금지)
-  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_logos.sql` (`db/` 아래에 있다)
-- **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=db/seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)
+- **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 `db/` 아래 남아 있는
+  `migrate_*.sql`을 파일명 순서대로 적용한다 — **적용이 끝난 마이그레이션은 지운다**(이력은 git에
+  남는다). 그래서 `db/`에 파일이 보인다는 것 자체가 "원격에 아직 안 넣었다"는 뜻이다.
+  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_session_admin.sql`
+  **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다.
+- **데모 갱신**: 랩 로그인 화면에서 유저코드 `DEMO`를 넣으면 "관리자 키" 칸이 나타난다. 여기에
+  `DEMO_ADMIN_KEY`를 넣고 로그인한 세션만 쓰기가 열려(7일 만료) 평소처럼 등록·수정·삭제할 수 있다.
+  키를 비우고 들어가면 지금까지와 같은 둘러보기 전용 세션이다.
+  키 설정: `npx wrangler pages secret put DEMO_ADMIN_KEY` (충분히 긴 무작위 문자열을 쓴다 —
+  예: `openssl rand -base64 24`). 설정하지 않으면 이 승격 경로 자체가 꺼져 DEMO는 순수 읽기 전용이 된다.
+  `db/seed.sql`의 데모 원두는 로컬·e2e용이다 — TEST 계정이 딸려 있어 **원격에 실행하지 않는다**.
 
 ## 로컬 개발
 
@@ -111,7 +117,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 ```bash
 npm ci                                                        # 루트에서 1회 (npm workspaces)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
@@ -159,4 +165,4 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 
 저장소 안에 짝이 되는 파일이 있어 여기 적어둘 값이 있는 것만 예외로 남긴다:
 
-- 🎨 [#32 디자인 리뉴얼](../../issues/32) — 디자인 시스템은 [DESIGN.md](DESIGN.md), 진행 추적은 [DESIGN_RENEWAL_PLAN.md](DESIGN_RENEWAL_PLAN.md), 브랜치는 `design-system`
+- 🎨 [#32 디자인 리뉴얼](../../issues/32) — 전 Phase 완료. 디자인 시스템의 단일 소스는 [DESIGN.md](DESIGN.md)

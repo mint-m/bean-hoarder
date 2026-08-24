@@ -35,19 +35,9 @@
 
 | 경로 | 역할 |
 |---|---|
-| `db/migrate_add_columns.sql` | 비파괴 마이그레이션: 기존 users/beans 데이터를 보존한 채 신규 컬럼만 추가. |
-| `db/migrate_ai_usage.sql` | AI 인식 사용량 카운터 — 서비스 키로 대신 호출해 주는 몫에만 상한을 건다. |
-| `db/migrate_archived.sql` | 비파괴 마이그레이션: 소비 완료 등으로 숨김 처리하는 보관(archived) 상태 컬럼 추가 |
-| `db/migrate_coffee_name.sql` | 비파괴 마이그레이션: 시그니쳐·블렌드 네이밍용 커피 이름 컬럼 추가 (라벨/카드 헤드라인 오버라이드) |
-| `db/migrate_drop.sql` | v2 인증 모델 변경(토큰 → 유저코드+암호)에 따른 재생성용. |
-| `db/migrate_logos_r2.sql` | Phase 3: 로고 저장을 D1 data URL → R2 오브젝트로 이전. |
-| `db/migrate_logos.sql` | 2026-07-08: 로스터리 로고 서버 저장 (기기 간 재사용) |
-| `db/migrate_producer_lot.sql` | 비파괴 마이그레이션: 생산자/농장, 랏·워싱스테이션 컬럼 추가 |
-| `db/migrate_r2_usage.sql` | Phase 4: R2 비용 백스톱 — 서비스 전역 월간 R2 쓰기(Class A) 카운터. |
-| `db/migrate_sessions.sql` | Phase 2 인증 업그레이드: 세션 토큰 + 인증 시도 rate limit. |
-| `db/migrate_washing_station.sql` | 비파괴 마이그레이션: 랏(lot)에서 워싱스테이션을 분리한 컬럼 추가 |
+| `db/migrate_session_admin.sql` | 데모 관리자 세션: 세션에 admin 플래그를 둔다. |
 | `db/schema.sql` | — |
-| `db/seed.sql` | 데모 계정(유저코드 DEMO, 암호 0000, 복구키 F89E-5079-5A48-3F33-62B0) + 데모 원두 pass_hash는 구형(SHA-256) 포맷 — 첫 로그인 시 서버가 PBKDF2로 자동 업그레이드한다. |
+| `db/seed.sql` | 데모/테스트 계정 + 데모 원두 카드. |
 
 **테스트** — 단위 테스트는 각 패키지 안에 두고, 사용자 동선은 e2e가 실제 서버를 띄워 검증한다.
 
@@ -92,7 +82,7 @@
 | `users` | `usercode`, `pass_hash`, `recovery_hash`, `created_at` |
 | `beans` | `key`, `usercode`, `roastery`, `origin`, `region`, `producer`, `lot`, `washing_station`, `variety`, `process`, `altitude`, `harvest`, `roast_date`, `package_date`, `net_weight`, `agtron`, `tasting_note`, `memo`, `source_url`, `coffee_name`, `archived`, `created_at` |
 | `logos` | `usercode`, `roastery`, `data_url`, `content_type`, `updated_at` |
-| `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at` |
+| `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at`, `admin` |
 | `auth_attempts` | `bucket`, `count`, `reset_at` |
 | `r2_usage` | `id`, `month`, `write_count` |
 | `ai_usage` | `bucket`, `count`, `reset_at` |

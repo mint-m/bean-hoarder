@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS logos (
 );
 
 -- 세션 토큰 (Phase 2 인증) — 토큰은 SHA-256 해시만 저장, 만료 90일
+-- admin=1은 데모 관리자 세션(DEMO_ADMIN_KEY로 로그인) — 공개 DEMO/0000 세션은 항상 0이다.
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
   usercode   TEXT NOT NULL REFERENCES users(usercode),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  expires_at TEXT NOT NULL
+  expires_at TEXT NOT NULL,
+  admin      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(usercode);
 

@@ -10,24 +10,36 @@
 export interface Account {
   usercode: string;
   token: string;
+  /**
+   * 데모 관리자 세션인가 — 관리자 키로 로그인하면 서버가 응답에 실어 준다.
+   * **화면 표시용 힌트일 뿐 권한이 아니다.** 실제 관문은 서버의 writeAllowed이므로
+   * 이 값을 손으로 켜도 API는 그대로 403이다. 여기서는 데모에 등록 화면을 열지 말지만 정한다.
+   */
+  admin?: boolean;
 }
 
 export function loadSession(): Account {
   return {
     usercode: localStorage.getItem("bh_usercode") || "",
     token: localStorage.getItem("bh_session") || "",
+    admin: localStorage.getItem("bh_admin") === "1",
   };
 }
 
-export function saveSession(usercode: string, token: string): void {
+export function saveSession(usercode: string, token: string, admin = false): void {
   localStorage.setItem("bh_usercode", usercode);
   localStorage.setItem("bh_session", token);
+  // 관리자가 아닐 때 지우는 게 중요하다 — 관리자로 들어왔다 평범한 계정으로 갈아타면
+  // 남은 플래그가 그 계정의 화면 판정을 흐린다.
+  if (admin) localStorage.setItem("bh_admin", "1");
+  else localStorage.removeItem("bh_admin");
   localStorage.removeItem("bh_pin"); // 구버전 잔재 제거
 }
 
 export function clearSession(): void {
   localStorage.removeItem("bh_usercode");
   localStorage.removeItem("bh_session");
+  localStorage.removeItem("bh_admin");
   localStorage.removeItem("bh_pin");
 }
 

@@ -465,6 +465,96 @@ test("데모 계정(DEMO)은 읽기만 가능하고 쓰기는 403으로 거부�
   }
 });
 
+/** 데모 계정을 심고 로그인해 세션 토큰을 얻는다. admin_key를 주면 관리자 승격을 시도한다. */
+async function loginDemo(adminKey?: string): Promise<Response> {
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES ('DEMO', ?, 'x')",
+  )
+    .bind(await sha256hex("DEMO:0000"))
+    .run();
+  return api(
+    "/login",
+    jsonBody(
+      adminKey === undefined
+        ? { usercode: "DEMO", password: "0000" }
+        : { usercode: "DEMO", password: "0000", admin_key: adminKey },
+    ),
+  );
+}
+
+// 데모 카드를 운영자가 앱에서 고칠 수 있어야 하므로, 관리자 키를 함께 낸 로그인만 쓰기를 연다.
+// 이 예외가 공개 자격증명(DEMO/0000)으로 새지 않는다는 것이 이 테스트의 핵심이다.
+test("데모 관리자: 관리자 키로 로그인한 세션은 쓰기가 열린다", async () => {
+  const res = await loginDemo(env.DEMO_ADMIN_KEY);
+  expect(res.status).toBe(200);
+  const payload = (await res.json()) as { token: string; admin?: boolean };
+  // 랩이 등록 화면을 열지 판단하는 힌트 (권한 자체는 서버가 쥔다)
+  expect(payload.admin).toBe(true);
+  const { token } = payload;
+  const auth = { Authorization: `Bearer ${token}` };
+
+  const created = await api("/beans", {
+    method: "POST",
+    headers: auth,
+    body: JSON.stringify({
+      ROASTERY: "DANCHE",
+      ORIGIN: "ETHIOPIA",
+      VARIETY: "74158",
+      PROCESS: "Washed",
+      ROAST_DATE: "26.06.28",
+      PACKAGE_DATE: "26.07.03",
+    }),
+  });
+  expect(created.status).toBe(200);
+  const { key } = (await created.json()) as { key: string };
+  expect(key).toMatch(/^DEMO\d{2}-\d{3}$/);
+
+  // 관리자 승격의 목적 — 이미 인쇄된 KEY의 내용 수정 (PUT은 전체 필드 교체가 계약이다)
+  const updated = await api(`/bean/${key}`, {
+    method: "PUT",
+    headers: auth,
+    body: JSON.stringify({
+      ROASTERY: "DANCHE",
+      ORIGIN: "ETHIOPIA",
+      VARIETY: "74158",
+      PROCESS: "Washed",
+      ROAST_DATE: "26.06.28",
+      PACKAGE_DATE: "26.07.03",
+      MEMO: "고친 설명",
+    }),
+  });
+  expect(updated.status).toBe(200);
+  const after = await api(`/bean/${key}`);
+  expect(((await after.json()) as { bean: { MEMO: string } }).bean.MEMO).toBe("고친 설명");
+});
+
+test("데모 관리자: 관리자 키 없이 받은 세션은 그대로 읽기 전용이다", async () => {
+  const res = await loginDemo();
+  const payload = (await res.json()) as { token: string; admin?: boolean };
+  expect(payload.admin).toBeUndefined(); // 일반 로그인 응답 형태는 종전 그대로
+  const { token } = payload;
+  const write = await api("/beans", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ROASTERY: "X", ORIGIN: "KENYA" }),
+  });
+  expect(write.status).toBe(403);
+  expect(((await write.json()) as { error: string }).error).toContain("데모 계정은 둘러보기 전용");
+});
+
+// 틀린 키가 401로 끝나야 세션이 남지 않는다. 또 DEMO/0000은 언제나 성공하므로 키 오입력이
+// 자격 검증 rate limit에 안 잡히는 구멍이 생기는데, login이 직접 실패로 기록해 막는다.
+test("데모 관리자: 틀린 관리자 키는 401이고 실패 카운터에 기록된다", async () => {
+  const res = await loginDemo("wrong-key");
+  expect(res.status).toBe(401);
+  expect((await res.json()) as { token?: string }).not.toHaveProperty("token");
+
+  const row = await env.DB.prepare("SELECT count FROM auth_attempts WHERE bucket = 'pw:DEMO'").first<{
+    count: number;
+  }>();
+  expect(row?.count).toBe(1);
+});
+
 // 자동 테스트가 쓰기까지 검증하려면 제한 없는 계정이 필요하다 — 시드의 TEST가 그 역할이다.
 test("TEST 계정은 쓰기 제한을 받지 않는다 (e2e가 등록 동선을 끝까지 검증할 수 있어야 한다)", async () => {
   await env.DB.prepare(

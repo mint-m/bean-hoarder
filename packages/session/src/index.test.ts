@@ -6,7 +6,7 @@
 // 브라우저 모듈이라 Node 유닛 환경에서는 localStorage·fetch를 가짜로 심어 평가한다.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test, vi } from "vitest";
-import { migrateLegacyPin } from "./index";
+import { clearSession, loadSession, migrateLegacyPin, saveSession } from "./index";
 
 function fakeStorage(seed: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(seed));
@@ -93,4 +93,21 @@ test("이미 세션이 있으면 이행을 건너뛴다 (로그인 호출 없음
   const acc = await migrateLegacyPin();
   assert.equal(acc.token, "bhs_x");
   assert.equal(fetchSpy.mock.calls.length, 0, "이미 세션 있으면 /api/login 미호출");
+});
+
+// 데모 관리자 플래그 — 관리자로 들어왔다 다른 계정으로 갈아탈 때 남으면 그 계정의 화면 판정이
+// 흐려진다. saveSession이 관리자가 아닐 때 확실히 지우는지가 요점.
+test("saveSession: admin 플래그는 켤 때만 남고 다음 로그인에서 지워진다", () => {
+  globalThis.localStorage = fakeStorage();
+
+  saveSession("DEMO", "bhs_1", true);
+  assert.equal(loadSession().admin, true);
+
+  saveSession("ABCD", "bhs_2"); // 평범한 계정으로 갈아타기
+  assert.equal(loadSession().admin, false);
+  assert.equal(loadSession().usercode, "ABCD");
+
+  saveSession("DEMO", "bhs_3", true);
+  clearSession();
+  assert.equal(loadSession().admin, false);
 });

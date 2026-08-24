@@ -53,7 +53,9 @@ export default function Workspace({
   onOpenSettings: () => void;
 }) {
   // 눌러봤자 403이 돌아올 버튼을 보여주지 않는다 — 막힌 이유와 다음 행동(가입)을 대신 안내한다
-  const readOnly = account.usercode === DEMO_USERCODE;
+  // 데모는 둘러보기 전용이지만, 관리자 키로 들어온 세션은 데모 카드를 고칠 수 있어야 한다.
+  // (최종 판정은 서버 — 여기서는 화면을 열지 말지만 정한다. packages/api/src/app.ts의 writeAllowed)
+  const readOnly = account.usercode === DEMO_USERCODE && !account.admin;
   const [form, setForm] = useState<FormState>(emptyForm);
   // 이벤트 핸들러에서 "지금의 폼"을 읽기 위한 최신값 참조 — 자동 채우기가 다음 상태를
   // setForm 바깥에서 순수하게 계산하는 데 쓴다 (fillParsed의 주석 참고).

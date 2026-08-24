@@ -4,6 +4,7 @@ declare namespace Cloudflare {
     DB: D1Database;
     LOGOS: R2Bucket;
     INVITE_CODE: string;
+    DEMO_ADMIN_KEY: string;
     TEST_SCHEMA_SQL: string;
   }
 }
