@@ -14,6 +14,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p functions/tsconfig.json && tsc -p e2e/tsconfig.json",
+    "gen:demo-beans": "node scripts/gen-demo-beans.mjs",
     "gen:demo-seed": "node scripts/gen-demo-seed.mjs",
     "gen:structure": "node scripts/gen-structure.mjs",
     "check:structure": "node scripts/gen-structure.mjs --check",

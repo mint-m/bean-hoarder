@@ -79,6 +79,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **구경거리는 정적 데모 덱(`/demo`)이고, 데이터는 `apps/web/src/demo-beans.json` 한 곳이다.**
   이 JSON에서 `db/seed.sql`의 데모 원두 블록이 생성되므로(`npm run gen:demo-seed`) **seed의 그 블록을
   손으로 고치지 않는다** — `npm run check`가 어긋나면 실패시킨다.
+  JSON도 손으로 고치기보다 **랩에서 DEMO 계정의 원두를 편집한 뒤 `npm run gen:demo-beans`로 떠 온다**
+  (`--remote`면 라이브 D1에서). 등록 화면이 하는 일을 사람이 JSON으로 대신하지 않기 위한 경로다.
   카드를 누르면 열리는 상세는 정적이 아니라 **실제 공개 조회(`/{KEY}`)**다. 그래서 JSON의 KEY는
   라이브 D1에 실존해야 하고, 그 원두는 운영자 계정에서 평범하게 등록·수정한다. KEY를 바꾸면
   데모 링크가 죽으므로 JSON의 KEY는 함부로 갈지 않는다.
