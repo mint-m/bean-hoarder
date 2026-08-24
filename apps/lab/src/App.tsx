@@ -1,6 +1,7 @@
 import { type Account, clearSession, migrateLegacyPin } from "@bnhd/session";
 import { useCallback, useEffect, useState } from "react";
 import AuthView from "./AuthView";
+import SettingsMenu from "./components/SettingsMenu";
 import Workspace from "./Workspace";
 
 const EXPIRED_NOTICE = "로그인이 만료되었습니다. 다시 로그인해 주세요.";
@@ -8,6 +9,9 @@ const EXPIRED_NOTICE = "로그인이 만료되었습니다. 다시 로그인해 
 export default function App() {
   const [account, setAccount] = useState<Account | null>(null); // null = 세션 부트 중
   const [expired, setExpired] = useState(false);
+  // 설정 서랍은 보통 톱바 버튼으로 열지만, 인식이 부실했을 때 그 자리에서도 열 수 있어야 한다
+  // (실패를 해결할 UI를 실패 안내 옆에 두는 규칙 — DESIGN.md §1).
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const signedIn = !!account?.usercode && !!account?.token;
 
   useEffect(() => {
@@ -59,17 +63,25 @@ export default function App() {
         <a className="wordmark" href="/">
           Bean-Hoarder<span>LAB</span>
         </a>
-        {signedIn && (
-          <div className="acct-chip">
-            <code>{account.usercode}</code>
-            <button type="button" onClick={signOut}>
-              로그아웃
-            </button>
-          </div>
-        )}
+        <div className="topbar-right">
+          {signedIn && (
+            <div className="acct-chip">
+              <code>{account.usercode}</code>
+              <button type="button" onClick={signOut}>
+                로그아웃
+              </button>
+            </div>
+          )}
+          <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen} />
+        </div>
       </header>
       {signedIn ? (
-        <Workspace account={account} onSessionExpired={handleSessionExpired} />
+        <Workspace
+          account={account}
+          onSessionExpired={handleSessionExpired}
+          onSignOut={signOut}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
       ) : (
         <AuthView onSignedIn={handleSignedIn} notice={expired ? EXPIRED_NOTICE : ""} />
       )}

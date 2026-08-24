@@ -134,10 +134,11 @@ export default function DesignCard(p: Props) {
     logoStateCls = "none";
   }
 
+  // 프리뷰 아래 접힌 아코디언 — 라벨 옵션은 매번 만지는 게 아니라 "결과물을 조정할 때"만 편다
   return (
-    <div className="card">
-      <h2>라벨 디자인</h2>
-      <p className="hint" style={{ margin: "-6px 0 10px" }}>
+    <details className="card acc">
+      <summary>라벨 옵션 — 인쇄 색상 · 표시 정보 · 글자 크기 · 로고</summary>
+      <p className="hint" style={{ margin: "10px 0" }}>
         인쇄 색상
       </p>
       <div className="toggles">
@@ -161,7 +162,7 @@ export default function DesignCard(p: Props) {
       </div>
 
       <p className="hint" style={{ margin: "14px 0 10px" }}>
-        부제목 줄에 함께 표시할 정보 — 값이 없으면 선택할 수 없습니다
+        부제목 줄 — 값이 있는 항목만 고를 수 있습니다
       </p>
       <div className="toggles">
         {SUB_POOL.map(([key, label]) => (
@@ -186,8 +187,7 @@ export default function DesignCard(p: Props) {
       </div>
 
       <p className="hint" style={{ margin: "14px 0 10px" }}>
-        하단 스펙 칸에 표시할 정보 — ↑↓로 우선순위 변경, 공간이 부족하면 낮은 순위부터 자동 숨김.
-        로스팅일·패키징일은 항상 별도 고정 표시(카드형은 QR 옆)됩니다.
+        하단 스펙 칸 — ↑↓로 우선순위 변경, 자리가 부족하면 낮은 순위부터 숨겨집니다. 날짜는 항상 표시.
       </p>
       <div className="toggles">
         {specOrder.map((key) => {
@@ -266,7 +266,7 @@ export default function DesignCard(p: Props) {
           로고 표시 (라벨 우상단)
         </label>
         <p className="hint" style={{ margin: "4px 0 8px" }}>
-          로스터리 이름 입력 후 로고를 올리면 저장되어, 다음부터 이름만 입력해도 자동 적용됩니다.
+          로스터리 이름과 함께 저장되어, 다음부터 이름만 넣으면 자동 적용됩니다.
         </p>
         <div className="logo-row">
           <div className="logo-thumb">
@@ -315,7 +315,7 @@ export default function DesignCard(p: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 

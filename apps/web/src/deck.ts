@@ -2,8 +2,8 @@
 // 로그인한 사용자의 원두를 월렛 카드처럼 쌓아 보여주고, 카드 메뉴로 보관·삭제를 처리한다.
 import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { type Account, loadSession, migrateLegacyPin } from "@bnhd/session";
+import { flavorGradient, originSignature } from "./lib/coffee-color";
 import { daysSince, el, escapeHtml } from "./lib/dom";
-import { originColor } from "./lib/origin-color";
 
 let account: Account = loadSession();
 let allBeans: HeadlineRow[] = [];
@@ -37,18 +37,25 @@ function cardHTML(b: HeadlineRow): string {
   const note = notesEnabled && g("TASTING_NOTE");
 
   const headline = buildHeadline(b) || g("KEY");
-  const color = originColor(g("ORIGIN"));
-  const borderStyle = color ? ` style="border-top-color:${color}"` : "";
+  // 커피 컬러(화면 전용 — DESIGN.md §3): 피크 밴드에 향미 그라데이션, 헤드라인 옆에 산지 시그니처 닷.
+  // 스택 상태에서 보이는 유일한 영역이 밴드이므로, 여기가 카드의 "색 띠" 정체성을 전부 짊어진다.
+  const color = originSignature(g("ORIGIN"));
   const dot = color ? `<span class="w-origin-dot" style="background:${color}"></span>` : "";
+  const grad = flavorGradient(g("TASTING_NOTE"));
+  const bandStyle = grad ? ` style="background-image:${grad}"` : "";
   const archivedClass = b.ARCHIVED ? " archived" : "";
-  return `<div class="wcard${archivedClass}"${borderStyle} tabindex="0" role="link"
+  return `<div class="wcard${archivedClass}" tabindex="0" role="link"
       aria-label="${escapeHtml(headline)} 상세보기" data-key="${g("KEY")}">
     <button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>
-    <div class="w-top"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
-    <div class="w-origin"><span class="w-origin-label">${dot}${escapeHtml(headline)}</span>${dday}</div>
-    ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
-    ${note ? `<p class="w-note">${escapeHtml(note)}</p>` : ""}
-    ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
+    <div class="w-band"${bandStyle}>
+      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
+      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
+    </div>
+    <div class="w-body">
+      ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
+      ${note ? `<p class="w-note">${escapeHtml(note)}</p>` : ""}
+      ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
+    </div>
   </div>`;
 }
 
@@ -67,7 +74,7 @@ function renderDeck(beans: HeadlineRow[]): void {
     showStatus(
       allBeans.length
         ? "검색 결과가 없습니다."
-        : '아직 등록된 원두가 없습니다.<br><br><a href="/admin">랩에서 첫 원두 등록하기 →</a>',
+        : '아직 등록된 원두가 없습니다.<br><br><a href="/lab">랩에서 첫 원두 등록하기 →</a>',
     );
     return;
   }
@@ -178,6 +185,8 @@ for (const btn of sheetBackdrop.querySelectorAll<HTMLButtonElement>(".sheet-btn"
     closeSheet();
     if (!key) return;
     if (act === "detail") location.href = `/${key}`;
+    // 덱에서 바로 고칠 수 있게 랩을 편집 상태로 연다 — 예전엔 랩의 목록을 열어 찾아 들어가는 길뿐이었다
+    if (act === "edit") location.href = `/lab/?edit=${encodeURIComponent(key)}`;
     if (act === "archive") toggleArchive(key);
     if (act === "delete") deleteBeanFromDeck(key);
   });
@@ -222,12 +231,12 @@ async function main(): Promise<void> {
   // 구버전이 저장한 PIN이 남아 있으면 세션 토큰으로 교환
   account = await migrateLegacyPin();
   if (!account.usercode || !account.token) {
-    showStatus('내 원두 덱은 로그인 후 볼 수 있습니다.<br><br><a href="/admin">랩에서 로그인 →</a>');
+    showStatus('내 원두 덱은 로그인 후 볼 수 있습니다.<br><br><a href="/lab">랩에서 로그인 →</a>');
     return;
   }
   const { res, body } = await apiCall("/api/beans");
   if (res.status === 401) {
-    showStatus('로그인이 만료되었습니다.<br><br><a href="/admin">랩에서 다시 로그인 →</a>');
+    showStatus('로그인이 만료되었습니다.<br><br><a href="/lab">랩에서 다시 로그인 →</a>');
     return;
   }
   if (!body?.ok || !body.beans) {

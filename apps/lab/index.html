@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>BEAN-HOARDER — LAB</title>
+<meta name="theme-color" content="#f4f4f5">
+<!-- 저장된 테마를 첫 페인트 전에 적용한다. 깜빡임을 막으려면 블로킹 인라인이어야 해서
+     세 진입점(조회·덱·랩)에 같은 사본을 둔다 — 기본은 라이트, 다크는 설정에서 켠 사람만. -->
+<script>
+  try {
+    if (localStorage.getItem("bh_theme") === "dark") {
+      document.documentElement.dataset.theme = "dark";
+      document.querySelector('meta[name="theme-color"]').content = "#0a0a0b";
+    }
+  } catch (_e) {}
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/lab.css">

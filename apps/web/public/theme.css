@@ -2,12 +2,15 @@
    컨셉: 모바일 보딩패스/월렛 — 화이트·블랙 베이스 + 포인트 컬러 하나 */
 
 :root {
-  color-scheme: light dark;
+  /* 기본은 화이트 베이스 고정 — OS 다크 설정을 따라가지 않는다.
+     다크는 사용자가 랩 설정에서 켜는 선택지이며 :root[data-theme="dark"]로만 적용된다
+     (각 HTML의 head 인라인 스크립트가 localStorage를 읽어 미리 붙인다 — 깜빡임 방지). */
+  color-scheme: light;
   --bg: #f4f4f5;
   --surface: #ffffff;
   --surface-2: #f4f4f5;
   --ink: #101012;
-  --sub: #74747c;
+  --sub: #6a6a72; /* 보조 텍스트 — 라이트에서 --bg/--surface 위 AA(≥4.5:1) 확보 (구 #74747c는 --bg 위 4.2:1로 미달) */
   --line: #e4e4e7;
   --accent: #f04e1c; /* 포인트 컬러 (탠저린) */
   --accent-hover: #d13f12;
@@ -20,10 +23,24 @@
     "Malgun Gothic", sans-serif;
   --display: "Space Grotesk", "Pretendard Variable", Pretendard, sans-serif;
 
-  /* 반경 스케일 — 16px 카드, 9px 컨트롤(버튼·인풋), 999px 알약 */
-  --radius: 16px;
-  --radius-sm: 9px;
+  /* 반경 스케일 — 10px 카드, 7px 컨트롤(버튼·인풋), 999px 알약.
+     둥글기를 줄여 모던한 톤으로 (구 16/9는 몰개성한 "둥글둥글 카드" 인상 — DESIGN.md §6) */
+  --radius: 10px;
+  --radius-sm: 7px;
   --radius-pill: 999px;
+
+  /* 여백 스케일 — 컴포넌트 간격은 여기서 고른다. 기존 인라인 px 잔재는 점진 이관 (DESIGN.md §5) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* 커피 컬러(화면 전용) — 원두 맥락 화면에서 산지 색이 accent 자리를 대신한다. 기본값은 브랜드 accent.
+     실제 색 계산은 src/lib/coffee-color.ts(산지 시그니처 + 향미 그라데이션). 규칙은 DESIGN.md §3. */
+  --coffee-strip: var(--accent);
 
   /* 파생 표면색 — --sub/--accent에서 자동 유도되어 라이트·다크 모두 자연스럽게 적응 */
   --fill-muted: color-mix(in srgb, var(--sub) 16%, transparent); /* 중립 채움 (아이콘 버튼 등) */
@@ -38,23 +55,23 @@
   --shadow-hover: 0 1px 2px rgba(16, 16, 18, 0.06), 0 10px 20px -14px rgba(16, 16, 18, 0.32);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0a0a0b;
-    --surface: #17171a;
-    --surface-2: #232327;
-    --ink: #f4f4f5;
-    --sub: #8e8e96;
-    --line: #2b2b30;
-    --accent: #ff6a3d;
-    --accent-hover: #ff8259;
-    --accent-ink: #17110d;
-    --ok: #5dbb80;
-    --bad: #f08575;
-    --scrim: rgba(0, 0, 0, 0.62);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
-    --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 20px -14px rgba(0, 0, 0, 0.9);
-  }
+/* 다크는 명시적 선택일 때만 (설정 → 테마). OS 설정은 보지 않는다 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --surface: #17171a;
+  --surface-2: #232327;
+  --ink: #f4f4f5;
+  --sub: #8e8e96;
+  --line: #2b2b30;
+  --accent: #ff6a3d;
+  --accent-hover: #ff8259;
+  --accent-ink: #17110d;
+  --ok: #5dbb80;
+  --bad: #f08575;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 20px -14px rgba(0, 0, 0, 0.9);
 }
 
 * {

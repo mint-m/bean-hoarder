@@ -67,8 +67,8 @@ const GROUPS = [
     prefix: "public/",
     extra: [
       {
-        path: "public/admin/",
-        desc: "랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다.",
+        path: "dist/lab/",
+        desc: "랩(등록·QR 발급 화면) — apps/lab 빌드 산출물. gitignore이며 npm run build가 만든다.",
       },
     ],
   },

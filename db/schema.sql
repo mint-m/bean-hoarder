@@ -66,3 +66,12 @@ CREATE TABLE IF NOT EXISTS r2_usage (
   month       TEXT NOT NULL,          -- 현재 집계 월 'YYYY-MM'
   write_count INTEGER NOT NULL DEFAULT 0
 );
+
+-- AI 인식 사용량 카운터 — 서비스 키로 대신 호출해 주는 몫에만 상한을 건다(계정별·전역 하루 한도).
+-- 사용자가 본인 키를 넣으면 브라우저에서 Google로 직접 가므로 세지 않는다. bucket 형식은
+-- 'acct:{유저코드}:{YYYY-MM-DD}' / 'global:{YYYY-MM-DD}' — 자세한 근거는 db/migrate_ai_usage.sql.
+CREATE TABLE IF NOT EXISTS ai_usage (
+  bucket   TEXT PRIMARY KEY,
+  count    INTEGER NOT NULL DEFAULT 0,
+  reset_at TEXT NOT NULL
+);

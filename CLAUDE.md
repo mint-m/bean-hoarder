@@ -45,7 +45,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
 ```
 
-데모 계정: 유저코드 `DEMO` / 암호 `0000`.
+데모 계정: 유저코드 `DEMO` / 암호 `0000` — **읽기 전용**(공개된 자격증명이라 서버가 쓰기를 막는다).
+등록·수정이 필요한 테스트는 시드의 `TEST` / `0000`을 쓴다.
 
 ## 절대 바꾸지 말 것
 
@@ -66,11 +67,20 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   `@bnhd/schema`를 import하면 zod가 딸려와 조회·덱 번들이 부푼다(이 격리가 서브패스로 나눈 이유다).
   (2) 이 함수는 **대문자화를 하지 않는다** — 조회·덱은 CSS `text-transform`으로, 라벨은 SVG라
   호출부에서 `.toUpperCase()`를 직접 건다. 공유 함수에 대문자를 넣으면 화면이 이중으로 처리된다.
+- **`setState(updater)` 안에서 바깥 변수를 채우고 곧바로 읽지 말 것.** React는 대기 중인 업데이트가
+  없을 때만 updater를 즉시 실행한다(eager state) — 직전에 다른 상태 변경이 있으면 렌더까지 미뤄진다.
+  그래서 "updater 안에서 결과를 모으고 호출 직후 그 값으로 성공을 판정"하면 **되다 안 되다** 한다.
+  자동 채우기가 정확히 이걸로 깨져서(인식에 성공하고도 "이미 다 입력돼 있습니다") 지금은 다음 상태를
+  **updater 바깥에서 순수하게 계산**한 뒤 넘긴다 — `Workspace.fillParsed` 참고. 최신 폼은 렌더마다
+  갱신하는 `formRef`로 읽는다.
+- **`db/seed.sql`에는 쓰기 제한이 없는 `TEST` 계정이 있다 — 원격 D1에 실행하지 말 것.** 공개된 `DEMO`는
+  서버가 쓰기를 403으로 막지만(`packages/api/src/app.ts`의 `writeAllowed`), TEST는 e2e가 등록 동선을
+  끝까지 검증하려고 둔 것이라 제한이 없다. 로컬·e2e DB 전용이다.
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.
 - **배포물은 전부 빌드 산출물**: `dist/`는 gitignore이고 `npm run build`가 만든다 —
-  `@bnhd/web`(조회·덱)이 먼저 `dist/`를 비우고 채운 뒤 `@bnhd/lab`이 `dist/admin`에 얹힌다.
+  `@bnhd/web`(조회·덱)이 먼저 `dist/`를 비우고 채운 뒤 `@bnhd/lab`이 `dist/lab`에 얹힌다.
   **순서를 바꾸면 랩이 지워진다.** wrangler는 `dist`만 서빙하므로 빌드 전에는 아무것도 안 뜬다.
 - **필드 추가 = `packages/schema`의 BEAN_FIELDS 한 줄 + D1 마이그레이션 SQL.**
   CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되므로 다른 곳은 손댈 필요가 없다.
@@ -104,7 +114,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 | 변경 이력 (한 줄 요약) | [README.md](README.md) "주요 변경" |
 | 릴리스 노트 (전문) | GitHub Releases — 태그가 버전의 단일 소스 |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
-| 설계 근거 | [DESIGN.md](DESIGN.md) |
+| 설계 배경·아키텍처 근거 | [README.md](README.md) "구조" · [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙) | [DESIGN.md](DESIGN.md) — 값의 단일 소스는 `apps/web/public/theme.css` |
 | 원칙·금지 사항·함정 | 이 문서 |
 
 - **문서 파일을 늘리지 않는다.** 새 `.md`를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수
@@ -112,8 +123,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   `STRUCTURE.md`는 예외인데 — 전부 생성물이라 사람이 유지할 게 없고, README에서 덜어낸
   것이지 새로 더한 게 아니다.
 - **문서는 독자로 가른다.** README는 사람이 읽는다(무엇인지·어떻게 쓰는지·어떻게 운영하는지),
-  STRUCTURE.md는 코드 파악용, 이 문서는 원칙. 한 파일이 여러 독자를 상대하기 시작하면
-  양쪽 모두에게 불친절해진다.
+  STRUCTURE.md는 코드 파악용, DESIGN.md는 디자인 시스템(색·타이포·컴포넌트 규칙), 이 문서는 원칙.
+  한 파일이 여러 독자를 상대하기 시작하면 양쪽 모두에게 불친절해진다.
 - **구조는 어느 문서에도 손으로 적지 않는다.** 파일 목록은 저장소를 보면 알 수 있으므로
   옮겨 적으면 낡기만 한다. `gen-structure.mjs`가 `git ls-files`·`app.ts`·`schema.sql`에서
   직접 읽어 생성하고, `npm run check`가 재생성 결과와 커밋된 내용이 같은지 검사한다.

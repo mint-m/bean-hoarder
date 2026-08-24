@@ -33,6 +33,11 @@ declare module "@bnhd/label" {
     design?: LabelDesign,
     logoDataUrl?: string | null,
   ): { svg: string; content: string; moduleCount: number; W: number; H: number };
+  export const QR_DOT_OPTIONS: number[];
+  export function buildQrSVG(
+    key: string,
+    dots?: number,
+  ): { svg: string; content: string; moduleCount: number; codeSize: number; size: number };
   export function renderCanvas(svg: string, dpi: number): Promise<HTMLCanvasElement>;
   export function renderPngBlob(svg: string, dpi: number): Promise<Blob>;
   export function verifyQr(svg: string, expectedContent: string, dpi?: number): Promise<{ ok: boolean }>;

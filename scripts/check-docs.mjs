@@ -4,9 +4,10 @@
 // 내용의 정확성은 판단하지 않는다 — "가리키는 대상이 실재하는가"만 본다.
 // 파일을 지우거나 옮겼는데 문서를 안 고친 경우(문서가 조용히 낡는 가장 흔한 유형)를 잡는 게 목적.
 //
-// 검사 대상은 저장소 루트의 모든 `*.md`다 — 목록을 손으로 유지하다가 DESIGN.md가 빠져
+// 검사 대상은 저장소 루트의 모든 `*.md`·`*.html`이다 — 목록을 손으로 유지하다가 DESIGN.md가 빠져
 // 낡은 라우트 목록을 오래 방치한 전례가 있어 자동 수집으로 바꿨다. 생성물인 STRUCTURE.md도
-// 포함한다: 생성기가 소스 주석을 그대로 실어 나르므로, 주석이 지워진 파일을 가리키면 여기서 잡힌다.
+// 포함하고(생성기가 소스 주석을 실어 나르므로 지워진 파일을 가리키면 여기서 잡힌다),
+// HOW_IT_WORKS.html도 포함한다 — .md가 아니라 검사에서 빠져 모노레포 이전 경로가 조용히 낡았던 전례가 있다.
 //
 // 실행: npm run check:docs
 
@@ -18,7 +19,8 @@ const IGNORE_END = "<!-- check-docs:ignore-end -->";
 
 // 저장소에 없지만 문서가 정당하게 가리키는 이름 (빌드 산출물·실행 중 생기는 것)
 const GENERATED = new Set([
-  "public/admin", // 랩 빌드 산출물 — CI가 배포 직전 생성
+  "dist", // 배포 산출물 루트 — npm run build가 생성 (gitignore)
+  "dist/lab", // 그 안의 랩 빌드 산출물
   ".wrangler-e2e", // e2e 전용 로컬 D1/R2 persist
 ]);
 const EXTERNAL_FILES = new Set([
@@ -63,7 +65,7 @@ function repoIndex() {
 }
 
 function docs() {
-  return git(["ls-files", "--cached", "*.md"])
+  return git(["ls-files", "--cached", "*.md", "*.html"])
     .filter((f) => !f.includes("/"))
     .sort();
 }

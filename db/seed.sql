@@ -1,8 +1,17 @@
 -- 데모 계정(유저코드 DEMO, 암호 0000, 복구키 F89E-5079-5A48-3F33-62B0) + 데모 원두
 -- pass_hash는 구형(SHA-256) 포맷 — 첫 로그인 시 서버가 PBKDF2로 자동 업그레이드한다.
+--
+-- ⚠️ DEMO는 자격증명이 공개돼 있어 서버가 **쓰기를 막는다**(packages/api/src/app.ts의 writeAllowed).
+--    등록·수정·삭제가 필요한 자동 테스트는 아래 TEST 계정을 쓴다.
 INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
   ('DEMO', 'ae399e68ab3b10ba60abbb7a9859e53785817f453f13528a2fd85557daf1ce47',
    '0a915ff66685ba15421a8c45464e63172507de5b77851d660451a3215f1f1185');
+
+-- 테스트 계정(유저코드 TEST, 암호 0000) — e2e 전용. 쓰기 제한이 없어 등록 동선을 끝까지 검증할 수 있다.
+-- 로컬·e2e DB에만 넣는다. 원격 D1에 seed.sql을 실행하면 라이브에도 생기므로 주의할 것.
+INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
+  ('TEST', '37d315b6d9de4369664a0f20c49a8d7b56703fc74245b5b83588fbe2ac6c98c6',
+   'f3694ec983ba1134bb1b67d54b97924ea67642bd4bd0cd154993b41cfa6ed84a');
 
 -- 데모 갱신을 반영하도록 INSERT OR REPLACE (재실행 시 기존 데모 행을 덮어씀)
 INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, producer, lot, washing_station,

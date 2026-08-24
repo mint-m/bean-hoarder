@@ -19,6 +19,7 @@
 //   PUT    /api/logos         로스터리 로고 저장/교체 (이미지 100KB 제한)
 //   DELETE /api/logos         로스터리 로고 삭제
 //   POST   /api/fetch         상품 페이지 텍스트/로고 이미지 프록시 (로그인 사용자 전용)
+//   POST   /api/extract       AI 인식 대행 (서비스 키, 계정별·전역 하루 한도 — 본인 키가 있으면 브라우저 직접)
 // 환경변수: INVITE_CODE는 Cloudflare secret으로 관리 (wrangler pages secret put INVITE_CODE)
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -28,6 +29,7 @@ import { json } from "./lib/http";
 import { login, logout, recoverAccount, signup } from "./routes/auth";
 import { exportCsv, importCsv } from "./routes/backup";
 import { addBean, deleteBean, getBeanPublic, listBeans, setArchived, updateBean } from "./routes/beans";
+import { extractWithAi } from "./routes/extract";
 import { deleteLogo, listLogos, putLogo } from "./routes/logos";
 import { fetchExternal } from "./routes/proxy";
 
@@ -43,6 +45,24 @@ const authRequired = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
+/**
+ * 공개 데모 계정 — 유저코드·암호가 README에 공개돼 있어 누구나 로그인할 수 있다.
+ * 쓰기를 열어 두면 사실상 인증 없는 무제한 계정이 되므로 **둘러보기 전용**으로 막는다.
+ * (읽기·목록·백업 내려받기는 그대로 두어 데모의 목적은 유지한다.)
+ * 자동 테스트는 이 제한에 걸리면 안 되므로 별도 시드 계정(TEST)을 쓴다 — db/seed.sql 참고.
+ */
+const DEMO_USERCODE = "DEMO";
+
+const writeAllowed = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("user").usercode === DEMO_USERCODE) {
+    return json(
+      { ok: false, error: "데모 계정은 둘러보기 전용입니다. 가입하면 바로 등록할 수 있어요." },
+      403,
+    );
+  }
+  await next();
+});
+
 const app = new Hono<AppEnv>().basePath("/api");
 
 app.post("/signup", signup);
@@ -51,18 +71,22 @@ app.delete("/session", authRequired, logout); // 현재 세션 폐기
 app.post("/recover", recoverAccount);
 
 app.get("/bean/:key", getBeanPublic); // 공개 — QR 스캔 조회
-app.put("/bean/:key", authRequired, updateBean);
-app.delete("/bean/:key", authRequired, deleteBean);
-app.patch("/bean/:key/archive", authRequired, setArchived);
+app.put("/bean/:key", authRequired, writeAllowed, updateBean);
+app.delete("/bean/:key", authRequired, writeAllowed, deleteBean);
+app.patch("/bean/:key/archive", authRequired, writeAllowed, setArchived);
 
-app.post("/beans", authRequired, addBean);
+app.post("/beans", authRequired, writeAllowed, addBean);
 app.get("/beans", authRequired, listBeans);
 app.get("/export.csv", authRequired, exportCsv);
-app.post("/import", authRequired, importCsv);
+app.post("/import", authRequired, writeAllowed, importCsv);
 app.get("/logos", authRequired, listLogos);
-app.put("/logos", authRequired, putLogo);
-app.delete("/logos", authRequired, deleteLogo);
-app.post("/fetch", authRequired, fetchExternal);
+app.put("/logos", authRequired, writeAllowed, putLogo);
+app.delete("/logos", authRequired, writeAllowed, deleteLogo);
+// 외부 페이지를 우리 서버가 대신 받아오는 프록시라 공개 계정에 열어 두면 남용 통로가 된다.
+// 데모는 등록을 못 하므로 이 기능을 쓸 이유도 없다.
+app.post("/fetch", authRequired, writeAllowed, fetchExternal);
+// AI 인식 대행 — 서비스 키를 쓰므로 데모는 막고(writeAllowed) 계정별·전역 하루 한도를 건다
+app.post("/extract", authRequired, writeAllowed, extractWithAi);
 
 app.notFound(() => json({ ok: false, error: "not found" }, 404));
 // 5xx는 구조화 JSON으로 로깅 — wrangler pages deployment tail / 대시보드 Real-time Logs에서

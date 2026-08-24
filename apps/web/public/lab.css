@@ -1,17 +1,21 @@
-/* Bean-Hoarder LAB(스튜디오) 전용 스타일 — 공용 토큰은 theme.css */
+/* Bean-Hoarder LAB — 공용 토큰은 theme.css.
+   3막 단일 컬럼 (DESIGN.md §7): ① 입력(인테이크 → 순차 검증) ② QR 발급 ③ 유지관리.
+   서비스의 산출물이 "라벨 도안"이 아니라 "인쇄되는 QR과 그 도착지"라서 이 순서다 —
+   라벨 이미지는 접힌 선택 패널로 내려간다.
+   위계는 장식이 아니라 제목·여백이 만든다(anti-AI: DESIGN.md §1). */
 
 body {
-  padding: 0 16px 96px;
+  padding: 0 var(--sp-4) 96px;
 }
 
 .topbar {
-  max-width: 960px;
+  max-width: 640px;
   margin: 0 auto;
   padding: 18px 2px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 .topbar .wordmark {
   font-size: 17px;
@@ -26,7 +30,7 @@ body {
 .acct-chip {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-2);
   font-size: 12.5px;
   color: var(--sub);
   border: 1px solid var(--line);
@@ -44,63 +48,194 @@ body {
   font-size: 11.5px;
   border-radius: var(--radius-pill);
 }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
 
+/* ---- 설정 — 당장 필요 없는 것을 치워 두는 서랍 ---- */
+.settings {
+  position: relative;
+}
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  color: var(--sub);
+}
+.settings-btn:hover {
+  color: var(--ink);
+}
+.settings-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 200;
+  width: min(320px, calc(100vw - var(--sp-6)));
+  padding: var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.settings-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.settings-block {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+/* 두 갈래 선택 — 라디오보다 눈에 덜 걸리고 누르기 쉽다 */
+.seg {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg button {
+  border: 0;
+  border-radius: 0;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--sub);
+  background: var(--surface);
+}
+.seg button.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* ---- 화면(스테이지): 한 번에 한 맥락만 ---- */
+.flow {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+/* 화면 머리의 되돌아가기 — 브라우저 뒤로가기와 같은 곳으로 간다 */
+.stage-head {
+  margin-bottom: var(--sp-3);
+}
+.stage-back,
+.stage-link {
+  border: 0;
+  background: none;
+  padding: 6px 2px;
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.stage-back:hover,
+.stage-link:hover {
+  color: var(--ink);
+}
+.stage-link {
+  align-self: flex-start;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.stage-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: space-between;
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+/* 입력 화면의 결론 — 등록 버튼은 스텝 다음에 온다 */
+.register-bar {
+  padding: var(--sp-4) var(--sp-5);
+}
+/* 데모 계정이 등록 화면 대신 보는 안내 — 막힌 이유와 다음 행동(가입)만 */
+.demo-notice {
+  padding: var(--sp-6) var(--sp-5);
+}
+
+/* 카드 제목 — 대문자 eyebrow 대신 본문 크기·굵기로 */
 h2 {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--sub);
-  margin: 0 0 14px;
+  font-size: 15px;
   font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 var(--sp-4);
 }
+.h2-aux {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sub);
+}
+
+/* ---- 공용 폼 부품 ---- */
 .field {
-  margin-bottom: 12px;
-}
-.field label {
   display: block;
+  margin-bottom: var(--sp-3);
+}
+.field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-1);
+}
+.field-name {
   font-size: 12px;
   color: var(--sub);
-  margin-bottom: 4px;
+}
+.label-aux {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--sub);
+}
+/* 필수 표시 — 조용한 별표. 색으로 소리치지 않는다 */
+.req {
+  color: var(--sub);
+  margin-left: 2px;
+}
+/* AI가 채운 값 = 사용자가 눈으로 확인해야 하는 자리 */
+.ai-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
 }
 .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--sp-2);
 }
 .btnrow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-.req {
-  color: var(--bad);
-  margin-left: 2px;
-}
-.rec {
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-pill);
-  padding: 1px 6px;
-  margin-left: 6px;
-  vertical-align: 1px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 .status-line {
   font-size: 12px;
-  margin-top: 8px;
+  margin-top: var(--sp-2);
   min-height: 16px;
 }
-.divider {
-  border: 0;
-  border-top: 1px dashed var(--line);
-  margin: 16px 0;
+.memo-input {
+  min-height: 90px;
 }
 
 .unit-wrap {
   position: relative;
+  display: block;
 }
 .unit-wrap input {
   padding-right: 28px;
@@ -115,27 +250,528 @@ h2 {
   pointer-events: none;
 }
 
-details.adv {
-  margin-top: 12px;
-  border-top: 1px dashed var(--line);
-  padding-top: 10px;
+details.adv summary,
+details.acc > summary {
+  cursor: pointer;
+  user-select: none;
 }
 details.adv summary {
   font-size: 12px;
   color: var(--sub);
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+details.acc > summary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* 추천 칩 — 한 번 눌러 채우는 보조 수단 (타이핑을 줄이는 게 목적) */
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* fieldset 기본 테두리·여백 제거 — 시맨틱만 쓰고 생김새는 우리가 정한다 */
+  border: 0;
+  padding: 0;
+  margin: -2px 0 var(--sp-3);
+  min-width: 0;
+}
+.chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--sub);
+}
+.chip:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.chip.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+/* 나머지 선택지를 펴는 칩 — 값이 아니라 동작이라 점선으로 구분 */
+.chip-more {
+  border-style: dashed;
+}
+
+/* 복사 버튼 — 결과를 버튼 자신이 말한다. 라벨이 바뀌어도 폭이 흔들리지 않게 최소 폭을 준다 */
+.copy-btn {
+  min-width: 6.8em;
+}
+.copy-btn.copied.ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.copy-btn.copied.fail {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* ---- 1막: 인테이크 ---- */
+.intake {
+  padding: var(--sp-6) var(--sp-5);
+}
+.intake-title {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+.intake-lede {
+  margin: 0 0 var(--sp-5);
+  font-size: 13.5px;
+  color: var(--sub);
+  line-height: 1.6;
+}
+/* 링크 한 줄도, 붙여넣은 본문도 같은 칸에 들어온다 — 여러 줄을 받아야 하므로 textarea.
+   기본 높이는 링크 한 줄에 맞춘다(대부분의 사용). 본문을 붙여넣으면 스크롤로 받는다 —
+   빈 칸이 크게 벌어져 있으면 그 자체로 "많이 써야 하나" 하는 인상을 준다. */
+.intake-input {
+  min-height: 0;
+  height: 46px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.intake-act {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.intake-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+.intake-row input {
+  flex: 1;
+  min-width: 0;
+}
+.intake-row button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.intake-url {
+  font-size: 14px;
+}
+.intake-status {
+  margin-bottom: 0;
+}
+/* 보조 동선 — 주 동선(가져와서 채우기)과 경쟁하지 않게 밑줄 링크 결로 */
+.intake-manual {
+  border: 0;
+  background: none;
+  color: var(--sub);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 2px;
+}
+.intake-manual:hover {
+  color: var(--ink);
+}
+.intake-paste {
+  min-height: 110px;
+  margin-top: var(--sp-2);
+}
+/* 링크가 막혔을 때만 나타나는 우회로 — 평소엔 존재 자체가 없다 */
+.intake-fallback {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.intake-fallback-lede {
+  margin: var(--sp-2) 0 0;
+}
+.intake-fallback-act {
+  margin-top: var(--sp-2);
+}
+.key-field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* 인식이 끝나면 인테이크는 접힌 한 줄로 물러난다 */
+.intake-done {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.intake-done-msg {
+  flex: 1;
+  min-width: 0;
+}
+.intake-reopen {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+/* ---- 1막: 순차 검증 스텝 ---- */
+.steps-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.steps-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--line);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.steps-fill {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  transition: width var(--t);
+}
+.steps-count {
+  font-size: 11.5px;
+  color: var(--sub);
+  flex-shrink: 0;
+}
+
+.step {
+  border-top: 1px solid var(--line);
+}
+.step:first-of-type {
+  border-top: 0;
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: var(--sp-3) 0;
+}
+.step-head:hover {
+  border-color: transparent;
+}
+.step-mark {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.step.done .step-mark {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.step-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.step-summary {
+  margin-left: auto;
+  max-width: 55%;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sub);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-missing {
+  color: var(--bad);
+}
+.step-body {
+  padding-bottom: var(--sp-4);
+}
+.step-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+/* 건너뛰기는 언제나 열려 있는 문 — 있지만 주장하지 않는다 */
+.step-skip {
+  border: 0;
+  background: none;
+  color: var(--sub);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 2px;
+}
+.step-skip:hover {
+  color: var(--ink);
+}
+
+/* ---- 2막: QR 발급 (이 서비스의 산출물) ---- */
+.qr-locked {
+  margin: var(--sp-3) 0 0;
+}
+.qr-out {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  margin-top: var(--sp-4);
+}
+.qr-visual {
+  flex: 0 0 auto;
+  width: 150px;
+}
+/* QR은 어떤 테마에서도 흰 바탕·검은 모듈이라야 스캔된다 — 토큰이 아니라 인쇄 규격이라 고정색 */
+.qr-img {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+.qr-img svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.qr-meta {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.qr-field {
+  margin-bottom: var(--sp-3);
+}
+.qr-label {
+  display: block;
+  font-size: 12px;
+  color: var(--sub);
+  margin-bottom: var(--sp-1);
+}
+/* 주소 자체가 도착지로 가는 링크다 — "미리보기" 버튼을 따로 두지 않는 이유 */
+.qr-url {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  word-break: break-all;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.qr-url:hover {
+  text-decoration-color: var(--ink);
+}
+.verify {
+  font-size: 11.5px;
+  margin-top: 6px;
+  font-weight: 600;
+  text-align: center;
+}
+.verify.ok {
+  color: var(--ok);
+}
+.verify.bad {
+  color: var(--bad);
+}
+
+/* ---- 2막 부가: 라벨 이미지 (선택) ---- */
+.label-panel-lede {
+  margin: var(--sp-3) 0;
+}
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.toggles label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
   cursor: pointer;
-  user-select: none;
-  margin-bottom: 10px;
+}
+.toggles label:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#toggle-spec {
+  flex-direction: column;
+  gap: 3px;
+}
+#toggle-spec .spec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+#toggle-spec .spec-row label {
+  flex: 1;
+  padding: 2px 0;
+}
+#toggle-spec .reorder-btns {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+#toggle-spec .reorder-btns.hidden {
+  visibility: hidden;
+}
+#toggle-spec .reorder-btns button {
+  padding: 1px 7px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.slider-field {
+  margin-bottom: var(--sp-3);
+}
+.slider-field label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--sub);
+  margin-bottom: var(--sp-1);
+}
+.slider-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  margin-top: var(--sp-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.preview-wrap > div {
+  width: 100%;
+  max-width: 420px;
+}
+/* 라벨도 인쇄물이라 미리보기는 흰 바탕 고정 */
+.preview-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 3px;
+  margin: 0 auto;
+}
+
+/* ---- 3막: 유지관리 (내 원두 목록) ---- */
+.bean-rows {
+  display: flex;
+  flex-direction: column;
+}
+.bean-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.bean-row:last-child {
+  border-bottom: 0;
+}
+.bean-row-main {
+  min-width: 0;
+}
+.bean-row .bkey {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+/* 입력 대소문자가 제각각이어도 목록 표기는 대문자로 통일 (한글·날짜는 영향 없음) */
+.bean-row .borigin {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-left: var(--sp-2);
+  text-transform: uppercase;
+}
+.bean-row .bmeta {
+  display: block;
+  font-size: 12px;
+  color: var(--sub);
+  margin-top: 1px;
+  text-transform: uppercase;
+}
+.bean-row .rowbtns {
+  display: flex;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+.bean-row button {
+  padding: 4px 9px;
+  font-size: 11.5px;
 }
 
 /* ---- 인증 뷰 (로그아웃 상태) ---- */
-#acct-signed-out {
-  max-width: 460px;
+/* AI 키 권유 — 인식이 부실했던 순간에만 뜬다. 경고가 아니라 제안이라 색으로 소리치지 않는다 */
+.ai-nudge {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin: var(--sp-3) 0 0;
+  padding: 10px var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--sub);
+}
+.ai-nudge-msg {
+  flex: 1;
+  min-width: 0;
+}
+.ai-nudge button {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+}
+
+/* 유저코드·복구키는 대문자 체계 — 값도 대문자로 바꾸지만(setUpper) 타이핑 중에도 그렇게 보이게 한다 */
+input.upper {
+  text-transform: uppercase;
+}
+
+/* 로그인·가입·복구 — 입력이 두어 칸뿐이라 본 화면(640px)만큼 넓으면 가로로 늘어져 보인다 */
+.auth-view {
+  max-width: 400px;
   margin: 24px auto 0;
+}
+/* 좁은 폭에서는 두 칸을 나란히 두면 각 칸이 너무 좁아진다 — 세로로 쌓는다 */
+.auth-view .row2 {
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
 }
 .auth-hero {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--sp-4);
 }
 .auth-hero .beanmark {
   width: 40px;
@@ -157,7 +793,7 @@ details.adv summary {
 .auth-notice {
   margin: 0 0 14px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--accent-soft);
   border: 1px solid var(--line);
   font-size: 13px;
@@ -166,14 +802,14 @@ details.adv summary {
 }
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-1);
   border-bottom: 1px solid var(--line);
   margin-bottom: 18px;
 }
 .tabs button {
   border: 0;
   background: none;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   padding: 8px 14px;
   font-size: 13.5px;
   font-weight: 600;
@@ -186,178 +822,6 @@ details.adv summary {
   border-bottom-color: var(--accent);
 }
 
-/* ---- 본 레이아웃 ---- */
-.layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
-  max-width: 960px;
-  margin: 0 auto;
-}
-@media (min-width: 880px) {
-  .layout {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
-}
-.layout .card + .card {
-  margin-top: 16px;
-}
-.sticky-col {
-  position: sticky;
-  top: 16px;
-}
-
-.toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-}
-.toggles label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.toggles label:has(input:disabled) {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* ---- 스펙 우선순위 목록 (값이 있는 항목만 선택 가능, ↑↓로 순서 변경) ---- */
-#toggle-spec {
-  flex-direction: column;
-  gap: 3px;
-}
-#toggle-spec .spec-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-#toggle-spec .spec-row label {
-  flex: 1;
-  padding: 2px 0;
-}
-#toggle-spec .reorder-btns {
-  display: flex;
-  gap: 3px;
-  flex-shrink: 0;
-}
-#toggle-spec .reorder-btns.hidden {
-  visibility: hidden;
-}
-#toggle-spec .reorder-btns button {
-  padding: 1px 7px;
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.slider-field {
-  margin-bottom: 12px;
-}
-.slider-field label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--sub);
-  margin-bottom: 4px;
-}
-.slider-field input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
-}
-
-.preview-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 18px;
-  background: var(--surface-2);
-  border-radius: 10px;
-}
-.preview-wrap > div {
-  width: 100%;
-  max-width: 420px;
-}
-.preview-wrap svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 520px;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 3px;
-  margin: 0 auto;
-}
-.qr-info {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--sub);
-  margin-top: 8px;
-  word-break: break-all;
-}
-.verify {
-  font-size: 12px;
-  margin-top: 6px;
-  font-weight: 600;
-}
-.verify.ok {
-  color: var(--ok);
-}
-.verify.bad {
-  color: var(--bad);
-}
-
-/* ---- 원두 목록 ---- */
-.bean-rows {
-  display: flex;
-  flex-direction: column;
-}
-.bean-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 2px;
-  border-bottom: 1px solid var(--line);
-}
-.bean-row:last-child {
-  border-bottom: 0;
-}
-.bean-row-main {
-  min-width: 0;
-}
-.bean-row .bkey {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-/* 입력 대소문자가 제각각이어도 목록 표기는 대문자로 통일 (한글·날짜는 영향 없음) */
-.bean-row .borigin {
-  font-size: 13.5px;
-  font-weight: 700;
-  margin-left: 8px;
-  text-transform: uppercase;
-}
-.bean-row .bmeta {
-  display: block;
-  font-size: 12px;
-  color: var(--sub);
-  margin-top: 1px;
-  text-transform: uppercase;
-}
-.bean-row .rowbtns {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.bean-row button {
-  padding: 4px 9px;
-  font-size: 11.5px;
-}
-
 /* ---- 복구키 모달 ---- */
 #recovery-box.modal-overlay {
   position: fixed;
@@ -367,7 +831,7 @@ details.adv summary {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: var(--sp-4);
 }
 .recovery-card {
   padding: 20px;
@@ -393,7 +857,7 @@ details.adv summary {
   padding: 10px;
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin: 10px 0;
 }
 .recovery-ack {
@@ -408,64 +872,17 @@ details.adv summary {
   margin-top: 2px;
 }
 
-/* ---- 모바일 미리보기 시트 ---- */
-#fab-preview {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 900;
-  display: none;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-  border-radius: var(--radius-pill);
-  padding: 12px 18px;
-  font-size: 13.5px;
-  box-shadow: var(--shadow);
-}
-@media (max-width: 879px) {
-  body.signed-in #fab-preview {
-    display: block;
-  }
-}
-#sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 950;
-  background: var(--scrim);
-  display: flex;
-  align-items: flex-end;
-}
-.sheet-card {
-  width: 100%;
-  background: var(--surface);
-  border-radius: 18px 18px 0 0;
-  padding: 16px 18px 24px;
-  border-top: 1px solid var(--line);
-  max-height: 80dvh;
-  overflow-y: auto;
-}
-.sheet-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.sheet-head h2 {
-  margin: 0;
-}
-
-/* ---- 로고 관리 ---- */
+/* ---- 로고 관리 (라벨 패널 안) ---- */
 .logo-row {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: flex-start;
 }
 .logo-thumb {
   flex-shrink: 0;
   width: 64px;
   height: 64px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface-2);
   display: flex;
@@ -505,4 +922,13 @@ details.adv summary {
 }
 .logo-status.loading {
   color: var(--sub);
+}
+
+@media (max-width: 560px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+  .qr-visual {
+    width: 120px;
+  }
 }
