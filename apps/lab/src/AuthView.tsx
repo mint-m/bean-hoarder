@@ -2,6 +2,7 @@
 
 import { type Account, saveSession } from "@bnhd/session";
 import { useState } from "react";
+import { CopyButton } from "./components/FormBits";
 import { copyText, download } from "./lib/format";
 
 type Tab = "login" | "signup" | "recover";
@@ -47,15 +48,15 @@ function RecoveryModal({
         </p>
         <div className="recovery-key">{recoveryKey}</div>
         <div className="btnrow">
-          <button
-            type="button"
-            onClick={async () => {
+          <CopyButton
+            label="다시 복사"
+            onCopy={async () => {
               const ok = await copyText(recoveryKey);
-              setCopyMsg(ok ? "복구키가 복사되었습니다." : "복사 실패 — 직접 선택해 복사하세요.");
+              // 버튼 자신이 결과를 말하므로, 남는 안내는 "그럼 어떻게 하라"는 실패 시 대안뿐
+              setCopyMsg(ok ? "" : "복사 실패 — 키를 직접 선택해 복사하세요.");
+              return ok;
             }}
-          >
-            다시 복사
-          </button>
+          />
           <button
             type="button"
             onClick={() => {
@@ -101,6 +102,10 @@ export default function AuthView({
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFields((f) => ({ ...f, [k]: e.target.value }));
+
+  /** 유저코드·복구키는 대문자 체계다 — 소문자로 쳐도 대문자로 들어가게 해 "안 맞는다"는 혼란을 없앤다 */
+  const setUpper = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFields((f) => ({ ...f, [k]: e.target.value.toUpperCase() }));
 
   function finish(body: AuthResponse, withRecovery: boolean) {
     if (!body.usercode || !body.token) return;
@@ -169,7 +174,8 @@ export default function AuthView({
   }
 
   return (
-    <div>
+    // auth-view: 로그인 화면은 본 화면보다 좁게 잡는다 — 입력이 몇 칸뿐이라 넓으면 휑하게 늘어진다
+    <div className="auth-view">
       <div className="auth-hero">
         <svg className="beanmark" viewBox="0 0 48 48" aria-hidden="true">
           <ellipse
@@ -229,11 +235,14 @@ export default function AuthView({
                 <label>유저코드</label>
                 <input
                   type="text"
+                  className="upper"
                   maxLength={4}
                   placeholder="ABCD"
                   autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   value={fields.usercode}
-                  onChange={set("usercode")}
+                  onChange={setUpper("usercode")}
                 />
               </div>
               <div className="field">
@@ -302,10 +311,13 @@ export default function AuthView({
                 <label>복구키</label>
                 <input
                   type="text"
+                  className="upper"
                   placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
                   autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   value={fields.recovery}
-                  onChange={set("recovery")}
+                  onChange={setUpper("recovery")}
                 />
               </div>
               <div className="field">

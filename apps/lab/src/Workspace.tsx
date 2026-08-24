@@ -1,12 +1,18 @@
-// 랩 본 화면 — 폼·라벨 디자인·로고·목록·백업의 상태 허브 (구 lab.js의 React 이식).
+// 랩 본 화면 — 입력·QR·유지관리의 상태 허브.
+//
+// 화면은 3막이다: ① 입력(IntakeCard → ReviewStepper) ② QR 발급(QrCard, 라벨은 LabelPanel로 강등)
+// ③ 유지관리(BeanListCard). 서비스가 책임지는 산출물이 "라벨 도안"이 아니라 "인쇄되는 QR과 그 QR이
+// 도착하는 상세 페이지"라서 이 순서다.
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
-import { buildLabelSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
+import { buildLabelSVG, buildQrSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
 import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import BeanFormCard from "./components/BeanFormCard";
 import BeanListCard from "./components/BeanListCard";
 import DesignCard from "./components/DesignCard";
-import PreviewCard from "./components/PreviewCard";
+import IntakeCard from "./components/IntakeCard";
+import LabelPanel from "./components/LabelPanel";
+import QrCard from "./components/QrCard";
+import ReviewStepper from "./components/ReviewStepper";
 import { api } from "./lib/api";
 import { insertByPriority, loadDesign, saveDesign } from "./lib/design";
 import { capitalizeNoteSegments, dotToIso, download, isoToDot, withUnit } from "./lib/format";
@@ -29,14 +35,30 @@ export interface LogoState {
   source: "server" | "manual" | null;
 }
 
+// 한 번에 한 맥락만 보여준다 — 입력하다가 QR·라벨·목록이 같이 눈에 들어오면 무엇을 하던 중인지 흐려진다.
+type Stage = "input" | "qr" | "label" | "list";
+
+/** 공개 데모 계정 — 서버가 쓰기를 막는다(packages/api의 writeAllowed). 화면도 같은 사실을 보여야 한다. */
+const DEMO_USERCODE = "DEMO";
+
 export default function Workspace({
   account,
   onSessionExpired,
+  onSignOut,
+  onOpenSettings,
 }: {
   account: Account;
   onSessionExpired: () => void;
+  onSignOut: () => void;
+  onOpenSettings: () => void;
 }) {
+  // 눌러봤자 403이 돌아올 버튼을 보여주지 않는다 — 막힌 이유와 다음 행동(가입)을 대신 안내한다
+  const readOnly = account.usercode === DEMO_USERCODE;
   const [form, setForm] = useState<FormState>(emptyForm);
+  // 이벤트 핸들러에서 "지금의 폼"을 읽기 위한 최신값 참조 — 자동 채우기가 다음 상태를
+  // setForm 바깥에서 순수하게 계산하는 데 쓴다 (fillParsed의 주석 참고).
+  const formRef = useRef(form);
+  formRef.current = form;
   const [design, setDesignRaw] = useState<LabelDesign>(loadDesign);
   const [mode, setMode] = useState<"new" | "edit">("new");
   const [confirmedKey, setConfirmedKey] = useState<string | null>(null);
@@ -49,8 +71,39 @@ export default function Workspace({
   const [autofillStatus, setAutofillStatus] = useState<StatusLine>({ msg: "", cls: "" });
   const [autofillText, setAutofillText] = useState("");
   const [verify, setVerify] = useState<{ text: string; cls: string }>({ text: "", cls: "" });
+  // 인쇄용 QR 모듈 크기(도트 수) — 라벨과 같은 도트 격자를 쓴다
+  const [qrDots, setQrDots] = useState(3);
+  // AI가 채운 필드 — 검증 스텝에서 "확인이 필요한 자리"로 표시하고, 사용자가 손대면 지운다
+  const [aiFilled, setAiFilled] = useState<Set<FormKey>>(new Set());
+  // 인테이크(링크 붙여넣기)를 지나 검증 단계에 들어섰는지
+  const [started, setStarted] = useState(false);
+  // 폼이 통째로 갈아끼워지는 시점(새 입력·편집 진입)에 검증 스텝 상태를 초기화하기 위한 키
+  const [formSeq, setFormSeq] = useState(0);
+  // 규칙 기반 인식이 부실했을 때만 켜지는 AI 키 권유 (키가 있으면 절대 켜지지 않는다)
+  const [aiNudge, setAiNudge] = useState(false);
+  // 서비스 키로 남은 AI 인식 횟수 — 3회 이하로 떨어졌을 때만 알린다 (0이면 소진)
+  const [aiQuotaLeft, setAiQuotaLeft] = useState<number | null>(null);
+  const [stage, setStage] = useState<Stage>("input");
 
-  // 인증 호출의 단일 통로 — 자식 카드(BeanFormCard·DesignCard)에도 prop으로 내려가므로
+  // 화면 이동을 히스토리에 쌓아 브라우저 뒤로가기가 "이전 단계"로 동작하게 한다 —
+  // 주소는 그대로 둔다(직접 링크로 들어와도 유효한 단계가 아닐 수 있어 상태로만 관리).
+  const goStage = useCallback((next: Stage) => {
+    setStage(next);
+    history.pushState({ bhStage: next }, "");
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  useEffect(() => {
+    history.replaceState({ bhStage: "input" }, "");
+    const onPop = (e: PopStateEvent) => {
+      setStage(((e.state as { bhStage?: Stage } | null)?.bhStage ?? "input") as Stage);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // 인증 호출의 단일 통로 — 자식 카드(IntakeCard·DesignCard)에도 prop으로 내려가므로
   // 세션 만료 감지를 여기 한 곳에 둔다. 401은 "토큰이 더 이상 유효하지 않다"는 뜻만 가진다:
   // rate limit은 429, 네트워크 끊김은 api()가 status 0으로 돌려주므로 여기 걸리지 않는다.
   const call = useCallback(
@@ -101,24 +154,38 @@ export default function Workspace({
 
   const label = useMemo(() => buildLabelSVG(row, design, logo.dataUrl), [row, design, logo.dataUrl]);
 
+  // 인쇄용 QR 단독 — 라벨과 같은 내용(BASE_URL/KEY)·같은 도트 격자를 쓴다.
+  const qr = useMemo(() => buildQrSVG(currentKey, qrDots), [currentKey, qrDots]);
+
+  // 실제로 인쇄되는 산출물(QR)을 203dpi로 래스터화해 디코드까지 확인한다.
+  // 라벨 SVG가 아니라 QR을 보므로 KEY·크기가 바뀔 때만 돌면 된다 — 타이핑마다 재검증하지 않는다.
   const verifySeqRef = useRef(0);
   useEffect(() => {
-    setVerify({ text: "QR 검증 중…", cls: "" });
+    setVerify({ text: "확인 중…", cls: "" });
     const mySeq = ++verifySeqRef.current;
-    verifyQr(label.svg, label.content, 203).then((v) => {
+    // 실제로 인쇄될 해상도(203dpi)로 래스터화해 디코드까지 해본다. 표시는 결과만 —
+    // 사용자가 알아야 할 것은 "인쇄해도 읽히는가"이지 dpi나 디코더 이름이 아니다.
+    verifyQr(qr.svg, qr.content, 203).then((v) => {
       if (mySeq !== verifySeqRef.current) return;
       setVerify(
         v.ok
-          ? { text: "QR 검증 OK — 203dpi 실디코드 통과", cls: "ok" }
-          : { text: "QR 검증 실패 — QR 크기를 키워보세요", cls: "bad" },
+          ? { text: "✓ 인쇄해도 스캔됩니다", cls: "ok" }
+          : { text: "스캔이 어려울 수 있어요 — 크기를 키워보세요", cls: "bad" },
       );
     });
-  }, [label]);
+  }, [qr]);
 
   // ── 표시 토글 자동 체크: 값이 방금 채워지면 켜고, 비워지면 끈다 ──
   const updateField = useCallback(
     (key: FormKey, value: string) => {
       if (key === "AGTRON" && /^\d/.test(value)) value = `#${value}`; // 숫자로 시작하면 # 자동 부착
+      // 사용자가 직접 손댄 순간 그 칸은 더 이상 "AI가 채운 미확인 값"이 아니다
+      setAiFilled((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
       setForm((prev) => {
         const had = !!prev[key].trim();
         const nowHas = !!value.trim();
@@ -240,6 +307,21 @@ export default function Workspace({
     refreshList();
   }, [refreshLogos, refreshList]);
 
+  // 덱에서 "정보 수정"으로 넘어온 경우(`?edit=KEY`) — 목록이 도착하면 그 원두를 편집 상태로 연다.
+  // 목록이 있어야 값을 채울 수 있으므로 beans를 기다렸다가 한 번만 실행한다.
+  const editParamRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: beans 도착 시 1회만 실행 (loadBeanForEdit은 렌더마다 새로 만들어져 의존성에 넣으면 반복 실행된다)
+  useEffect(() => {
+    if (editParamRef.current || !beans) return;
+    editParamRef.current = true;
+    const key = new URLSearchParams(location.search).get("edit");
+    if (!key) return;
+    // 주소를 정리해 새로고침·뒤로가기에서 편집이 되살아나지 않게
+    history.replaceState({ bhStage: "input" }, "", location.pathname);
+    if (beans.some((b) => b.KEY === key)) loadBeanForEdit(key);
+    else setStatus({ msg: `${key} 를 찾을 수 없습니다 — 이미 삭제됐을 수 있어요.`, cls: "error" });
+  }, [beans]);
+
   // ── 저장 / 초기화 / 편집 / 삭제 ─────────────────────────────
   async function save() {
     const missing: string[] = [];
@@ -252,6 +334,27 @@ export default function Workspace({
     if (missing.length) {
       setStatus({ msg: `필수 항목을 입력하세요: ${missing.join(", ")}`, cls: "error" });
       return;
+    }
+    // 같은 로스터리·산지·로스팅일이면 사실상 같은 봉지일 가능성이 높다. 소분해서 라벨을 더 만드는
+    // 정상 동작을 막지는 않고 한 번 확인만 받는다 — 실수로 두 번 등록하는 쪽이 훨씬 흔하다.
+    if (mode === "new") {
+      const dup = (beans || []).find(
+        (b) =>
+          (b.ROASTERY || "").trim().toUpperCase() === row.ROASTERY.toUpperCase() &&
+          (b.ORIGIN || "").trim().toUpperCase() === row.ORIGIN.toUpperCase() &&
+          (b.ROAST_DATE || "") === row.ROAST_DATE,
+      );
+      if (
+        dup &&
+        !confirm(
+          `이미 같은 원두가 등록돼 있습니다 — ${dup.KEY}\n` +
+            `로스터리·산지·로스팅일이 모두 같습니다.\n\n` +
+            `소분해서 라벨을 더 만드는 경우라면 그대로 진행하세요. 새로 등록할까요?`,
+        )
+      ) {
+        setStatus({ msg: `등록을 취소했습니다 — 기존 ${dup.KEY}를 목록에서 확인해 보세요.`, cls: "" });
+        return;
+      }
     }
     const payload: Record<string, string> = { ...row, YEAR: YY };
     delete payload.KEY;
@@ -272,12 +375,11 @@ export default function Workspace({
       setMode("edit");
       setConfirmedKey(body.key);
       setStatus({
-        msg: wasEdit
-          ? `수정 저장 완료 — ${body.key}`
-          : `등록 완료 — KEY ${body.key} 확정. URL·QR 복사와 인쇄를 진행하세요.`,
+        msg: wasEdit ? `수정 저장 완료 — ${body.key}` : `등록 완료 — KEY ${body.key} 확정`,
         cls: "ok",
       });
       refreshList();
+      goStage("qr"); // 등록의 결과물은 QR이다 — 바로 그 화면으로 넘긴다
     } else {
       setStatus({ msg: body?.error || "저장 실패", cls: "error" });
     }
@@ -293,8 +395,14 @@ export default function Workspace({
     setMode("new");
     setConfirmedKey(null);
     setStatus({ msg: "", cls: "" });
+    setAiFilled(new Set());
+    setAiNudge(false);
+    setAiQuotaLeft(null);
+    setStarted(false); // 인테이크(링크 붙여넣기)부터 다시
+    setFormSeq((s) => s + 1); // 검증 스텝의 완료·건너뜀 상태 초기화
     pruneSelections(next);
     refreshList();
+    goStage("input");
   }
 
   function loadBeanForEdit(key: string) {
@@ -326,8 +434,11 @@ export default function Workspace({
     setMode("edit");
     setConfirmedKey(key);
     setStatus({ msg: `${key} 를 수정 중입니다.`, cls: "ok" });
+    setAiFilled(new Set()); // 저장된 값이므로 "AI가 채운 미확인 값"이 아니다
+    setStarted(true); // 이미 값이 다 있으니 인테이크는 건너뛴다
+    setFormSeq((s) => s + 1); // 전 스텝을 완료 상태로 다시 구성
     pruneSelections(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    goStage("input");
   }
 
   async function deleteBean(key: string) {
@@ -398,41 +509,67 @@ export default function Workspace({
   }
 
   // ── 자동 채우기 ─────────────────────────────────────────────
+  //
+  // ⚠️ 다음 폼을 **setForm 바깥에서 순수하게** 계산한다. 예전엔 updater 안에서 filled 배열을 채우고
+  // 곧바로 filled.length로 성공을 판정했는데, React는 대기 중인 업데이트가 없을 때만 updater를 즉시
+  // 실행한다(eager state). 그래서 직전에 다른 상태 변경이 있었으면 updater가 미뤄져 filled가 빈 채로
+  // 읽혔고, 인식에 성공하고도 "이미 다 입력돼 있습니다"가 뜨며 다음 단계로 넘어가지 않았다.
+  // 되다 안 되다 하는 증상의 정체가 이것이었다.
   function fillParsed(parsed: Record<string, string>, sourceLabel: string, overwrite: boolean): boolean {
+    // 실패했을 때 "왜 실패했는지"를 정확히 말하려면 두 경우를 갈라야 한다:
+    // 아무것도 못 알아본 것과, 알아봤지만 이미 다 채워져 있는 것은 사용자가 할 일이 다르다.
+    const recognized = Object.entries(parsed).filter(([f, v]) => f in emptyForm() && !!v).length;
     const filled: string[] = [];
+    const filledKeys = new Set<FormKey>();
     let memoOverflow: string | null = null;
-    setForm((prev) => {
-      const next = { ...prev };
-      for (const [field, v] of Object.entries(parsed)) {
-        if (!(field in next) || !v) continue;
-        const key = field as FormKey;
-        if (!overwrite && next[key].trim()) continue;
-        if (SHORT_FIELDS.includes(field) && isParagraphLike(v)) {
-          if (!memoOverflow) memoOverflow = v;
-          continue;
-        }
-        // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
-        next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(v) : v;
-        filled.push(FIELD_LABELS_KO[field] || field);
+
+    const prev = formRef.current;
+    const next = { ...prev };
+    for (const [field, v] of Object.entries(parsed)) {
+      if (!(field in next) || !v) continue;
+      const key = field as FormKey;
+      if (!overwrite && next[key].trim()) continue;
+      if (SHORT_FIELDS.includes(field) && isParagraphLike(v)) {
+        if (!memoOverflow) memoOverflow = v;
+        continue;
       }
-      if (memoOverflow && (overwrite || !next.MEMO.trim())) {
-        next.MEMO = memoOverflow;
-        if (!filled.includes(FIELD_LABELS_KO.MEMO as string)) filled.push(FIELD_LABELS_KO.MEMO || "MEMO");
-      }
-      pruneSelectionsAndAutoCheck(prev, next);
-      return next;
-    });
+      // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
+      next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(v) : v;
+      filled.push(FIELD_LABELS_KO[field] || field);
+      filledKeys.add(key);
+    }
+    if (memoOverflow && (overwrite || !next.MEMO.trim())) {
+      next.MEMO = memoOverflow;
+      filledKeys.add("MEMO");
+      if (!filled.includes(FIELD_LABELS_KO.MEMO as string)) filled.push(FIELD_LABELS_KO.MEMO || "MEMO");
+    }
+
+    formRef.current = next; // 렌더 전에 연속 호출돼도 최신 값을 보게
+    setForm(next);
+    pruneSelectionsAndAutoCheck(prev, next);
+
+    const hasAiKey = !!(localStorage.getItem("bh_gemini_key") || "").trim();
+
     if (filled.length) {
+      setAiFilled(filledKeys);
       setAutofillStatus({
-        msg: `${sourceLabel} 채움: ${filled.join(", ")} — 검토 후 저장하세요.`,
+        msg: `${sourceLabel} 채움: ${filled.join(", ")} — 아래에서 순서대로 확인하세요.`,
         cls: "ok",
       });
+      // 규칙 기반이 몇 칸밖에 못 건졌다면 AI가 확실히 더 낫다 — 그 사실이 드러난 지금만 권한다.
+      // (잘 채워졌으면 권하지 않는다. 매번 띄우면 그냥 소음이다.)
+      if (!hasAiKey && filled.length <= 3) setAiNudge(true);
       return true;
     }
+
+    if (!hasAiKey) setAiNudge(true);
     setAutofillStatus({
-      msg: overwrite
-        ? "인식된 항목이 없습니다."
-        : "인식된 새 항목이 없습니다. 이미 채워진 필드는 덮어쓰지 않습니다.",
+      msg:
+        recognized === 0
+          ? hasAiKey
+            ? "원두 정보를 찾지 못했습니다. 정보가 적힌 부분만 붙여넣어 보세요."
+            : "원두 정보를 찾지 못했습니다."
+          : "새로 채울 항목이 없습니다 — 기존 값은 그대로 뒀습니다.",
       cls: "error",
     });
     return false;
@@ -470,46 +607,195 @@ export default function Workspace({
     }
   }
 
-  /** 링크에서 텍스트를 가져온 직후: 키가 있으면 AI, 없으면 휴리스틱 폴백. 반환값 = 항목 채움 여부 */
+  /**
+   * 인식 사다리 — 좋은 것부터 시도하고, 안 되면 조용히 한 단계씩 내려간다.
+   *   ① 본인 키    → 브라우저에서 Google 직접 (무제한, 서비스 할당량 무관)
+   *   ② 서비스 키  → POST /api/extract (계정별·전역 하루 한도)
+   *   ③ 규칙 기반  → parseBeanText (항상 동작, 네트워크 없음)
+   * 어느 단계에서 멈추든 사용자는 "채워졌다/못 채웠다"만 보면 되므로 실패는 다음 단계로 흘린다.
+   */
   async function recognizeText(raw: string): Promise<boolean> {
-    const apiKey = (localStorage.getItem("bh_gemini_key") || "").trim();
-    if (!apiKey) return fillParsed(parseBeanText(raw), "", false);
-    return runAiRecognition(raw);
+    if ((localStorage.getItem("bh_gemini_key") || "").trim()) return runAiRecognition(raw);
+
+    setAutofillStatus({ msg: "AI 인식 중…", cls: "" });
+    const { body } = await call<{ fields: Record<string, string>; remaining: number }>("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: raw }),
+    });
+    if (body?.ok && body.fields) {
+      const ok = fillParsed(body.fields, "AI ", true);
+      // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게
+      if (ok && typeof body.remaining === "number" && body.remaining <= 3) {
+        setAiQuotaLeft(body.remaining);
+      }
+      return ok;
+    }
+    // 한도 소진·키 미설정·호출 실패 — 규칙 기반으로 내려간다 (fallback 플래그는 서버가 준다)
+    if (body?.error?.includes("다 썼습니다")) setAiQuotaLeft(0);
+    return fillParsed(parseBeanText(raw), "", false);
   }
 
+  /**
+   * 같은 상품 페이지로 이미 등록한 원두 찾기 — 인테이크가 **가져오기 전에** 부른다.
+   * 목록은 이미 메모리에 있으므로 추가 요청이 없고, 걸리면 페이지 fetch와 AI 호출을 통째로 아낀다
+   * (등록 시점의 로스터리·산지·로스팅일 중복 확인은 그대로 남아 두 번째 그물이 된다).
+   */
+  const findByUrl = useCallback(
+    (url: string): string | null => {
+      const norm = (s: string) =>
+        s
+          .trim()
+          .replace(/[?#].*$/, "")
+          .replace(/\/+$/, "")
+          .toLowerCase();
+      const target = norm(url);
+      if (!target) return null;
+      return (beans || []).find((b) => norm(String(b.SOURCE_URL || "")) === target)?.KEY ?? null;
+    },
+    [beans],
+  );
+
+  // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩·datalist가 쓴다
+  const withLogo = useMemo(() => new Set(Object.keys(logosMap)), [logosMap]);
+  const roasteryOptions = useMemo(() => {
+    const fromBeans = (beans || []).map((b) => (b.ROASTERY || "").trim().toUpperCase()).filter(Boolean);
+    const sorted = [...new Set([...withLogo, ...fromBeans])].sort();
+    return [...sorted.filter((n) => withLogo.has(n)), ...sorted.filter((n) => !withLogo.has(n))];
+  }, [beans, withLogo]);
+
+  // KEY가 없으면 QR·라벨 화면은 성립하지 않는다 (뒤로가기로 흘러들어온 경우 입력으로 되돌린다)
+  const view: Stage = (stage === "qr" || stage === "label") && !confirmedKey ? "input" : stage;
+
+  // 한 화면에 한 맥락 (DESIGN.md §7): 입력 → QR 발급 → (선택) 라벨 도안, 목록은 별도 화면.
   return (
-    <div className="layout" id="app-view">
-      <div>
-        <BeanFormCard
-          form={form}
-          mode={mode}
+    <div className="flow" id="app-view">
+      {view === "input" && readOnly && (
+        <div className="card demo-notice">
+          <h1 className="intake-title">데모 둘러보기</h1>
+          <p className="intake-lede">
+            데모는 <b>구경용</b>입니다. 등록하려면 초대코드로 가입하세요 — 초대코드와 숫자 4자리면 끝입니다.
+          </p>
+          <div className="btnrow">
+            <button type="button" className="primary" onClick={onSignOut}>
+              가입하러 가기
+            </button>
+            <button type="button" onClick={() => goStage("list")}>
+              등록된 원두 둘러보기 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {view === "input" && !readOnly && (
+        <>
+          <IntakeCard
+            autofillText={autofillText}
+            setAutofillText={setAutofillText}
+            status={autofillStatus}
+            setStatus={setAutofillStatus}
+            call={call}
+            recognizeText={recognizeText}
+            sourceUrl={form.SOURCE_URL}
+            setSourceUrl={(v) => updateField("SOURCE_URL", v)}
+            findByUrl={findByUrl}
+            started={started}
+            onStart={() => setStarted(true)}
+            // "다시 가져오기"는 새 출처로 처음부터 채운다는 뜻 — 플래그만 되돌리고 폼을 남기면
+            // 다음 채우기가 "이미 다 입력돼 있습니다"에 걸려 멈춘다 (실제로 겪은 버그).
+            onReopen={startNew}
+            filledCount={aiFilled.size}
+            aiNudge={aiNudge}
+            aiQuotaLeft={aiQuotaLeft}
+            onOpenSettings={() => {
+              setAiNudge(false); // 한 번 안내했으면 충분하다
+              onOpenSettings();
+            }}
+          />
+
+          {started && (
+            <>
+              <ReviewStepper
+                key={formSeq}
+                form={form}
+                updateField={updateField}
+                aiFilled={aiFilled}
+                roasteryOptions={roasteryOptions}
+                withLogo={withLogo}
+                onRoasteryBlur={handleRoasteryBlur}
+                allDone={mode === "edit"}
+              />
+
+              {/* 입력 화면의 결론 — 등록해야 KEY가 나오고, KEY가 나와야 QR을 만들 수 있다 */}
+              <div className="card register-bar">
+                <div className="btnrow">
+                  <button type="button" className="primary" onClick={save}>
+                    {mode === "edit" ? `수정 저장 (${confirmedKey})` : "등록 — KEY 발급받기"}
+                  </button>
+                  {mode === "edit" && confirmedKey && (
+                    <button type="button" onClick={() => goStage("qr")}>
+                      QR 보기 →
+                    </button>
+                  )}
+                  <button type="button" onClick={startNew}>
+                    처음부터
+                  </button>
+                </div>
+                <div className={`status-line register-status ${status.cls}`}>{status.msg}</div>
+              </div>
+            </>
+          )}
+
+          <button type="button" className="stage-link" onClick={() => goStage("list")}>
+            내 원두 목록 →
+          </button>
+        </>
+      )}
+
+      {view === "qr" && confirmedKey && (
+        <QrCard
+          qr={qr}
+          qrDots={qrDots}
+          setQrDots={setQrDots}
+          verify={verify}
           confirmedKey={confirmedKey}
-          logosMap={logosMap}
-          beans={beans}
-          updateField={updateField}
-          autofillText={autofillText}
-          setAutofillText={setAutofillText}
-          autofillStatus={autofillStatus}
-          setAutofillStatus={setAutofillStatus}
-          onRoasteryBlur={handleRoasteryBlur}
-          call={call}
-          recognizeText={recognizeText}
-          runAiRecognition={runAiRecognition}
+          site={SITE}
+          status={status}
+          setStatus={setStatus}
+          onBackToInput={() => goStage("input")}
+          onLabel={() => goStage("label")}
+          onNew={startNew}
         />
-        <DesignCard
+      )}
+
+      {view === "label" && (
+        <LabelPanel
+          label={label}
           design={design}
           setDesign={setDesign}
           form={form}
-          logo={logo}
-          setLogo={setLogo}
-          logosMap={logosMap}
-          setLogosMap={setLogosMap}
-          logoStatus={logoStatus}
-          setLogoStatus={setLogoStatus}
-          saveLogoForRoastery={saveLogoForRoastery}
-          call={call}
-          logoMaxLen={LOGO_MAX_LEN}
-        />
+          pruneSelections={pruneSelections}
+          currentKey={currentKey}
+          onBack={() => goStage("qr")}
+        >
+          <DesignCard
+            design={design}
+            setDesign={setDesign}
+            form={form}
+            logo={logo}
+            setLogo={setLogo}
+            logosMap={logosMap}
+            setLogosMap={setLogosMap}
+            logoStatus={logoStatus}
+            setLogoStatus={setLogoStatus}
+            saveLogoForRoastery={saveLogoForRoastery}
+            call={call}
+            logoMaxLen={LOGO_MAX_LEN}
+          />
+        </LabelPanel>
+      )}
+
+      {view === "list" && (
         <BeanListCard
           beans={beans}
           site={SITE}
@@ -518,26 +804,10 @@ export default function Workspace({
           onRefresh={refreshList}
           onExport={exportCsv}
           onImport={importCsvFile}
+          onBack={() => goStage("input")}
+          readOnly={readOnly}
         />
-      </div>
-      <div>
-        <PreviewCard
-          label={label}
-          verify={verify}
-          design={design}
-          setDesign={setDesign}
-          mode={mode}
-          confirmedKey={confirmedKey}
-          currentKey={currentKey}
-          site={SITE}
-          status={status}
-          setStatus={setStatus}
-          onSave={save}
-          onNew={startNew}
-          form={form}
-          pruneSelections={pruneSelections}
-        />
-      </div>
+      )}
     </div>
   );
 }

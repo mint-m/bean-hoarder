@@ -4,8 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f5">
+<!-- 저장된 테마를 첫 페인트 전에 적용 (깜빡임 방지라 블로킹 인라인 — 세 진입점에 같은 사본) -->
+<script>
+  try {
+    if (localStorage.getItem("bh_theme") === "dark") {
+      document.documentElement.dataset.theme = "dark";
+      document.querySelector('meta[name="theme-color"]').content = "#0a0a0b";
+    }
+  } catch (_e) {}
+</script>
 <title>BEAN-HOARDER — 내 원두 덱</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%23f04e1c' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23ffffff' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,15 +42,23 @@
   .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px;
     background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
 
-  /* ── 월렛 덱: 카드가 겹쳐 쌓이고, 탭하면 상세 페이지로 ── */
+  /* ── 월렛 덱: 카드가 겹쳐 쌓이고, 탭하면 상세 페이지로 ──
+     피크 밴드가 1급 설계 단위다 (DESIGN.md §7): 스택 상태에서 보이는 상단 띠(--w-peek)에
+     정체성(향미 그라데이션 + 산지 닷 + 헤드라인 + 핵심 메타)을 모두 싣는다 — Apple Wallet이
+     색 띠로 패스를 구별하는 방식. 카드 높이를 고정해 스택이 "색 띠 카탈로그"로 정렬되게 한다. */
   /* isolation: isolate — 숨긴(archived) 카드에 줄 음수 z-index가 덱 바깥(헤더·검색창 등)으로
      새지 않고 이 컨테이너 안에서만 "맨 뒤"로 가라앉도록 자체 stacking context를 만든다. */
-  .deck { display: flex; flex-direction: column; padding-top: 4px; isolation: isolate; }
+  .deck {
+    --w-peek: 66px;   /* 스택시 보이는 밴드 높이 */
+    --w-card-h: 158px; /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치 */
+    display: flex; flex-direction: column; padding-top: 4px; isolation: isolate;
+  }
   .wcard {
     display: block; color: var(--ink); cursor: pointer;
     background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
-    border-top: 5px solid var(--accent);
-    padding: 13px 18px 16px; margin-top: -58px;
+    border: 1px solid var(--line);
+    height: var(--w-card-h); overflow: hidden;
+    margin-top: calc(var(--w-peek) - var(--w-card-h));
     position: relative;
     transition: transform .18s ease, box-shadow .18s ease;
   }
@@ -55,7 +71,7 @@
     box-shadow: var(--shadow-hover);
   }
   .wcard:hover ~ .wcard, .wcard:focus-within ~ .wcard {
-    transform: translateY(54px);
+    transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
   }
   /* 숨긴 카드는 덱의 가장 뒤(음수 z-index)로 가라앉혀 다른 카드 뒤에 깔리게 하고, 불투명하게
      채도만 낮춘다(투명하게 하면 겹친 뒤 카드가 비쳐 지저분해 보여서 opacity는 쓰지 않는다). */
@@ -63,7 +79,6 @@
     filter: grayscale(90%) brightness(.94);
     z-index: -1;
   }
-  .wcard.archived .w-origin .dday { display: none; }
   /* 카드 자체는 클릭·엔터 시 바로 상세 이동 — 메뉴는 호버 시 나타나는 별도 버튼으로만 연다.
      우측 하단(RSTD/NET 줄 옆)은 늘 여유 공간이라 절대 위치로 얹어도 본문 레이아웃을 밀어내지 않는다. */
   .wcard-menu {
@@ -80,29 +95,50 @@
   @media (hover: none) {
     .wcard-menu { opacity: 1; }
   }
-  .w-top { display: flex; justify-content: space-between; align-items: baseline; }
+  /* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
+  .w-band {
+    height: var(--w-peek); padding: 11px 18px 9px; box-sizing: border-box;
+    background-color: var(--surface-2);
+    display: flex; flex-direction: column; justify-content: space-between;
+    position: relative;
+  }
+  /* 밴드와 본문이 칼같이 잘리면 띠가 덧댄 것처럼 보인다 — 아래쪽 몇 px만 본문 색으로 빠르게 풀어
+     경계를 지운다. 내용은 z-index로 위에 두어 이 페이드에 씻기지 않게 한다. */
+  .w-band::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 12px;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none; z-index: 0;
+  }
+  .w-band > * { position: relative; z-index: 1; }
+  .w-band-top { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+  .w-origin-label {
+    display: inline-flex; align-items: center; gap: 9px; min-width: 0;
+    font-family: var(--display); font-weight: 700; font-size: 21px; line-height: 1.05;
+    text-transform: uppercase;
+  }
+  /* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다 */
+  .w-origin-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w-origin-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dday {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0;
+    color: var(--sub); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1px 8px;
+  }
+  /* 기본형 뒤에 둔다 — 재정의는 항상 나중에 와야 캐스케이드가 예측 가능하다 */
+  .wcard.archived .dday { display: none; }
+  .w-band-sub { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .w-roastery {
-    font-size: 11px; font-weight: 700; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--accent);
+    font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--sub);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .w-key { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; color: var(--sub); }
-  .w-origin {
-    font-family: var(--display); font-weight: 700; font-size: 25px; line-height: 1.05;
-    text-transform: uppercase; margin-top: 3px;
-    display: flex; align-items: center; gap: 10px; justify-content: space-between;
-  }
-  .w-origin-label { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
-  .w-origin-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
-  /* biome-ignore lint/style/noDescendingSpecificity: 기존 캐스케이드 — 순서를 바꾸면 표시가 달라질 수 있어 이전 단계에서 건드리지 않는다 */
-  .w-origin .dday {
-    font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0;
-    background: var(--accent); color: var(--accent-ink); border-radius: var(--radius-pill); padding: 2px 9px;
-  }
-  .w-meta { font-size: 12.5px; color: var(--sub); margin-top: 4px; text-transform: uppercase;
+  /* 본문 — 카드를 뽑아냈을 때(호버·마지막 카드)만 온전히 보인다 */
+  .w-body { padding: 10px 18px 0; }
+  .w-meta { font-size: 12.5px; color: var(--sub); text-transform: uppercase;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .w-note { font-size: 12.5px; font-style: italic; color: var(--ink); margin: 6px 0 0;
+  .w-note { font-size: 12.5px; font-style: italic; color: var(--ink); margin: 5px 0 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .w-foot { font-family: var(--mono); font-size: 11.5px; color: var(--sub); margin-top: 8px; }
+  .w-foot { font-family: var(--mono); font-size: 11.5px; color: var(--sub); margin-top: 7px; }
 
   /* ── 카드 탭 시 상세 이동 전 확인 메뉴 (상세보기·숨기기·삭제) ── */
   .sheet-backdrop {
@@ -113,7 +149,7 @@
   .sheet-panel {
     position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px;
     transform: translate(-50%, 100%); transition: transform .18s ease;
-    background: var(--surface); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(16,16,18,.25);
+    background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 -8px 30px rgba(16,16,18,.25);
     padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 101;
   }
   .sheet-backdrop.open .sheet-panel { transform: translate(-50%, 0); }
@@ -125,7 +161,7 @@
   .sheet-btn {
     display: block; width: 100%; text-align: left; background: none; border: none;
     font: inherit; font-size: 15px; color: var(--ink); padding: 13px 8px; cursor: pointer;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
   }
   .sheet-btn:hover, .sheet-btn:focus-visible { background: var(--hover); }
   .sheet-btn.danger { color: var(--bad); }
@@ -135,7 +171,7 @@
 <body>
 <header class="topbar">
   <a class="wordmark" href="/">Bean-Hoarder<span>DECK</span></a>
-  <a class="btn" href="/admin">랩 열기 →</a>
+  <a class="btn" href="/lab">랩 열기 →</a>
 </header>
 <main>
   <input type="search" id="filter" placeholder="검색 — 산지, 로스터리, 키, 노트…" autocomplete="off" class="hidden">
@@ -151,6 +187,7 @@
   <div class="sheet-panel" role="menu" aria-label="원두 카드 메뉴">
     <div class="sheet-title" id="sheet-title"></div>
     <button type="button" class="sheet-btn" data-act="detail">상세보기 →</button>
+    <button type="button" class="sheet-btn" data-act="edit">정보 수정 →</button>
     <button type="button" class="sheet-btn" data-act="archive">숨기기</button>
     <button type="button" class="sheet-btn danger" data-act="delete">삭제</button>
     <button type="button" class="sheet-btn cancel" data-act="cancel">취소</button>

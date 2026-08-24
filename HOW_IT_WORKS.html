@@ -105,21 +105,21 @@
       <div class="arch-platform-label"><b>bnhd.pages.dev</b> — Cloudflare Pages 프로젝트 (무료)</div>
       <div class="arch-inner">
         <div class="arch-box">
-          <strong>정적 페이지</strong>
-          <span>index.html (조회)<br>admin.html + lab.js (랩)<br>deck.html (덱)<br>label.js (렌더러)</span>
+          <strong>정적 페이지 (dist/)</strong>
+          <span>조회·덱 — apps/web (MPA)<br>랩(/lab) — apps/lab (React)<br>라벨 렌더러 — packages/label</span>
         </div>
         <div class="arch-col">
           <div class="arch-hstep">
             <span class="arch-arrow">→</span>
             <div class="arch-box" style="flex:1">
               <strong>Functions API</strong>
-              <span>/api/signup · /api/recover<br>/api/beans<br>/api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch</span>
+              <span>/api/signup · /api/login · /api/recover<br>/api/beans · /api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch<br>라우팅: packages/api (Hono)</span>
             </div>
           </div>
           <div class="arch-arrow" style="margin-left:34px">↓</div>
           <div class="arch-box" style="margin-left:34px">
             <strong>D1 데이터베이스</strong>
-            <span>users (usercode, pass_hash, recovery_hash)<br>beans (key, roastery, …)<br>logos (usercode, roastery, data_url)</span>
+            <span>users (usercode, pass_hash, recovery_hash)<br>beans (key, roastery, …)<br>logos · sessions · auth_attempts · r2_usage</span>
           </div>
         </div>
       </div>
@@ -142,7 +142,7 @@
     <div class="flow-arrow">→</div>
     <div class="step"><div class="circle">3</div><strong>유저코드 발급</strong><span>무작위 4자리, 암호는 해시로만 저장</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong>브라우저 저장</strong><span>localStorage에 보관, 재방문 시 자동 로그인</span></div>
+    <div class="step"><div class="circle">4</div><strong>브라우저 저장</strong><span>세션 토큰을 브라우저에 저장, 재방문 시 자동 로그인</span></div>
   </div>
 </section>
 
@@ -157,7 +157,7 @@
   <div class="flow">
     <div class="step"><div class="circle">1</div><strong>폼 입력</strong><span>입력할 때마다 라벨 미리보기 갱신</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>유저코드:암호로 인증된 요청</span></div>
+    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>세션 토큰으로 인증된 요청</span></div>
     <div class="flow-arrow">→</div>
     <div class="step"><div class="circle">3</div><strong>서버가 KEY 채번</strong><span>같은 유저코드·연도 내 최대값+1</span></div>
     <div class="flow-arrow">→</div>
@@ -197,7 +197,7 @@
     <tr><td class="old">"웹에 게시" 단계에서 진행이 멈춤</td><td class="old">구글시트를 DB로 사용</td><td class="new">D1 — 게시라는 개념 자체가 없음</td></tr>
     <tr><td class="old">사용자마다 Apps Script를 직접 배포</td><td class="old">시트에 쓰려면 인증 필요</td><td class="new">가입 즉시 토큰 발급, 서버가 대신 씀</td></tr>
     <tr><td class="old">레지스트리 시트를 운영자가 수동 관리</td><td class="old">유저코드 ↔ 시트 매핑 필요</td><td class="new">users 테이블 — 가입이 곧 등록</td></tr>
-    <tr><td class="old">라벨 렌더러가 Python·JS로 이원화</td><td class="old">미리보기와 인쇄 파이프라인 분리</td><td class="new">label.js 단일 모듈을 두 곳에서 공유</td></tr>
+    <tr><td class="old">라벨 렌더러가 Python·JS로 이원화</td><td class="old">미리보기와 인쇄 파이프라인 분리</td><td class="new">단일 라벨 모듈(packages/label)을 미리보기·인쇄가 공유</td></tr>
     <tr><td class="old">QR 검증이 데스크톱 파이썬 전용</td><td class="old">zxing-cpp 의존</td><td class="new">jsQR로 브라우저 안에서 자동 검증</td></tr>
     <tr><td class="old">KEY 채번을 클라이언트가 추측</td><td class="old">CSV를 읽어 max+1 계산</td><td class="new">서버가 등록 시점에 원자적으로 배정</td></tr>
   </table>
@@ -210,7 +210,8 @@
     <li><b>가입</b>: 초대코드(운영자가 공유) + 숫자 4자리 암호만으로 계정 생성. 초대코드는 Cloudflare secret으로 관리 — 저장소에 없고 언제든 교체 가능.</li>
     <li><b>암호</b>: 탈취돼도 무방한 편의용 — 무단 등록·수정을 막는 수준. 서버는 PBKDF2(유저코드:암호) 해시만 저장.</li>
     <li><b>복구키</b>: 가입 시 1회 표시되는 고엔트로피 키. 유저코드·암호를 모두 잊었을 때의 유일한 복구 수단이며 사용하면 회전된다.</li>
-    <li><b>쓰기</b>: 등록·수정·삭제·백업에 <code style="font-family:var(--mono)">Authorization: Bearer 유저코드:암호</code> 필요. 브라우저에 저장돼 재방문 시 자동 로그인.</li>
+    <li><b>무차별 대입</b>: 4자리 암호 특성상 D1 기반 rate limit으로 차단 — 유저코드당 10회/10분, IP당 30회/10분 초과 시 429.</li>
+    <li><b>쓰기</b>: 등록·수정·삭제·백업에 세션 토큰(<code style="font-family:var(--mono)">POST /api/login</code>으로 발급, 90일 만료)이 필요 — <code style="font-family:var(--mono)">Authorization: Bearer</code> 헤더로 전송한다. 브라우저는 암호가 아니라 토큰만 저장한다(레거시 <code style="font-family:var(--mono)">유저코드:암호</code> 헤더도 이행기 동안 동작).</li>
     <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
     <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
     <li><b>데이터 회복</b>: CSV 백업을 언제든 내려받고, 같은 파일로 복원(같은 KEY 덮어쓰기) — 실수·악의적 변조를 백업 시점으로 되돌린다.</li>
@@ -233,14 +234,15 @@
 <section>
   <h2>08 · 관련 파일</h2>
   <div class="filelist">
-    <div><b>public/index.html</b> — 조회 페이지, /api/bean/{KEY} 호출</div>
-    <div><b>public/admin.html + lab.css + lab.js</b> — 랩(스튜디오): 가입, 입력, 미리보기, 등록, 백업·복원, 로고 관리</div>
-    <div><b>public/deck.html</b> — 내 원두 월렛 덱</div>
-    <div><b>public/label.js</b> — 라벨 SVG 렌더러 + QR 검증, 3개 사이즈(40×20·50×30·50×60) 지원</div>
-    <div><b>public/autofill.js</b> — 붙여넣은 텍스트에서 원두 정보 추출 (휴리스틱)</div>
-    <div><b>functions/api/[[path]].js + _lib.js</b> — signup · recover · beans · bean/{KEY} · export.csv · import · logos · fetch</div>
-    <div><b>schema.sql / seed.sql</b> — D1 테이블 정의, 데모 데이터</div>
-    <div><b>DESIGN.md</b> — 설계 근거 전문</div>
+    <div><b>apps/web/</b> — 조회·덱 MPA: apps/web/index.html · apps/web/deck.html · apps/web/src/viewer.ts · apps/web/src/deck.ts. 공용 토큰 apps/web/public/theme.css</div>
+    <div><b>apps/lab/</b> — 랩(스튜디오): 가입·입력·미리보기·등록·백업·복원·로고. React → /lab으로 빌드</div>
+    <div><b>packages/label/</b> — 라벨 SVG 렌더러 + QR 검증, 3개 사이즈(40×20·50×30·50×60)</div>
+    <div><b>packages/autofill/</b> — 붙여넣은 텍스트에서 원두 정보 추출 (휴리스틱)</div>
+    <div><b>packages/schema/</b> — 원두 필드·헤드라인 조합 규칙의 단일 소스</div>
+    <div><b>packages/api/</b> — Hono API (signup · login · beans · bean/{KEY} · export.csv · import · logos · fetch). functions/api/[[path]].ts가 마운트</div>
+    <div><b>packages/session/</b> — 세션 저장·이행 (조회·덱·랩 공유)</div>
+    <div><b>db/schema.sql · db/seed.sql</b> — D1 테이블 정의, 데모 데이터</div>
+    <div><b>DESIGN.md</b> — 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙). STRUCTURE.md — 저장소 구조(생성물), README.md — 사용법·운영</div>
   </div>
 </section>
 

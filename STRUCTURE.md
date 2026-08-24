@@ -11,7 +11,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| `public/admin/` | 랩(등록·관리 화면) — apps/lab 빌드 산출물. gitignore이며 CI가 배포 직전에 만든다. |
+| `dist/lab/` | 랩(등록·QR 발급 화면) — apps/lab 빌드 산출물. gitignore이며 npm run build가 만든다. |
 
 **서버** — Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.
 
@@ -23,7 +23,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| `apps/lab/`<br>`@bnhd/lab` | 랩(등록·관리 화면)의 React 진입점 — base /admin/으로 빌드되어 public/admin에 올라간다. |
+| `apps/lab/`<br>`@bnhd/lab` | 랩(등록·관리 화면)의 React 진입점 — base /lab/으로 빌드되어 dist/lab에 올라간다. |
 | `apps/web/`<br>`@bnhd/web` | — |
 | `packages/api/`<br>`@bnhd/api` | Bean-Hoarder v2 API — Hono 앱 (Cloudflare Pages Functions에 마운트). |
 | `packages/autofill/`<br>`@bnhd/autofill` | 붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서. |
@@ -36,6 +36,7 @@
 | 경로 | 역할 |
 |---|---|
 | `db/migrate_add_columns.sql` | 비파괴 마이그레이션: 기존 users/beans 데이터를 보존한 채 신규 컬럼만 추가. |
+| `db/migrate_ai_usage.sql` | AI 인식 사용량 카운터 — 서비스 키로 대신 호출해 주는 몫에만 상한을 건다. |
 | `db/migrate_archived.sql` | 비파괴 마이그레이션: 소비 완료 등으로 숨김 처리하는 보관(archived) 상태 컬럼 추가 |
 | `db/migrate_coffee_name.sql` | 비파괴 마이그레이션: 시그니쳐·블렌드 네이밍용 커피 이름 컬럼 추가 (라벨/카드 헤드라인 오버라이드) |
 | `db/migrate_drop.sql` | v2 인증 모델 변경(토큰 → 유저코드+암호)에 따른 재생성용. |
@@ -82,6 +83,7 @@
 | PUT | `/logos` | 필요 |
 | DELETE | `/logos` | 필요 |
 | POST | `/fetch` | 필요 |
+| POST | `/extract` | 필요 |
 
 **D1 테이블** (`bnhd-v2`)
 
@@ -93,3 +95,4 @@
 | `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at` |
 | `auth_attempts` | `bucket`, `count`, `reset_at` |
 | `r2_usage` | `id`, `month`, `write_count` |
+| `ai_usage` | `bucket`, `count`, `reset_at` |

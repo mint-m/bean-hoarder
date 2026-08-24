@@ -1,8 +1,5 @@
 // 날짜·단위·텍스트 포맷 유틸 (lab.js에서 이식).
 
-import { BASE_URL } from "@bnhd/label";
-import qrcode from "qrcode-generator";
-
 /** <input type=date>(ISO) → 저장 포맷(yy.mm.dd) */
 export function isoToDot(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
@@ -65,29 +62,14 @@ export function download(filename: string, blob: Blob | null): void {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-/** QR 단독 이미지(콰이엇존 4모듈 포함, 512px급)를 클립보드에 복사 */
-export async function copyQrImage(key: string): Promise<{ ok: boolean; blob?: Blob }> {
-  const qr = qrcode(0, "M");
-  qr.addData(`${BASE_URL}/${key}`, "Alphanumeric");
-  qr.make();
-  const n = qr.getModuleCount();
-  const quiet = 4;
-  const scale = 16;
-  const size = (n + quiet * 2) * scale;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = "#000";
-  for (let r = 0; r < n; r++)
-    for (let c = 0; c < n; c++)
-      if (qr.isDark(r, c)) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
-  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-  if (!blob) return { ok: false };
+/**
+ * 이미지 Blob을 클립보드에 복사. 실패하면 blob을 돌려줘 호출부가 다운로드로 폴백한다.
+ * (QR 생성 자체는 하지 않는다 — 인쇄 기하의 단일 소스는 @bnhd/label의 buildQrSVG다.)
+ */
+export async function copyImage(blob: Blob): Promise<{ ok: boolean; blob: Blob }> {
   try {
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return { ok: true };
+    return { ok: true, blob };
   } catch (_e) {
     return { ok: false, blob };
   }
