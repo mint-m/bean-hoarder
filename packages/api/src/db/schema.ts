@@ -56,6 +56,14 @@ export const authAttempts = sqliteTable("auth_attempts", {
   reset_at: text().notNull(),
 });
 
+// AI 인식 사용량 — 서비스 키로 대신 호출해 주는 몫의 하루 한도(계정별·전역).
+// 사용자 본인 키는 브라우저에서 직접 나가므로 세지 않는다. 근거는 lib/ai-quota.ts.
+export const aiUsage = sqliteTable("ai_usage", {
+  bucket: text().primaryKey(),
+  count: integer().notNull().default(0),
+  reset_at: text().notNull(),
+});
+
 // R2 비용 백스톱 — 서비스 전역 월간 R2 쓰기(Class A) 카운터. 단일 행(id='global').
 // 월이 바뀌면 write_count를 리셋한다(budget.ts가 판정). 자세한 근거는 lib/budget.ts 참조.
 export const r2Usage = sqliteTable("r2_usage", {

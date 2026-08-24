@@ -19,6 +19,7 @@
 //   PUT    /api/logos         로스터리 로고 저장/교체 (이미지 100KB 제한)
 //   DELETE /api/logos         로스터리 로고 삭제
 //   POST   /api/fetch         상품 페이지 텍스트/로고 이미지 프록시 (로그인 사용자 전용)
+//   POST   /api/extract       AI 인식 대행 (서비스 키, 계정별·전역 하루 한도 — 본인 키가 있으면 브라우저 직접)
 // 환경변수: INVITE_CODE는 Cloudflare secret으로 관리 (wrangler pages secret put INVITE_CODE)
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -28,6 +29,7 @@ import { json } from "./lib/http";
 import { login, logout, recoverAccount, signup } from "./routes/auth";
 import { exportCsv, importCsv } from "./routes/backup";
 import { addBean, deleteBean, getBeanPublic, listBeans, setArchived, updateBean } from "./routes/beans";
+import { extractWithAi } from "./routes/extract";
 import { deleteLogo, listLogos, putLogo } from "./routes/logos";
 import { fetchExternal } from "./routes/proxy";
 
@@ -83,6 +85,8 @@ app.delete("/logos", authRequired, writeAllowed, deleteLogo);
 // 외부 페이지를 우리 서버가 대신 받아오는 프록시라 공개 계정에 열어 두면 남용 통로가 된다.
 // 데모는 등록을 못 하므로 이 기능을 쓸 이유도 없다.
 app.post("/fetch", authRequired, writeAllowed, fetchExternal);
+// AI 인식 대행 — 서비스 키를 쓰므로 데모는 막고(writeAllowed) 계정별·전역 하루 한도를 건다
+app.post("/extract", authRequired, writeAllowed, extractWithAi);
 
 app.notFound(() => json({ ok: false, error: "not found" }, 404));
 // 5xx는 구조화 JSON으로 로깅 — wrangler pages deployment tail / 대시보드 Real-time Logs에서
