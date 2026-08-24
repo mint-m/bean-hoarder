@@ -13,8 +13,6 @@ interface Props {
   onExport: () => void;
   onImport: (file: File) => void;
   onBack: () => void;
-  /** 데모 계정 — 서버가 쓰기를 막으므로 수정·삭제·복원 버튼을 아예 내보내지 않는다 */
-  readOnly?: boolean;
 }
 
 export default function BeanListCard(p: Props) {
@@ -46,17 +44,13 @@ export default function BeanListCard(p: Props) {
                   </span>
                 </div>
                 <div className="rowbtns">
-                  {!p.readOnly && (
-                    <button type="button" onClick={() => p.onEdit(b.KEY)}>
-                      수정
-                    </button>
-                  )}
+                  <button type="button" onClick={() => p.onEdit(b.KEY)}>
+                    수정
+                  </button>
                   <CopyButton label="URL 복사" onCopy={() => copyText(`${p.site}/${b.KEY}`)} />
-                  {!p.readOnly && (
-                    <button type="button" className="danger" onClick={() => p.onDelete(b.KEY)}>
-                      삭제
-                    </button>
-                  )}
+                  <button type="button" className="danger" onClick={() => p.onDelete(b.KEY)}>
+                    삭제
+                  </button>
                 </div>
               </div>
             ))}
@@ -70,11 +64,9 @@ export default function BeanListCard(p: Props) {
         <button type="button" onClick={p.onExport}>
           CSV 백업 다운로드
         </button>
-        {!p.readOnly && (
-          <button type="button" onClick={() => fileRef.current?.click()}>
-            CSV 백업 복원
-          </button>
-        )}
+        <button type="button" onClick={() => fileRef.current?.click()}>
+          CSV 백업 복원
+        </button>
         <button type="button" onClick={() => window.open("/deck", "_blank")}>
           덱으로 보기 ↗
         </button>

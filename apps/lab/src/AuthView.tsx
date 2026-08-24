@@ -13,8 +13,6 @@ interface AuthResponse {
   usercode?: string;
   token?: string;
   recovery_key?: string;
-  /** 데모 관리자 키로 로그인했을 때만 서버가 실어 준다 */
-  admin?: boolean;
 }
 
 async function postJson(path: string, body: unknown): Promise<AuthResponse | null> {
@@ -99,7 +97,7 @@ export default function AuthView({
 }) {
   const [tab, setTab] = useState<Tab>("login");
   const [status, setStatus] = useState<{ msg: string; ok: boolean }>({ msg: "", ok: true });
-  const [fields, setFields] = useState({ usercode: "", pin: "", invite: "", recovery: "", adminKey: "" });
+  const [fields, setFields] = useState({ usercode: "", pin: "", invite: "", recovery: "" });
   const [pending, setPending] = useState<{ account: Account; recoveryKey: string } | null>(null);
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -111,8 +109,8 @@ export default function AuthView({
 
   function finish(body: AuthResponse, withRecovery: boolean) {
     if (!body.usercode || !body.token) return;
-    const account = { usercode: body.usercode, token: body.token, admin: !!body.admin };
-    saveSession(account.usercode, account.token, account.admin);
+    const account = { usercode: body.usercode, token: body.token };
+    saveSession(account.usercode, account.token);
     if (withRecovery && body.recovery_key) {
       copyText(body.recovery_key); // 가입/복구 시점에 클립보드 저장 유도 (실패해도 무시)
       setPending({ account, recoveryKey: body.recovery_key });
@@ -128,13 +126,7 @@ export default function AuthView({
       setStatus({ msg: "유저코드 4자리와 숫자 암호 4자리를 입력하세요.", ok: false });
       return;
     }
-    // 데모 관리자 키는 있을 때만 보낸다 — 서버는 DEMO에서만 이 필드를 본다(app.ts의 writeAllowed).
-    const adminKey = fields.adminKey.trim();
-    const body = await postJson("/api/login", {
-      usercode: uc,
-      password: pin,
-      ...(adminKey ? { admin_key: adminKey } : {}),
-    });
+    const body = await postJson("/api/login", { usercode: uc, password: pin });
     if (body?.ok && body.token) finish(body, false);
     else setStatus({ msg: body?.error || "유저코드 또는 암호가 올바르지 않습니다.", ok: false });
   }
@@ -265,21 +257,6 @@ export default function AuthView({
                 />
               </div>
             </div>
-            {/* 공개된 데모 계정은 읽기 전용이라 운영자만 이 키로 쓰기를 연다.
-                유저코드가 DEMO일 때만 보여 일반 사용자의 로그인 화면은 그대로 둔다. */}
-            {fields.usercode === "DEMO" && (
-              <div className="field">
-                <label>관리자 키 (선택 — 데모 카드를 수정할 때만)</label>
-                <input
-                  type="password"
-                  placeholder="비워 두면 둘러보기 전용"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={fields.adminKey}
-                  onChange={set("adminKey")}
-                />
-              </div>
-            )}
             <div className="btnrow">
               <button type="button" className="primary" onClick={login}>
                 이 브라우저에 로그인

@@ -221,7 +221,7 @@
     <li><b>쓰기</b>: 등록·수정·삭제·백업에 세션 토큰(<code style="font-family:var(--mono)">POST /api/login</code>으로 발급, 90일 만료)이 필요 — <code style="font-family:var(--mono)">Authorization: Bearer</code> 헤더로 전송한다. 브라우저는 암호가 아니라 토큰만 저장한다(레거시 <code style="font-family:var(--mono)">유저코드:암호</code> 헤더도 이행기 동안 동작).</li>
     <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
     <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
-    <li><b>데모 계정</b>: 유저코드·암호가 문서에 공개돼 있어 서버가 <b>쓰기를 403으로 막는다</b>(둘러보기 전용). 열어 두면 사실상 인증 없는 무제한 계정이 되기 때문이다 — 화면에서 버튼을 숨기는 것만으로는 API 직접 호출을 막을 수 없다.</li>
+    <li><b>공개 계정을 두지 않는다</b>: 로그인 없이 둘러보는 화면은 정적 데모 덱(<code>/demo</code>)이 맡는다. 예전엔 자격증명을 공개한 데모 계정을 두고 서버가 쓰기를 막았는데, 그러면 그 계정을 관리할 방법까지 함께 사라진다 — 구경거리를 계정이 아니라 페이지로 떼어내 양쪽을 다 얻었다.</li>
     <li><b>AI 인식 대행</b>: 서비스 키는 Cloudflare secret으로만 존재하며 브라우저로 내려가지 않는다. 계정별·전역 하루 한도로 남용을 막고, 한도를 넘기면 규칙 기반 인식으로 내려간다.</li>
     <li><b>데이터 회복</b>: CSV 백업을 언제든 내려받고, 같은 파일로 복원(같은 KEY 덮어쓰기) — 실수·악의적 변조를 백업 시점으로 되돌린다.</li>
     <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
@@ -250,7 +250,7 @@
     <div><b>packages/schema/</b> — 원두 필드·헤드라인 조합 규칙의 단일 소스</div>
     <div><b>packages/api/</b> — Hono API (signup · login · beans · bean/{KEY} · export.csv · import · logos · fetch). functions/api/[[path]].ts가 마운트</div>
     <div><b>packages/session/</b> — 세션 저장·이행 (조회·덱·랩 공유)</div>
-    <div><b>db/schema.sql · db/seed.sql</b> — D1 테이블 정의, 데모 데이터</div>
+    <div><b>db/schema.sql · db/seed.sql</b> — D1 테이블 정의, 로컬·e2e 픽스처</div>
     <div><b>DESIGN.md</b> — 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙). STRUCTURE.md — 저장소 구조(생성물), README.md — 사용법·운영</div>
   </div>
 </section>

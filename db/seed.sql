@@ -18,23 +18,12 @@ INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
    'f3694ec983ba1134bb1b67d54b97924ea67642bd4bd0cd154993b41cfa6ed84a');
 
 -- 데모 원두 — 로컬·e2e에서 조회 동선(/{KEY})이 실물 카드를 갖도록 심는다.
--- 라이브 데모 카드의 단일 소스는 여기가 아니라 원격 D1이다(관리자 키 로그인으로 앱에서 수정).
--- INSERT OR REPLACE라 재실행하면 로컬 데모가 이 내용으로 되돌아온다.
-INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, producer, lot, washing_station,
-  variety, process, altitude, harvest, roast_date, package_date, net_weight, agtron,
-  tasting_note, memo, source_url) VALUES
-  ('DEMO26-001', 'DEMO', 'DANCHE', 'ETHIOPIA', 'Yirgacheffe, Gedeb', 'Smallholder farmers', 'Worka Sakaro',
-   'Gedeb CWS', '74158', 'Washed', '2100m', '25/26', '26.06.28', '26.07.03', '60g', '#95 (라이트)',
-   'Jasmine, bergamot, white peach',
-   '게뎁의 소농들이 딴 체리를 워카 사카로 워싱스테이션에 모아 함께 가공한 커뮤니티 랏. 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열로, 2,100m의 재배 고도가 단단한 산미를 받쳐 준다. 자스민과 베르가못의 화사한 향 뒤로 잘 익은 백도의 단맛이 이어지고, 여운은 깔끔하게 떨어진다.',
-   'https://example.com/beans/yirgacheffe-gedeb'),
-  ('DEMO26-002', 'DEMO', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña',
-   '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.09', '26.08.23', '250g', '',
-   'Melon, lime, tropical fruit',
-   '윌리엄 오르티스의 라 카바냐 농장에서 시즌의 마지막 세 번째 수확분만 골라 담은 랏. 콜롬비아에서는 아직 드문 치로소를 워시드로 가공했다. 멜론과 라임을 닮은 열대 과일 향이 부드럽게 퍼지고, 워시드다운 깔끔한 마무리가 뒤를 받친다.',
-   'https://www.seycoffee.com/collections/coffee/products/2026-william-ortiz-la-cabana-end-of-season-colombia'),
-  ('DEMO26-003', 'DEMO', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña',
-   '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.14', '26.08.24', '20g', '#120 (울트라라이트)',
-   'Melon, lime, tropical fruit',
-   '같은 라 카바냐 치로소를 커핑용 20g으로 소분한 봉지. 한 봉지를 여러 크기로 나눠 담아도 원두 정보는 KEY마다 따로 남는다 — 로스팅일과 소분일이 봉지별로 다른 이유다.',
-   '');
+-- 정적 데모 덱(/demo)이 링크하는 KEY와 같아야 하므로 apps/web/src/demo-beans.json에서 파생한다
+-- (아래 블록은 생성물 — 손으로 고치지 말고 JSON을 고친 뒤 npm run gen:demo-seed).
+-- 라이브 데모 카드의 실제 소스는 원격 D1이다 — 이 파일은 원격에 실행하지 않는다.
+-- >>> 데모 원두 (생성됨 — npm run gen:demo-seed, 원본은 apps/web/src/demo-beans.json)
+INSERT OR REPLACE INTO beans (key, roastery, origin, region, producer, lot, washing_station, variety, process, altitude, harvest, roast_date, package_date, net_weight, agtron, tasting_note, memo, source_url, coffee_name, usercode) VALUES
+  ('DEMO26-001', 'DANCHE', 'ETHIOPIA', 'Yirgacheffe, Gedeb', 'Smallholder farmers', 'Worka Sakaro', 'Gedeb CWS', '74158', 'Washed', '2100m', '25/26', '26.06.28', '26.07.03', '60g', '#95 (라이트)', 'Jasmine, bergamot, white peach', '게뎁의 소농들이 딴 체리를 워카 사카로 워싱스테이션에 모아 함께 가공한 커뮤니티 랏. 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열로, 2,100m의 재배 고도가 단단한 산미를 받쳐 준다. 자스민과 베르가못의 화사한 향 뒤로 잘 익은 백도의 단맛이 이어지고, 여운은 깔끔하게 떨어진다.', 'https://example.com/beans/yirgacheffe-gedeb', '', 'DEMO'),
+  ('DEMO26-002', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña', '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.09', '26.08.23', '250g', '', 'Melon, lime, tropical fruit', '윌리엄 오르티스의 라 카바냐 농장에서 시즌의 마지막 세 번째 수확분만 골라 담은 랏. 콜롬비아에서는 아직 드문 치로소를 워시드로 가공했다. 멜론과 라임을 닮은 열대 과일 향이 부드럽게 퍼지고, 워시드다운 깔끔한 마무리가 뒤를 받친다.', 'https://www.seycoffee.com/collections/coffee/products/2026-william-ortiz-la-cabana-end-of-season-colombia', '', 'DEMO'),
+  ('DEMO26-003', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña', '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.14', '26.08.24', '20g', '#120 (울트라라이트)', 'Melon, lime, tropical fruit', '같은 라 카바냐 치로소를 커핑용 20g으로 소분한 봉지. 한 봉지를 여러 크기로 나눠 담아도 원두 정보는 KEY마다 따로 남는다 — 로스팅일과 소분일이 봉지별로 다른 이유다.', '', '', 'DEMO');
+-- <<< 데모 원두

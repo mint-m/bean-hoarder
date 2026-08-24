@@ -11,10 +11,6 @@ database_id = "f6b539d0-3394-4011-9f00-f3961d549409"
 #   npx wrangler pages secret put INVITE_CODE
 # (교체도 같은 명령으로. 대시보드 Settings > Environment variables에서도 가능)
 
-# DEMO_ADMIN_KEY도 같은 방식의 secret — 공개된 DEMO 계정에서 쓰기를 여는 관리자 키다.
-#   npx wrangler pages secret put DEMO_ADMIN_KEY
-# 설정하지 않으면 기능이 꺼진 채로 DEMO는 순수 읽기 전용이 된다.
-
 [[r2_buckets]]
 binding = "LOGOS"
 bucket_name = "bnhd-logos"

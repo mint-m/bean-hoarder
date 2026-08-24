@@ -72,16 +72,19 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   자동 채우기가 정확히 이걸로 깨져서(인식에 성공하고도 "이미 다 입력돼 있습니다") 지금은 다음 상태를
   **updater 바깥에서 순수하게 계산**한 뒤 넘긴다 — `Workspace.fillParsed` 참고. 최신 폼은 렌더마다
   갱신하는 `formRef`로 읽는다.
-- **`db/seed.sql`에는 쓰기 제한이 없는 `TEST` 계정이 있다 — 원격 D1에 실행하지 말 것.** 공개된 `DEMO`는
-  서버가 쓰기를 403으로 막지만(`packages/api/src/app.ts`의 `writeAllowed`), TEST는 e2e가 등록 동선을
-  끝까지 검증하려고 둔 것이라 제한이 없다. 로컬·e2e DB 전용이다.
-- **데모 카드는 관리자 키로만 고친다.** DEMO는 쓰기가 막혀 있어 평범한 로그인으로는 등록·수정 UI가
-  통하지 않는다. 랩 로그인에서 유저코드 `DEMO`를 넣으면 나타나는 "관리자 키" 칸에 `DEMO_ADMIN_KEY`
-  (Cloudflare secret)를 넣은 세션만 쓰기가 열린다 — 승격은 `packages/api/src/routes/auth.ts`의
-  `login`에서 일어나고 `writeAllowed`가 `user.admin`을 본다. 키가 배포에 없으면 기능 자체가 꺼진다.
-  **공개된 `DEMO`/`0000`만으로는 절대 열리지 않아야 한다** — `packages/api/test/app.test.ts`의
-  "데모 관리자" 테스트 3건이 그 경계를 지킨다. `db/seed.sql`의 데모 원두는 로컬·e2e 전용이라
-  라이브에 반영되지 않는다(원격에 실행 금지 — 위 TEST 계정 항목).
+- **`db/seed.sql`의 계정은 로컬·e2e 픽스처다 — 원격 D1에 실행하지 말 것.** `DEMO`·`TEST` 모두 암호가
+  저장소에 적혀 있어, 원격에 넣으면 누구나 로그인하는 계정이 라이브에 생긴다. **서비스에 특별
+  취급되는 계정은 없다** — 예전엔 공개 데모 계정을 두고 서버가 쓰기를 막았지만, 그 구조는 계정을
+  관리할 방법까지 함께 없애서 걷어냈다.
+- **구경거리는 정적 데모 덱(`/demo`)이고, 데이터는 `apps/web/src/demo-beans.json` 한 곳이다.**
+  이 JSON에서 `db/seed.sql`의 데모 원두 블록이 생성되므로(`npm run gen:demo-seed`) **seed의 그 블록을
+  손으로 고치지 않는다** — `npm run check`가 어긋나면 실패시킨다.
+  카드를 누르면 열리는 상세는 정적이 아니라 **실제 공개 조회(`/{KEY}`)**다. 그래서 JSON의 KEY는
+  라이브 D1에 실존해야 하고, 그 원두는 운영자 계정에서 평범하게 등록·수정한다. KEY를 바꾸면
+  데모 링크가 죽으므로 JSON의 KEY는 함부로 갈지 않는다.
+- **덱 카드 마크업·스타일은 한 벌뿐이다** — `apps/web/src/lib/wallet-card.ts`(마크업)와
+  `apps/web/public/deck.css`(스타일)를 `/deck`과 `/demo`가 함께 쓴다. 한쪽만 고치면 데모와 실제
+  덱이 달라 보인다. 클래스 이름이 그 둘 사이의 계약이다.
 - **랩 개발 서버는 8790**: `npm run dev -w @bnhd/lab`의 Vite 프록시가 8790을 본다
   (`apps/lab/vite.config.ts`). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 `/api`가 죽으므로
   랩을 붙일 때는 `--port 8790`을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.

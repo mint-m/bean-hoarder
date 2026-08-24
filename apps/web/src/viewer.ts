@@ -55,8 +55,8 @@ function showLanding(): void {
     if (v) {
       location.href = `/${encodeURIComponent(v)}`;
     } else {
-      // 입력이 비어있을 때 데모 원두 페이지로 이동
-      location.href = `/DEMO26-001`;
+      // 입력이 비었으면 구경거리로 보낸다 — 무엇을 치라는 건지 모르는 첫 방문자가 여기 걸린다
+      location.href = "/demo";
     }
   });
   setupScanner();

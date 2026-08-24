@@ -4,7 +4,7 @@
 import { loginBodySchema, PIN_RE, recoverBodySchema, signupBodySchema, USERCODE_RE } from "@bnhd/schema";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
-import { DEMO_USERCODE, verifyCredentials } from "../auth";
+import { verifyCredentials } from "../auth";
 import { createDb, schema } from "../db";
 import type { AppEnv } from "../env";
 import {
@@ -62,16 +62,6 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
   return json({ ok: false, error: "유저코드 발급 실패 (재시도 요망)" }, 500);
 }
 
-/**
- * 관리자 키 대조 — 길이·내용을 드러내지 않도록 양쪽을 SHA-256으로 넘긴 뒤 비교한다.
- * 키가 배포에 설정돼 있지 않으면 어떤 입력도 통과하지 못한다(기능 off).
- */
-async function isAdminKey(env: AppEnv["Bindings"], provided: string): Promise<boolean> {
-  if (!env.DEMO_ADMIN_KEY || !provided) return false;
-  const [a, b] = await Promise.all([sha256hex(provided), sha256hex(env.DEMO_ADMIN_KEY)]);
-  return a === b;
-}
-
 export async function login(c: Context<AppEnv>): Promise<Response> {
   const body = loginBodySchema.parse(await c.req.json().catch(() => ({})));
   const usercode = body.usercode.toUpperCase();
@@ -84,29 +74,8 @@ export async function login(c: Context<AppEnv>): Promise<Response> {
     return json({ ok: false, error: "유저코드 또는 암호가 올바르지 않습니다." }, 401);
   }
   const db = createDb(c.env.DB);
-
-  // 데모 관리자 승격 — 공개된 DEMO/0000만으로는 절대 서지 않고, 관리자 키를 함께 낸 로그인만
-  // 쓰기 가능한 세션을 받는다. DEMO/0000은 언제나 성공하므로 키 오입력은 자격 검증 rate limit에
-  // 걸리지 않는다 — 여기서 직접 실패로 기록해 같은 카운터(10회/10분)로 전수 대입을 막는다.
-  let admin = false;
-  if (usercode === DEMO_USERCODE && body.admin_key) {
-    admin = await isAdminKey(c.env, body.admin_key);
-    if (!admin) {
-      await recordFailure(db, `pw:${usercode}`);
-      await recordFailure(db, `ip:${clientIp(c.req.raw)}`);
-      return json({ ok: false, error: "유저코드 또는 암호가 올바르지 않습니다." }, 401);
-    }
-  }
-
-  const session = await createSession(db, usercode, admin);
-  // admin은 승격됐을 때만 덧붙인다 — 일반 로그인 응답은 종전과 완전히 동일하다(계약 유지).
-  return json({
-    ok: true,
-    usercode,
-    token: session.token,
-    expires_at: session.expires_at,
-    ...(admin ? { admin: true } : {}),
-  });
+  const session = await createSession(db, usercode);
+  return json({ ok: true, usercode, token: session.token, expires_at: session.expires_at });
 }
 
 /** 현재 세션 폐기 — 레거시(usercode:pin) 인증으로 호출되면 폐기할 세션이 없으므로 그냥 성공 */

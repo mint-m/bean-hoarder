@@ -35,7 +35,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| `db/migrate_session_admin.sql` | 데모 관리자 세션: 세션에 admin 플래그를 둔다. |
+| `db/migrate_drop_session_admin.sql` | 데모 관리자 세션 철회 — sessions.admin 컬럼을 되돌린다. |
 | `db/schema.sql` | — |
 | `db/seed.sql` | 데모/테스트 계정 + 데모 원두 카드. |
 
@@ -51,6 +51,7 @@
 | 경로 | 역할 |
 |---|---|
 | `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
+| `scripts/gen-demo-seed.mjs` | 데모 원두 시드를 데이터에서 파생시킨다. |
 | `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
 
 **API 라우트** — 모두 `/api` 접두. 표시가 없으면 인증 없이 열려 있다.
@@ -82,7 +83,7 @@
 | `users` | `usercode`, `pass_hash`, `recovery_hash`, `created_at` |
 | `beans` | `key`, `usercode`, `roastery`, `origin`, `region`, `producer`, `lot`, `washing_station`, `variety`, `process`, `altitude`, `harvest`, `roast_date`, `package_date`, `net_weight`, `agtron`, `tasting_note`, `memo`, `source_url`, `coffee_name`, `archived`, `created_at` |
 | `logos` | `usercode`, `roastery`, `data_url`, `content_type`, `updated_at` |
-| `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at`, `admin` |
+| `sessions` | `token_hash`, `usercode`, `created_at`, `expires_at` |
 | `auth_attempts` | `bucket`, `count`, `reset_at` |
 | `r2_usage` | `id`, `month`, `write_count` |
 | `ai_usage` | `bucket`, `count`, `reset_at` |

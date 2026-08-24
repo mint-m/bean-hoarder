@@ -12,13 +12,6 @@ import { lookupSession, SESSION_TOKEN_RE } from "./lib/session";
 const LEGACY_RE = /^Bearer\s+([A-Z0-9]{4}):(\d{4})$/i;
 const SESSION_RE = /^Bearer\s+(bhs_[0-9a-f]{32})$/i;
 
-/**
- * 공개 데모 계정의 유저코드 — 유저코드·암호가 README에 공개돼 있다.
- * 쓰기 제한(app.ts의 writeAllowed)과 관리자 승격(routes/auth.ts의 login)이 함께 보는 값이라
- * 어느 한쪽에 두면 순환 import가 되므로 인증 모듈에 둔다.
- */
-export const DEMO_USERCODE = "DEMO";
-
 export type AuthResult = { kind: "ok"; user: AuthedUser } | { kind: "limited" } | { kind: "fail" };
 
 /**
@@ -75,10 +68,7 @@ export async function authenticate(env: Env, request: Request): Promise<AuthResu
     const db = createDb(env.DB);
     const found = await lookupSession(db, s[1]);
     return found
-      ? {
-          kind: "ok",
-          user: { usercode: found.usercode, sessionTokenHash: found.tokenHash, admin: found.admin },
-        }
+      ? { kind: "ok", user: { usercode: found.usercode, sessionTokenHash: found.tokenHash } }
       : { kind: "fail" };
   }
 

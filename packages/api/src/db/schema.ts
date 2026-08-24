@@ -42,13 +42,11 @@ export const beans = sqliteTable(
 );
 
 // 세션 토큰 — 원문이 아니라 SHA-256 해시를 저장, 만료 90일 고정 (Phase 2 인증)
-// admin=1은 데모 관리자 세션 — 공개 DEMO/0000 로그인으로는 절대 세워지지 않는다(routes/auth.ts).
 export const sessions = sqliteTable("sessions", {
   token_hash: text().primaryKey(),
   usercode: text().notNull(),
   created_at: text().notNull().default(sql`(datetime('now'))`),
   expires_at: text().notNull(),
-  admin: integer().notNull().default(0),
 });
 
 // 인증 시도 rate limit — bucket당 고정 윈도우 실패 카운터

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
-// 조회(/)·덱(/deck)의 MPA 빌드 — 두 HTML이 각각 진입점이고 산출물은 배포 루트 dist/에 떨어진다.
+// 조회(/)·덱(/deck)·데모(/demo)의 MPA 빌드 — 각 HTML이 진입점이고 산출물은 배포 루트 dist/에 떨어진다.
 // 랩(@bnhd/lab)은 같은 dist/lab 아래로 따로 빌드되므로, 이 빌드가 먼저 돌아야 한다
 // (emptyOutDir가 dist/를 비우기 때문 — 순서는 루트 package.json의 build 스크립트가 보장한다).
 //
@@ -17,6 +17,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL("./index.html", import.meta.url)),
         deck: fileURLToPath(new URL("./deck.html", import.meta.url)),
+        demo: fileURLToPath(new URL("./demo.html", import.meta.url)),
       },
     },
   },

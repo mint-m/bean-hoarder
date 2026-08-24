@@ -13,7 +13,7 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 | 조회 (QR 스캔 대상) | **[bnhd.pages.dev](https://bnhd.pages.dev)** — 인증 없음 |
 | 랩 (등록·QR 발급) | **[bnhd.pages.dev/lab](https://bnhd.pages.dev/lab)** — 가입/로그인 필요 |
 | 덱 (내 원두 카드) | **[bnhd.pages.dev/deck](https://bnhd.pages.dev/deck)** — 로그인 필요 |
-| 원두 카드 상세 (데모) | [bnhd.pages.dev/DEMO26-001](https://bnhd.pages.dev/DEMO26-001) |
+| 데모 (로그인 없이 둘러보기) | **[bnhd.pages.dev/demo](https://bnhd.pages.dev/demo)** — 정적 페이지 |
 | 작동 방식 (그래픽 문서) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
 | 디자인 시스템 | [DESIGN.md](DESIGN.md) · 저장소 구조 [STRUCTURE.md](STRUCTURE.md) |
 
@@ -98,14 +98,14 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 - **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 `db/` 아래 남아 있는
   `migrate_*.sql`을 파일명 순서대로 적용한다 — **적용이 끝난 마이그레이션은 지운다**(이력은 git에
   남는다). 그래서 `db/`에 파일이 보인다는 것 자체가 "원격에 아직 안 넣었다"는 뜻이다.
-  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_session_admin.sql`
-  **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다.
-- **데모 갱신**: 랩 로그인 화면에서 유저코드 `DEMO`를 넣으면 "관리자 키" 칸이 나타난다. 여기에
-  `DEMO_ADMIN_KEY`를 넣고 로그인한 세션만 쓰기가 열려(7일 만료) 평소처럼 등록·수정·삭제할 수 있다.
-  키를 비우고 들어가면 지금까지와 같은 둘러보기 전용 세션이다.
-  키 설정: `npx wrangler pages secret put DEMO_ADMIN_KEY` (충분히 긴 무작위 문자열을 쓴다 —
-  예: `openssl rand -base64 24`). 설정하지 않으면 이 승격 경로 자체가 꺼져 DEMO는 순수 읽기 전용이 된다.
-  `db/seed.sql`의 데모 원두는 로컬·e2e용이다 — TEST 계정이 딸려 있어 **원격에 실행하지 않는다**.
+  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_drop_session_admin.sql`
+  **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다
+  (컬럼을 없애는 마이그레이션이라면 반대로 코드를 먼저 올린다).
+- **데모 갱신**: 데모 덱(`/demo`)은 저장소에 고정된 데이터로 만든 정적 페이지다 —
+  `apps/web/src/demo-beans.json`을 고치고 `npm run gen:demo-seed`(로컬 시드 갱신) 후 배포한다.
+  카드를 누르면 열리는 상세는 정적이 아니라 실제 공개 조회(`/{KEY}`)이므로, **JSON의 KEY가
+  라이브 D1에 실제로 있어야 한다** — 그 원두들은 운영자 계정에서 평범하게 등록·수정한다.
+  `npm run check`가 JSON과 `db/seed.sql`이 어긋나면 실패시킨다.
 
 ## 로컬 개발
 
@@ -117,7 +117,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 ```bash
 npm ci                                                        # 루트에서 1회 (npm workspaces)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
@@ -126,10 +126,10 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
-- 데모 계정: 유저코드 `DEMO` / 암호 `0000` — **둘러보기 전용**(서버가 쓰기를 403으로 막는다).
-  자격증명이 공개돼 있어 쓰기를 열어 두면 사실상 인증 없는 무제한 계정이 되기 때문이다.
-- 테스트 계정: 유저코드 `TEST` / 암호 `0000` — 쓰기 제한이 없어 e2e가 등록 동선을 끝까지 검증한다.
-  `db/seed.sql`에 있으므로 **원격 D1에 seed를 실행하면 라이브에도 생긴다** — 운영 DB에는 넣지 않는다.
+- `db/seed.sql`의 `DEMO`·`TEST` 계정(둘 다 암호 `0000`)은 **로컬·e2e 전용 픽스처**다.
+  자격증명이 저장소에 적혀 있으므로 **원격 D1에 seed를 실행하지 않는다** — 실행하면 라이브에
+  누구나 로그인할 수 있는 계정이 생긴다. 서비스에는 특별 취급되는 계정이 없다.
+- 로그인 없이 둘러보는 화면은 정적 데모 덱(`/demo`)이 맡는다 — 공개 계정을 두지 않는 이유다.
 - 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
   **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
 - 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
