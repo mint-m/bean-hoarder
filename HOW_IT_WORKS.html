@@ -113,7 +113,7 @@
             <span class="arch-arrow">→</span>
             <div class="arch-box" style="flex:1">
               <strong>Functions API</strong>
-              <span>/api/signup · /api/login · /api/recover<br>/api/beans · /api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch<br>라우팅: packages/api (Hono)</span>
+              <span>/api/signup · /api/login · /api/recover<br>/api/beans · /api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch · /api/extract<br>라우팅: packages/api (Hono)</span>
             </div>
           </div>
           <div class="arch-arrow" style="margin-left:34px">↓</div>
@@ -148,23 +148,30 @@
 
 <section>
   <h2>03 · 흐름 2</h2>
-  <h3>원두 등록 — 서버가 KEY를 채번하고 QR을 자동 검증한다</h3>
+  <h3>원두 등록 — 붙여넣기로 초안을 만들고, 확인만 하고, KEY를 받는다</h3>
   <p class="lede">
-    폼을 채우는 동안 라벨은 "예상 KEY"로 실시간 미리보기된다. 실제 저장은 등록 버튼을 눌렀을 때 한 번,
-    서버 쪽에서 일어난다 — 같은 연도·같은 유저코드 안에서 원자적으로 다음 번호를 배정하므로 두 사람이
-    동시에 등록해도 번호가 겹치지 않는다.
+    17개 칸을 손으로 채우는 대신 상품 페이지 링크(또는 페이지 내용)를 붙여넣어 초안을 만든다.
+    인식은 3단 사다리다 — 본인 AI 키가 있으면 브라우저에서 Google로 직접, 없으면 서비스 키로 서버가
+    대신(하루 한도), 그것도 안 되면 규칙 기반 파서. 어느 단계에서 멈추든 채우기는 동작한다.
+    이후 사용자는 우선순위 순서로 한 번에 한 단계씩 확인하고(건너뛰기 가능), 등록 버튼을 눌렀을 때
+    비로소 서버가 KEY를 채번한다 — 같은 연도·같은 유저코드 안에서 원자적으로 다음 번호를 배정하므로
+    두 사람이 동시에 등록해도 번호가 겹치지 않는다.
   </p>
   <div class="flow">
-    <div class="step"><div class="circle">1</div><strong>폼 입력</strong><span>입력할 때마다 라벨 미리보기 갱신</span></div>
+    <div class="step"><div class="circle">1</div><strong>링크·본문 붙여넣기</strong><span>링크면 <code>/api/fetch</code>가 페이지를 대신 받아온다</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong><code>POST /api/beans</code></strong><span>세션 토큰으로 인증된 요청</span></div>
+    <div class="step"><div class="circle">2</div><strong>AI 인식</strong><span>본인 키 → 서비스 키(<code>/api/extract</code>) → 규칙 기반 순으로 폴백</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">3</div><strong>서버가 KEY 채번</strong><span>같은 유저코드·연도 내 최대값+1</span></div>
+    <div class="step"><div class="circle">3</div><strong>순차 확인</strong><span>필수부터 한 단계씩. AI가 채운 칸엔 "확인" 표시</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong>QR 자동 검증</strong><span>203dpi로 래스터화 후 jsQR로 실제 디코드</span></div>
+    <div class="step"><div class="circle">4</div><strong><code>POST /api/beans</code></strong><span>서버가 KEY 채번 (유저코드·연도 내 최대값+1)</span></div>
     <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">5</div><strong>URL·QR 복사</strong><span>상세 URL 또는 QR 이미지를 클립보드로. 라벨 PNG 다운로드는 선택</span></div>
+    <div class="step"><div class="circle">5</div><strong>QR 발급 + 검증</strong><span>확정 KEY로 QR을 만들고 203dpi 래스터화 후 jsQR로 실제 디코드</span></div>
   </div>
+  <p class="lede" style="margin-top:16px">
+    QR은 KEY를 담으므로 <b>등록 전에는 내보내지 않는다</b> — 확정 전 QR을 인쇄하면 존재하지 않는 곳을
+    가리키게 된다. 라벨 도안은 원하는 사람만 들어가는 별도 화면이다(양식과 프린터가 제각각이라 선택 기능).
+  </p>
   <p class="lede" style="margin-top:16px">
     등록 후에는 "내 원두 목록"에서 언제든 수정(<code style="font-family:var(--mono)">PUT</code>)·삭제(<code style="font-family:var(--mono)">DELETE</code>)할 수 있다 —
     KEY 앞 4자리가 내 유저코드인 원두만 건드릴 수 있다.
@@ -214,6 +221,8 @@
     <li><b>쓰기</b>: 등록·수정·삭제·백업에 세션 토큰(<code style="font-family:var(--mono)">POST /api/login</code>으로 발급, 90일 만료)이 필요 — <code style="font-family:var(--mono)">Authorization: Bearer</code> 헤더로 전송한다. 브라우저는 암호가 아니라 토큰만 저장한다(레거시 <code style="font-family:var(--mono)">유저코드:암호</code> 헤더도 이행기 동안 동작).</li>
     <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
     <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
+    <li><b>데모 계정</b>: 유저코드·암호가 문서에 공개돼 있어 서버가 <b>쓰기를 403으로 막는다</b>(둘러보기 전용). 열어 두면 사실상 인증 없는 무제한 계정이 되기 때문이다 — 화면에서 버튼을 숨기는 것만으로는 API 직접 호출을 막을 수 없다.</li>
+    <li><b>AI 인식 대행</b>: 서비스 키는 Cloudflare secret으로만 존재하며 브라우저로 내려가지 않는다. 계정별·전역 하루 한도로 남용을 막고, 한도를 넘기면 규칙 기반 인식으로 내려간다.</li>
     <li><b>데이터 회복</b>: CSV 백업을 언제든 내려받고, 같은 파일로 복원(같은 KEY 덮어쓰기) — 실수·악의적 변조를 백업 시점으로 되돌린다.</li>
     <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
   </ul>
