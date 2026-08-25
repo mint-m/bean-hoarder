@@ -101,18 +101,22 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_drop_session_admin.sql`
   **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다
   (컬럼을 없애는 마이그레이션이라면 반대로 코드를 먼저 올린다).
-- **데모 갱신**: 데모 덱(`/demo`)은 `apps/web/src/demo-beans.json`으로 만드는 정적 페이지다.
-  JSON을 손으로 고쳐도 되지만, **랩에서 평소처럼 편집한 뒤 떠 오는 쪽이 정석이다**:
+- **데모 갱신**: 데모 덱(`/demo`)은 정적 페이지지만 **내용의 권위는 라이브 D1에 있다** —
+  카드를 누르면 열리는 상세가 실제 공개 조회(`/{KEY}`)라, 방문자가 보는 것을 최종적으로 정하는
+  건 언제나 라이브다. 그래서 데이터는 한 방향으로만 흐른다:
 
-  ```bash
-  # DEMO 계정으로 랩에 로그인해 원두를 등록·수정한 뒤
-  npm run gen:demo-beans              # 로컬 D1 → JSON (+ db/seed.sql 자동 갱신)
-  npm run gen:demo-beans -- --remote  # 라이브 D1에서 그대로 떠 오기
+  ```
+  원격 D1 ──▶ apps/web/src/demo-beans.json ──▶ db/seed.sql ──▶ 로컬·e2e D1
   ```
 
-  카드를 누르면 열리는 상세는 정적이 아니라 실제 공개 조회(`/{KEY}`)다. 그래서 **JSON의 KEY가
-  라이브 D1에 실제로 있어야 한다** — `--remote`로 뜨면 이 조건이 자동으로 맞는다.
-  `npm run check`가 JSON과 `db/seed.sql`이 어긋나면 실패시킨다.
+  바꾸는 방법은 하나다. **랩에 DEMO 계정으로 로그인해 라이브 원두를 평소처럼 고친 뒤** 떠 온다:
+
+  ```bash
+  npm run gen:demo-beans   # 원격 D1 → JSON → db/seed.sql (한 번에)
+  ```
+
+  JSON을 손으로 고치지 않는다 — 다음 갱신 때 덮어써지고, 무엇보다 라이브 카드는 그대로라
+  덱과 상세가 다른 말을 하게 된다. `npm run check`가 JSON과 `db/seed.sql`의 어긋남을 잡는다.
 
 ## 로컬 개발
 

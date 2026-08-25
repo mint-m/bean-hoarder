@@ -51,7 +51,7 @@
 | 경로 | 역할 |
 |---|---|
 | `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
-| `scripts/gen-demo-beans.mjs` | 데모 원두 데이터를 D1에서 떠 온다 — 손으로 JSON을 고치지 않고 앱에서 꾸미기 위한 경로. |
+| `scripts/gen-demo-beans.mjs` | 라이브 데모 원두를 저장소로 떠 온다 — 데모 데이터가 흐르는 방향의 출발점. |
 | `scripts/gen-demo-seed.mjs` | 데모 원두 시드를 데이터에서 파생시킨다. |
 | `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
 
