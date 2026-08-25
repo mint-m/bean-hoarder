@@ -1,29 +1,20 @@
--- 데모/테스트 계정 + 데모 원두 카드.
+-- 로컬·e2e 픽스처 — 계정과 조회 테스트용 원두 한 건.
 -- pass_hash는 구형(SHA-256) 포맷 — 첫 로그인 시 서버가 PBKDF2로 자동 업그레이드한다.
 --
--- ⚠️ 이 파일은 **원격 D1에 실행하지 말 것** — 쓰기 제한이 없는 TEST 계정이 들어 있다.
---    라이브 데모 카드를 고치려면 랩에서 관리자 키로 로그인해 앱에서 수정한다 (README "운영").
+-- ⚠️ **원격 D1에 실행하지 말 것.** 암호가 저장소에 적혀 있어, 원격에 넣으면 누구나 로그인하는
+--    계정이 라이브에 생긴다. 서비스에 특별 취급되는 계정은 없다.
 --
--- 데모 계정: 유저코드 DEMO, 암호 0000, 복구키 F89E-5079-5A48-3F33-62B0
--- ⚠️ DEMO는 자격증명이 공개돼 있어 서버가 **쓰기를 막는다**(packages/api/src/app.ts의 writeAllowed).
---    등록·수정·삭제가 필요한 자동 테스트는 아래 TEST 계정을 쓴다.
-INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
-  ('DEMO', 'ae399e68ab3b10ba60abbb7a9859e53785817f453f13528a2fd85557daf1ce47',
-   '0a915ff66685ba15421a8c45464e63172507de5b77851d660451a3215f1f1185');
+-- 데모(구경거리)는 여기 없다 — /demo 덱과 데모 카드는 apps/web/src/demo-beans.json으로 만드는
+-- 정적 페이지라 D1을 전혀 타지 않는다. 데모와 DB는 서로 모른다.
 
--- 테스트 계정(유저코드 TEST, 암호 0000) — e2e 전용. 쓰기 제한이 없어 등록 동선을 끝까지 검증할 수 있다.
--- 로컬·e2e DB에만 넣는다.
+-- e2e 전용 계정(유저코드 TEST, 암호 0000) — 쓰기 제한이 없어 등록 동선을 끝까지 검증한다.
 INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
   ('TEST', '37d315b6d9de4369664a0f20c49a8d7b56703fc74245b5b83588fbe2ac6c98c6',
    'f3694ec983ba1134bb1b67d54b97924ea67642bd4bd0cd154993b41cfa6ed84a');
 
--- 데모 원두 — 로컬·e2e에서 조회 동선(/{KEY})이 실물 카드를 갖도록 심는다.
--- 정적 데모 덱(/demo)이 링크하는 KEY와 같아야 하므로 apps/web/src/demo-beans.json에서 파생한다
--- (아래 블록은 생성물 — 손으로 고치지 말고 JSON을 고친 뒤 npm run gen:demo-seed).
--- 라이브 데모 카드의 실제 소스는 원격 D1이다 — 이 파일은 원격에 실행하지 않는다.
--- >>> 데모 원두 (생성됨 — npm run gen:demo-seed, 원본은 apps/web/src/demo-beans.json)
-INSERT OR REPLACE INTO beans (key, roastery, origin, region, producer, lot, washing_station, variety, process, altitude, harvest, roast_date, package_date, net_weight, agtron, tasting_note, memo, source_url, coffee_name, usercode) VALUES
-  ('DEMO26-001', 'DANCHE', 'ETHIOPIA', 'Yirgacheffe, Gedeb', 'Smallholder farmers', 'Worka Sakaro', 'Gedeb CWS', '74158', 'Washed', '2100m', '25/26', '26.06.28', '26.07.03', '60g', '#95 (라이트)', 'Jasmine, bergamot, white peach', '게뎁의 소농들이 딴 체리를 워카 사카로 워싱스테이션에 모아 함께 가공한 커뮤니티 랏. 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열로, 2,100m의 재배 고도가 단단한 산미를 받쳐 준다. 자스민과 베르가못의 화사한 향 뒤로 잘 익은 백도의 단맛이 이어지고, 여운은 깔끔하게 떨어진다.', 'https://example.com/beans/yirgacheffe-gedeb', '', 'DEMO'),
-  ('DEMO26-002', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña', '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.09', '26.08.23', '250g', '', 'Melon, lime, tropical fruit', '윌리엄 오르티스의 라 카바냐 농장에서 시즌의 마지막 세 번째 수확분만 골라 담은 랏. 콜롬비아에서는 아직 드문 치로소를 워시드로 가공했다. 멜론과 라임을 닮은 열대 과일 향이 부드럽게 퍼지고, 워시드다운 깔끔한 마무리가 뒤를 받친다.', 'https://www.seycoffee.com/collections/coffee/products/2026-william-ortiz-la-cabana-end-of-season-colombia', '', 'DEMO'),
-  ('DEMO26-003', 'SEY', 'COLOMBIA', 'Pitalito, Huila', 'William Ortiz', 'La Cabaña', '', 'Chiroso', 'Washed', '1700m', '26.05', '26.08.14', '26.08.24', '20g', '#120 (울트라라이트)', 'Melon, lime, tropical fruit', '같은 라 카바냐 치로소를 커핑용 20g으로 소분한 봉지. 한 봉지를 여러 크기로 나눠 담아도 원두 정보는 KEY마다 따로 남는다 — 로스팅일과 소분일이 봉지별로 다른 이유다.', '', '', 'DEMO');
--- <<< 데모 원두
+-- 공개 조회(/{KEY}) 동선이 D1을 실제로 거치는지 확인하기 위한 고정 원두.
+-- 데모 카드는 정적 경로라 이 검증을 대신해 주지 못한다 — 그래서 API로 답하는 행이 따로 필요하다.
+INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, variety, process,
+  altitude, roast_date, package_date, net_weight, agtron, tasting_note) VALUES
+  ('TEST26-001', 'TEST', 'E2E FIXTURE', 'ETHIOPIA', 'Yirgacheffe', 'Heirloom', 'Washed',
+   '2000m', '26.06.28', '26.07.03', '60g', '#95 (라이트)', 'Jasmine, bergamot');

@@ -3,17 +3,36 @@
 import { expect, test } from "@playwright/test";
 
 test("공개 조회: QR 상세 카드가 렌더링된다", async ({ page }) => {
-  await page.goto("/DEMO26-001");
+  await page.goto("/TEST26-001");
   await expect(page.locator("body")).toContainText("ETHIOPIA");
-  await expect(page.locator("body")).toContainText("DANCHE");
+  await expect(page.locator("body")).toContainText("E2E FIXTURE");
 });
 
 // 경로(/{KEY}) 외에 쿼리(?c={KEY})로도 조회할 수 있다 — 랩의 링크·수동 입력이 쓰는 진입.
 // viewer.getCode()의 별도 분기라 경로 진입 테스트로는 덮이지 않는다.
 test("공개 조회: ?c= 쿼리 진입도 같은 카드를 연다", async ({ page }) => {
-  await page.goto("/?c=DEMO26-001");
+  await page.goto("/?c=TEST26-001");
   await expect(page.locator("body")).toContainText("ETHIOPIA");
-  await expect(page.locator("body")).toContainText("DANCHE");
+  await expect(page.locator("body")).toContainText("E2E FIXTURE");
+});
+
+// 데모는 "정적"이 요점이다 — D1도 API도 타지 않아야 라이브와 어긋날 여지가 없다.
+// 화면이 그려지는 것만 봐서는 그 요점이 지켜졌는지 알 수 없으므로(예전 구현도 그림은 그렸다)
+// /api/** 를 통째로 끊어 놓고 덱과 카드가 멀쩡한지 확인한다.
+test("데모: API를 전부 끊어도 덱과 카드가 그대로 뜬다", async ({ page }) => {
+  await page.route("**/api/**", (route) => route.abort());
+
+  await page.goto("/demo");
+  const cards = page.locator(".wcard");
+  await expect(cards.first()).toBeVisible();
+
+  const key = await cards.last().getAttribute("data-key");
+  expect(key, "데모 카드에 KEY가 없다").toBeTruthy();
+  expect(key as string, "데모 KEY는 예약 접두 DEMO로 시작해야 한다").toMatch(/^DEMO/);
+
+  await page.goto(`/${key}`);
+  await expect(page.locator("#bean")).toBeVisible();
+  await expect(page.locator("body")).toContainText(key as string);
 });
 
 test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱에서 카드 확인", async ({ page }) => {
@@ -22,8 +41,7 @@ test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱�
   page.on("dialog", (d) => d.accept());
   await page.goto("/lab/");
 
-  // 테스트 계정 로그인. 공개된 DEMO는 서버가 쓰기를 막으므로(둘러보기 전용) 등록 동선은
-  // 시드의 TEST 계정으로 검증한다. 시드는 구형 해시라 세션 발급 + 무중단 업그레이드 경로까지 커버된다.
+  // 시드의 TEST 계정으로 로그인. 시드는 구형 해시라 세션 발급 + 무중단 업그레이드 경로까지 커버된다.
   await page.getByPlaceholder("ABCD").fill("TEST");
   await page.getByPlaceholder("0000").fill("0000");
   await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();

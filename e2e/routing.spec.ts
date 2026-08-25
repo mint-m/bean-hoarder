@@ -15,7 +15,7 @@ const DECK = "<title>BEAN-HOARDER — 내 원두 덱</title>";
 const DEMO = "<title>BEAN-HOARDER — 데모 덱</title>";
 
 test("QR 계약: 등록된 KEY 경로가 조회 페이지로 떨어진다", async ({ request }) => {
-  const res = await request.get("/DEMO26-001");
+  const res = await request.get("/TEST26-001");
   expect(res.status()).toBe(200);
   expect(res.headers()["content-type"]).toMatch(/text\/html/);
   expect(await res.text()).toContain(VIEWER);
@@ -45,21 +45,13 @@ test("라우팅 계약: /deck 이 확장자 없이 덱 페이지로 해석된다
 });
 
 // 데모 덱은 로그인도 D1도 없이 떠야 한다 — 첫 방문자가 서비스를 확인하는 유일한 창구다.
-// 카드가 링크하는 KEY는 실제 조회 페이지로 이어져야 하므로 그 경로까지 함께 확인한다.
-test("라우팅 계약: /demo 가 정적 데모 덱으로 해석되고 카드 링크가 살아 있다", async ({ request }) => {
+// 카드가 링크하는 /{KEY}도 조회 페이지로 떨어져야 한다 — 데모 카드는 그 페이지가 정적으로 그린다.
+test("라우팅 계약: /demo 가 정적 데모 덱으로 해석된다", async ({ request }) => {
   const res = await request.get("/demo");
   expect(res.status()).toBe(200);
   expect(await res.text()).toContain(DEMO);
 
-  // 정적 페이지라 KEY는 번들 안에 있다 — 스크립트를 받아 첫 KEY를 뽑아 조회 페이지를 확인한다
-  const html = await (await request.get("/demo")).text();
-  const src = html.match(/<script[^>]+src="([^"]+demo[^"]*)"/)?.[1];
-  expect(src, "데모 페이지가 자기 번들을 참조하지 않는다").toBeTruthy();
-  const bundle = await (await request.get(src as string)).text();
-  const key = bundle.match(/[A-Z0-9]{4}\d{2}-\d{3}/)?.[0];
-  expect(key, "데모 번들에 원두 KEY가 들어 있지 않다").toBeTruthy();
-
-  const card = await request.get(`/${key}`);
+  const card = await request.get("/DEMO26-001");
   expect(card.status()).toBe(200);
   expect(await card.text()).toContain(VIEWER);
 });

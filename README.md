@@ -98,25 +98,21 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 - **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 `db/` 아래 남아 있는
   `migrate_*.sql`을 파일명 순서대로 적용한다 — **적용이 끝난 마이그레이션은 지운다**(이력은 git에
   남는다). 그래서 `db/`에 파일이 보인다는 것 자체가 "원격에 아직 안 넣었다"는 뜻이다.
-  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_drop_session_admin.sql`
+  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=<그 파일>`
   **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다
   (컬럼을 없애는 마이그레이션이라면 반대로 코드를 먼저 올린다).
-- **데모 갱신**: 데모 덱(`/demo`)은 정적 페이지지만 **내용의 권위는 라이브 D1에 있다** —
-  카드를 누르면 열리는 상세가 실제 공개 조회(`/{KEY}`)라, 방문자가 보는 것을 최종적으로 정하는
-  건 언제나 라이브다. 그래서 데이터는 한 방향으로만 흐른다:
+- **데모 갱신**: 데모는 DB가 아니라 **콘텐츠**다. 덱(`/demo`)도 카드(`/DEMO…`)도
+  `apps/web/src/demo-beans.json` 하나로 그리는 정적 페이지라 D1을 전혀 타지 않는다 —
+  라이브와 어긋날 여지가 없고, 바뀌는 시점은 배포다. 운영 중 손댈 것이 없다.
 
-  ```
-  원격 D1 ──▶ apps/web/src/demo-beans.json ──▶ db/seed.sql ──▶ 로컬·e2e D1
-  ```
-
-  바꾸는 방법은 하나다. **랩에 DEMO 계정으로 로그인해 라이브 원두를 평소처럼 고친 뒤** 떠 온다:
+  JSON을 손으로 적는 대신 로컬 랩에서 꾸며 보고 떠 온다:
 
   ```bash
-  npm run gen:demo-beans   # 원격 D1 → JSON → db/seed.sql (한 번에)
+  # 로컬 랩에서 DEMO 계정으로 원두를 등록·수정한 뒤
+  npm run gen:demo-beans   # 로컬 D1 → apps/web/src/demo-beans.json
   ```
 
-  JSON을 손으로 고치지 않는다 — 다음 갱신 때 덮어써지고, 무엇보다 라이브 카드는 그대로라
-  덱과 상세가 다른 말을 하게 된다. `npm run check`가 JSON과 `db/seed.sql`의 어긋남을 잡는다.
+  `DEMO` 접두는 이 용도로 예약돼 있다 — 유저코드 알파벳에 `O`가 없어 실계정에 발급될 수 없다.
 
 ## 로컬 개발
 
@@ -137,10 +133,10 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
-- `db/seed.sql`의 `DEMO`·`TEST` 계정(둘 다 암호 `0000`)은 **로컬·e2e 전용 픽스처**다.
+- `db/seed.sql`의 `TEST` 계정(암호 `0000`)과 픽스처 원두는 **로컬·e2e 전용**이다.
   자격증명이 저장소에 적혀 있으므로 **원격 D1에 seed를 실행하지 않는다** — 실행하면 라이브에
   누구나 로그인할 수 있는 계정이 생긴다. 서비스에는 특별 취급되는 계정이 없다.
-- 로그인 없이 둘러보는 화면은 정적 데모 덱(`/demo`)이 맡는다 — 공개 계정을 두지 않는 이유다.
+- 로그인 없이 둘러보는 화면은 정적 데모(`/demo`)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.
 - 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
   **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
 - 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.

@@ -35,9 +35,8 @@
 
 | 경로 | 역할 |
 |---|---|
-| `db/migrate_drop_session_admin.sql` | 데모 관리자 세션 철회 — sessions.admin 컬럼을 되돌린다. |
 | `db/schema.sql` | — |
-| `db/seed.sql` | 데모/테스트 계정 + 데모 원두 카드. |
+| `db/seed.sql` | 로컬·e2e 픽스처 — 계정과 조회 테스트용 원두 한 건. |
 
 **테스트** — 단위 테스트는 각 패키지 안에 두고, 사용자 동선은 e2e가 실제 서버를 띄워 검증한다.
 
@@ -51,8 +50,7 @@
 | 경로 | 역할 |
 |---|---|
 | `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
-| `scripts/gen-demo-beans.mjs` | 라이브 데모 원두를 저장소로 떠 온다 — 데모 데이터가 흐르는 방향의 출발점. |
-| `scripts/gen-demo-seed.mjs` | 데모 원두 시드를 데이터에서 파생시킨다. |
+| `scripts/gen-demo-beans.mjs` | 데모 덱에 실을 원두를 로컬 D1에서 떠 온다 — 저작 편의를 위한 한 방향 내보내기. |
 | `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
 
 **API 라우트** — 모두 `/api` 접두. 표시가 없으면 인증 없이 열려 있다.

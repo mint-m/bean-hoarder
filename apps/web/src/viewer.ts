@@ -12,6 +12,14 @@ import { daysSince, el, escapeHtml } from "./lib/dom";
 type JsQR = typeof import("jsqr").default;
 
 const KEY_RE = /^[A-Z0-9]{4}\d{2}-\d{3}$/;
+/**
+ * 데모 KEY 접두 — 이 접두의 카드는 D1이 아니라 저장소의 정적 데이터가 답한다.
+ *
+ * 유저코드 알파벳(CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ")에는 O가 없어 **DEMO는 실계정에
+ * 발급될 수 없다** — 이 접두는 영구 예약분이라 이 분기가 남의 원두를 가로챌 일이 없다.
+ * 덕분에 데모는 D1에 행을 두지 않아도 되고, 라이브와 저장소가 어긋날 여지 자체가 없다.
+ */
+const DEMO_PREFIX = "DEMO";
 // 티켓 정보 행(날짜·용량·로스팅포인트)에 못 들어간 부가 스펙 — 한 줄 텍스트(specline)로 표시
 const SPEC_FIELDS: readonly (readonly [string, string])[] = [
   ["PROCESS", "PROCESS"],
@@ -284,6 +292,21 @@ async function main(): Promise<void> {
     );
     return;
   }
+  // 데모 카드는 정적이다 — API를 타지 않고 번들에 실린 데이터로 그린다. 지연 import라
+  // 이 데이터는 별도 청크로 갈라져, QR로 도착하는 대부분의 트래픽은 받아 가지 않는다.
+  if (code.startsWith(DEMO_PREFIX)) {
+    const { default: demoBeans } = await import("./demo-beans.json");
+    const bean = (demoBeans as HeadlineRow[]).find((b) => String(b.KEY) === code);
+    if (!bean) {
+      show(
+        `데모에 없는 코드입니다.<br><span class="code">${escapeHtml(code)}</span><br><br><a href="/demo">데모 덱으로 ←</a>`,
+      );
+      return;
+    }
+    render(bean, false);
+    return;
+  }
+
   let res: Response;
   try {
     res = await fetch(`/api/bean/${encodeURIComponent(code)}`, { cache: "no-store" });

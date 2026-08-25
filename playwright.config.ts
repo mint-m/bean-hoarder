@@ -10,8 +10,8 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run e2e:server",
-    // 데모 시드가 조회되면 서버+DB 준비 완료
-    url: "http://127.0.0.1:8788/api/bean/DEMO26-001",
+    // 시드 픽스처가 조회되면 서버+DB 준비 완료 (데모는 정적이라 준비 신호가 되지 못한다)
+    url: "http://127.0.0.1:8788/api/bean/TEST26-001",
     reuseExistingServer: false,
     timeout: 120_000,
   },
