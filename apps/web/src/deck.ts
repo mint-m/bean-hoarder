@@ -29,7 +29,7 @@ function renderDeck(beans: HeadlineRow[]): void {
   }
   el("deck-status").classList.add("hidden");
   deck.innerHTML = sortBeans(beans)
-    .map((b) => walletCardHTML(b, { notes: notesEnabled }))
+    .map((b) => walletCardHTML(b, { notes: notesEnabled, menu: true }))
     .join("");
   // 카드 본문 클릭·엔터 = 바로 상세 이동. 메뉴 버튼(⋯)만 상세 이동을 막고 액션시트를 연다.
   for (const node of deck.querySelectorAll<HTMLElement>(".wcard")) {

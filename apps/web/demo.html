@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <meta name="theme-color" content="#f4f4f5">
 <!-- 저장된 테마를 첫 페인트 전에 적용 (깜빡임 방지라 블로킹 인라인 — 네 진입점에 같은 사본) -->
 <script>
@@ -23,15 +24,6 @@
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/deck.css">
 <style>
-  body { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: 0 16px 40px; }
-  .topbar {
-    width: 100%; max-width: 460px; padding: 18px 2px 14px;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  }
-  .topbar .wordmark { font-size: 16px; }
-  .topbar .wordmark span { font-weight: 600; font-size: 11px; letter-spacing: .24em; color: var(--sub); margin-left: 6px; }
-  .topbar a.btn { text-decoration: none; font-size: 12px; padding: 6px 12px; border-radius: var(--radius-pill); }
-  main { width: 100%; max-width: 460px; flex: 1; }
   /* 이 페이지가 남의 기록을 구경하는 자리라는 걸 먼저 알린다 — 카드보다 앞서 읽히도록 덱 위에 둔다 */
   .lede {
     background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
@@ -40,7 +32,6 @@
   .lede h1 { font-size: 17px; margin: 0 0 8px; }
   .lede p { font-size: 13.5px; line-height: 1.65; color: var(--sub); margin: 0; }
   .lede .hint { margin-top: 10px; font-size: 12.5px; }
-  footer { margin-top: 28px; font-size: 11px; letter-spacing: .08em; color: var(--sub); }
   .outro { text-align: center; margin-top: 26px; font-size: 13px; color: var(--sub); }
   .outro a { font-weight: 600; }
 </style>

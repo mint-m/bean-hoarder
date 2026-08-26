@@ -124,7 +124,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 ```bash
 npm ci                                                        # 루트에서 1회 (npm workspaces)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + 데모 원두 (선택)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
@@ -133,7 +133,9 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
-- `db/seed.sql`의 `TEST` 계정(암호 `0000`)과 픽스처 원두는 **로컬·e2e 전용**이다.
+- `db/seed.sql`의 `TEST`·`DEMO` 계정(둘 다 암호 `0000`)과 픽스처 원두는 **로컬 전용**이다.
+  `TEST`는 e2e가 등록 동선을 검증하는 계정이고, `DEMO`는 데모에 실을 원두를 랩에서 꾸며 보는
+  저작용이다 — 서비스는 둘 중 어느 쪽도 특별 취급하지 않는다.
   자격증명이 저장소에 적혀 있으므로 **원격 D1에 seed를 실행하지 않는다** — 실행하면 라이브에
   누구나 로그인할 수 있는 계정이 생긴다. 서비스에는 특별 취급되는 계정이 없다.
 - 로그인 없이 둘러보는 화면은 정적 데모(`/demo`)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.

@@ -7,12 +7,14 @@ import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schem
 import { flavorGradient, originSignature } from "./coffee-color";
 import { daysSince, escapeHtml } from "./dom";
 
-/** 카드 본문에 테이스팅 노트를 보일지 — 덱은 사용자 설정, 데모는 항상 켠다 */
 export interface WalletCardOptions {
+  /** 카드 본문에 테이스팅 노트를 보일지 — 덱은 사용자 설정, 데모는 항상 켠다 */
   notes: boolean;
+  /** 카드 메뉴(⋯) 버튼을 달지 — 보관·삭제가 있는 내 덱만 단다. 데모는 구경뿐이라 없다. */
+  menu?: boolean;
 }
 
-export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled }: WalletCardOptions): string {
+export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: WalletCardOptions): string {
   const g = (k: string) => String(b[k] ?? "").trim();
   const n = daysSince(g("ROAST_DATE"));
   const dday = n != null ? `<span class="dday">D+${n}</span>` : "";
@@ -42,7 +44,7 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled }: WalletCa
   const archivedClass = b.ARCHIVED ? " archived" : "";
   return `<div class="wcard${archivedClass}" tabindex="0" role="link"
       aria-label="${escapeHtml(headline)} 상세보기" data-key="${g("KEY")}">
-    <button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>
+    ${menu ? '<button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>' : ""}
     <div class="w-band"${bandStyle}>
       <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
       <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>

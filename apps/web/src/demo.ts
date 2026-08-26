@@ -16,10 +16,8 @@ deck.innerHTML = sortBeans(demoBeans as HeadlineRow[])
   .map((b) => walletCardHTML(b, { notes: true }))
   .join("");
 
-// 덱과 달리 카드 메뉴(보관·삭제)가 없다 — 남의 기록을 구경하는 페이지라 열 수 있는 동작이
-// 상세보기뿐이다. 메뉴 버튼은 지우고 카드 전체를 링크처럼 쓴다.
+// 카드 전체가 링크다 — 구경뿐이라 열 수 있는 동작이 상세보기 하나뿐이고, 그래서 메뉴도 없다.
 for (const node of deck.querySelectorAll<HTMLElement>(".wcard")) {
-  node.querySelector(".wcard-menu")?.remove();
   const key = node.dataset.key as string;
   const open = () => {
     location.href = `/${key}`;

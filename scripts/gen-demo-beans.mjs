@@ -14,8 +14,8 @@
 // 로컬 D1을 채워 고리가 닫혔고, 그 안에서 JSON은 원본도 사본도 아니었다. 지금은 seed가
 // 데모를 모르므로(픽스처만 담는다) 이 화살표는 되돌아오지 않는다.
 //
-// 어느 계정에서 뜰지는 --usercode로 고른다. 기본 DEMO는 이 목적의 예약 접두다 — 유저코드
-// 알파벳에 O가 없어 실계정에 발급될 수 없고, 조회 페이지가 그 접두를 정적 분기로 쓴다.
+// 반드시 DEMO 계정에서 뜬다. 조회 페이지는 KEY의 DEMO 접두를 보고 정적 분기를 타므로, 다른
+// 계정의 원두를 실으면 그 카드만 D1을 다시 타게 되어 데모의 격리가 조용히 깨진다.
 //
 // 숨긴(archived) 원두는 빼고 가져온다 — 내놓지 않기로 한 것이 구경거리에 남으면 안 된다.
 // 컬럼 목록은 적지 않는다. SELECT *가 주는 순서가 곧 db/schema.sql의 순서이고, 그건
@@ -28,8 +28,7 @@ const OUT = "apps/web/src/demo-beans.json";
 /** JSON에 담지 않는 컬럼 — 소유자는 데모에 의미가 없고, 나머지 둘은 카드 표현과 무관하다 */
 const DROP = new Set(["usercode", "archived", "created_at"]);
 
-const flag = process.argv.find((a) => a.startsWith("--usercode="));
-const usercode = (flag ? flag.split("=")[1] : "DEMO").toUpperCase();
+const USERCODE = "DEMO";
 
 const raw = execFileSync(
   "npx",
@@ -40,7 +39,7 @@ const raw = execFileSync(
     "bnhd-v2",
     "--local",
     "--command",
-    `SELECT * FROM beans WHERE usercode = '${usercode}' AND archived = 0 ORDER BY key;`,
+    `SELECT * FROM beans WHERE usercode = '${USERCODE}' AND archived = 0 ORDER BY key;`,
     "--json",
   ],
   { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
@@ -50,7 +49,7 @@ const raw = execFileSync(
 const rows = JSON.parse(raw.slice(raw.indexOf("[")))[0]?.results ?? [];
 if (!rows.length) {
   console.error(
-    `gen:demo-beans — 로컬 D1에 ${usercode} 계정의 원두가 없다. ` +
+    `gen:demo-beans — 로컬 D1에 ${USERCODE} 계정의 원두가 없다. ` +
       "랩(http://localhost:8788/lab)에서 그 계정으로 로그인해 데모로 내놓을 원두를 먼저 등록할 것.",
   );
   process.exit(1);
@@ -65,4 +64,4 @@ const beans = rows.map((row) =>
 );
 
 writeFileSync(OUT, `${JSON.stringify(beans, null, 2)}\n`);
-console.log(`gen:demo-beans — ${OUT} 갱신 (${usercode} 계정에서 ${beans.length}건)`);
+console.log(`gen:demo-beans — ${OUT} 갱신 (${USERCODE} 계정에서 ${beans.length}건)`);
