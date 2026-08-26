@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4f4f5">
+<!-- 저장된 테마를 첫 페인트 전에 적용 (깜빡임 방지라 블로킹 인라인 — 네 진입점에 같은 사본) -->
+<script>
+  try {
+    if (localStorage.getItem("bh_theme") === "dark") {
+      document.documentElement.dataset.theme = "dark";
+      document.querySelector('meta[name="theme-color"]').content = "#0a0a0b";
+    }
+  } catch (_e) {}
+</script>
+<title>BEAN-HOARDER — 데모 덱</title>
+<meta name="description" content="Bean-Hoarder가 원두 소분 기록을 어떻게 보여주는지 로그인 없이 둘러봅니다.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%23f04e1c' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23ffffff' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/deck.css">
+<style>
+  /* 이 페이지가 남의 기록을 구경하는 자리라는 걸 먼저 알린다 — 카드보다 앞서 읽히도록 덱 위에 둔다 */
+  .lede {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px 20px; margin-bottom: 18px;
+  }
+  .lede h1 { font-size: 17px; margin: 0 0 8px; }
+  .lede p { font-size: 13.5px; line-height: 1.65; color: var(--sub); margin: 0; }
+  .lede .hint { margin-top: 10px; font-size: 12.5px; }
+  .outro { text-align: center; margin-top: 26px; font-size: 13px; color: var(--sub); }
+  .outro a { font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="wordmark" href="/">Bean-Hoarder<span>DEMO</span></a>
+  <a class="btn" href="/lab">랩 열기 →</a>
+</header>
+<main>
+  <div class="lede">
+    <h1>둘러보기용 덱입니다</h1>
+    <p>
+      직접 사 모은 원두를 소분하고 QR 라벨을 붙이면, 덱은 이렇게 쌓입니다.
+      카드 상단의 색 띠는 산지와 향미에서 자동으로 만들어집니다.
+    </p>
+    <p class="hint">카드를 누르면 QR을 찍었을 때 열리는 실제 조회 화면으로 갑니다.</p>
+  </div>
+  <div id="deck" class="deck"></div>
+  <div class="outro">
+    내 원두로 시작하려면 <a href="/lab">랩에서 등록 →</a>
+  </div>
+</main>
+<footer>BEAN-HOARDER — 원두 소분 라벨 아카이브</footer>
+
+<script type="module" src="/src/demo.ts"></script>
+</body>
+</html>

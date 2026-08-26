@@ -38,22 +38,15 @@ export interface LogoState {
 // 한 번에 한 맥락만 보여준다 — 입력하다가 QR·라벨·목록이 같이 눈에 들어오면 무엇을 하던 중인지 흐려진다.
 type Stage = "input" | "qr" | "label" | "list";
 
-/** 공개 데모 계정 — 서버가 쓰기를 막는다(packages/api의 writeAllowed). 화면도 같은 사실을 보여야 한다. */
-const DEMO_USERCODE = "DEMO";
-
 export default function Workspace({
   account,
   onSessionExpired,
-  onSignOut,
   onOpenSettings,
 }: {
   account: Account;
   onSessionExpired: () => void;
-  onSignOut: () => void;
   onOpenSettings: () => void;
 }) {
-  // 눌러봤자 403이 돌아올 버튼을 보여주지 않는다 — 막힌 이유와 다음 행동(가입)을 대신 안내한다
-  const readOnly = account.usercode === DEMO_USERCODE;
   const [form, setForm] = useState<FormState>(emptyForm);
   // 이벤트 핸들러에서 "지금의 폼"을 읽기 위한 최신값 참조 — 자동 채우기가 다음 상태를
   // setForm 바깥에서 순수하게 계산하는 데 쓴다 (fillParsed의 주석 참고).
@@ -670,24 +663,7 @@ export default function Workspace({
   // 한 화면에 한 맥락 (DESIGN.md §7): 입력 → QR 발급 → (선택) 라벨 도안, 목록은 별도 화면.
   return (
     <div className="flow" id="app-view">
-      {view === "input" && readOnly && (
-        <div className="card demo-notice">
-          <h1 className="intake-title">데모 둘러보기</h1>
-          <p className="intake-lede">
-            데모는 <b>구경용</b>입니다. 등록하려면 초대코드로 가입하세요 — 초대코드와 숫자 4자리면 끝입니다.
-          </p>
-          <div className="btnrow">
-            <button type="button" className="primary" onClick={onSignOut}>
-              가입하러 가기
-            </button>
-            <button type="button" onClick={() => goStage("list")}>
-              등록된 원두 둘러보기 →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {view === "input" && !readOnly && (
+      {view === "input" && (
         <>
           <IntakeCard
             autofillText={autofillText}
@@ -805,7 +781,6 @@ export default function Workspace({
           onExport={exportCsv}
           onImport={importCsvFile}
           onBack={() => goStage("input")}
-          readOnly={readOnly}
         />
       )}
     </div>

@@ -19,6 +19,7 @@ export default defineConfig({
             "packages/schema/src/**/*.test.ts",
             "packages/session/src/**/*.test.ts",
             "packages/api/src/**/*.test.ts",
+            "apps/web/src/**/*.test.ts",
           ],
         },
       },

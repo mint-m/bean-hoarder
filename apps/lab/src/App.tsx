@@ -79,7 +79,6 @@ export default function App() {
         <Workspace
           account={account}
           onSessionExpired={handleSessionExpired}
-          onSignOut={signOut}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : (

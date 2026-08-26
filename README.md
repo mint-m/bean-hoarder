@@ -13,7 +13,7 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 | 조회 (QR 스캔 대상) | **[bnhd.pages.dev](https://bnhd.pages.dev)** — 인증 없음 |
 | 랩 (등록·QR 발급) | **[bnhd.pages.dev/lab](https://bnhd.pages.dev/lab)** — 가입/로그인 필요 |
 | 덱 (내 원두 카드) | **[bnhd.pages.dev/deck](https://bnhd.pages.dev/deck)** — 로그인 필요 |
-| 원두 카드 상세 (데모) | [bnhd.pages.dev/DEMO26-001](https://bnhd.pages.dev/DEMO26-001) |
+| 데모 (로그인 없이 둘러보기) | **[bnhd.pages.dev/demo](https://bnhd.pages.dev/demo)** — 정적 페이지 |
 | 작동 방식 (그래픽 문서) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
 | 디자인 시스템 | [DESIGN.md](DESIGN.md) · 저장소 구조 [STRUCTURE.md](STRUCTURE.md) |
 
@@ -95,11 +95,20 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
   3. **사용자 셀프 백업** — 각자 랩에서 CSV 내보내기/복원.
   (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
 - **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
-- **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 미적용 마이그레이션만 순서대로:
-  `migrate_add_columns.sql` → `migrate_producer_lot.sql` → `migrate_washing_station.sql` → `migrate_logos.sql` → `migrate_archived.sql` → `migrate_sessions.sql` → `migrate_logos_r2.sql` → `migrate_r2_usage.sql` → `migrate_coffee_name.sql` → `migrate_ai_usage.sql`
-  (`migrate_drop.sql`은 초기 재생성용 기록 — 실행 금지)
-  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=db/migrate_logos.sql` (`db/` 아래에 있다)
-- **데모 갱신**: `npx wrangler d1 execute bnhd-v2 --remote --file=db/seed.sql` (데모 원두는 INSERT OR REPLACE라 재실행으로 갱신)
+- **스키마**: 새 환경은 `db/schema.sql` 하나로 생성. 기존 DB에는 `db/` 아래 남아 있는
+  `migrate_*.sql`을 파일명 순서대로 적용한다 — **적용이 끝난 마이그레이션은 지운다**(이력은 git에
+  남는다). 그래서 `db/`에 파일이 보인다는 것 자체가 "원격에 아직 안 넣었다"는 뜻이다.
+  적용: `npx wrangler d1 execute bnhd-v2 --remote --file=<그 파일>`
+  **코드보다 먼저 적용할 것** — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다
+  (컬럼을 없애는 마이그레이션이라면 반대로 코드를 먼저 올린다).
+- **데모 갱신**: 데모는 DB가 아니라 **콘텐츠**다. 덱(`/demo`)도 카드(`/DEMO…`)도
+  `apps/web/src/demo-beans.json` 하나로 그리는 정적 페이지라 D1을 전혀 타지 않는다.
+  그 파일이 데모 콘텐츠가 존재하는 **유일한 곳**이다 — 고치고, `git diff`로 검토하고,
+  배포하면 끝이다. 운영 중 손댈 것도, 동기화할 곳도 없다.
+
+  손으로 쓰는 파일이라 형식은 `apps/web/src/demo-beans.test.ts`가 지킨다 — 필수 항목 누락,
+  KEY 형식·`DEMO` 접두·중복, 알 수 없는 필드명을 `npm run check`가 잡는다.
+  (`DEMO` 접두는 유저코드 알파벳에 `O`가 없어 실계정에 발급될 수 없는, 예약된 접두다.)
 
 ## 로컬 개발
 
@@ -111,7 +120,7 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 ```bash
 npm ci                                                        # 루트에서 1회 (npm workspaces)
 npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
-npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모 계정/원두 (선택)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
@@ -120,10 +129,10 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
-- 데모 계정: 유저코드 `DEMO` / 암호 `0000` — **둘러보기 전용**(서버가 쓰기를 403으로 막는다).
-  자격증명이 공개돼 있어 쓰기를 열어 두면 사실상 인증 없는 무제한 계정이 되기 때문이다.
-- 테스트 계정: 유저코드 `TEST` / 암호 `0000` — 쓰기 제한이 없어 e2e가 등록 동선을 끝까지 검증한다.
-  `db/seed.sql`에 있으므로 **원격 D1에 seed를 실행하면 라이브에도 생긴다** — 운영 DB에는 넣지 않는다.
+- `db/seed.sql`의 `TEST` 계정(암호 `0000`)과 픽스처 원두는 **로컬·e2e 전용**이다.
+  자격증명이 저장소에 적혀 있으므로 **원격 D1에 seed를 실행하지 않는다** — 실행하면 라이브에
+  누구나 로그인할 수 있는 계정이 생긴다. 서비스에는 특별 취급되는 계정이 없다.
+- 로그인 없이 둘러보는 화면은 정적 데모(`/demo`)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.
 - 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
   **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
 - 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
@@ -159,4 +168,4 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 
 저장소 안에 짝이 되는 파일이 있어 여기 적어둘 값이 있는 것만 예외로 남긴다:
 
-- 🎨 [#32 디자인 리뉴얼](../../issues/32) — 디자인 시스템은 [DESIGN.md](DESIGN.md), 진행 추적은 [DESIGN_RENEWAL_PLAN.md](DESIGN_RENEWAL_PLAN.md), 브랜치는 `design-system`
+- 🎨 [#32 디자인 리뉴얼](../../issues/32) — 전 Phase 완료. 디자인 시스템의 단일 소스는 [DESIGN.md](DESIGN.md)

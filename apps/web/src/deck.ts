@@ -1,9 +1,9 @@
 // 내 원두 덱(/deck) 진입점 — 구 public/deck.html 인라인 스크립트의 이식.
 // 로그인한 사용자의 원두를 월렛 카드처럼 쌓아 보여주고, 카드 메뉴로 보관·삭제를 처리한다.
-import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { buildHeadline, type HeadlineRow } from "@bnhd/schema/headline";
 import { type Account, loadSession, migrateLegacyPin } from "@bnhd/session";
-import { flavorGradient, originSignature } from "./lib/coffee-color";
-import { daysSince, el, escapeHtml } from "./lib/dom";
+import { el, escapeHtml } from "./lib/dom";
+import { sortBeans, walletCardHTML } from "./lib/wallet-card";
 
 let account: Account = loadSession();
 let allBeans: HeadlineRow[] = [];
@@ -14,57 +14,6 @@ function showStatus(html: string): void {
   const node = el("deck-status");
   node.innerHTML = html;
   node.classList.remove("hidden");
-}
-
-function cardHTML(b: HeadlineRow): string {
-  const g = (k: string) => String(b[k] ?? "").trim();
-  const n = daysSince(g("ROAST_DATE"));
-  const dday = n != null ? `<span class="dday">D+${n}</span>` : "";
-  // 헤드라인이 이미 쓴 필드(세부지역 등)는 메타에서 제외 — 라벨과 동일하게 중복 방지
-  const usedInHead = headlineUsedFields(b);
-  const meta = ["REGION", "VARIETY", "PROCESS"]
-    .filter((k) => !usedInHead.includes(k))
-    .map(g)
-    .filter(Boolean)
-    .join(" · ");
-  const foot = [
-    g("ROAST_DATE") && `RSTD ${g("ROAST_DATE")}`,
-    g("NET_WEIGHT") && `NET ${g("NET_WEIGHT")}`,
-    g("AGTRON").split(/\s+/)[0],
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const note = notesEnabled && g("TASTING_NOTE");
-
-  const headline = buildHeadline(b) || g("KEY");
-  // 커피 컬러(화면 전용 — DESIGN.md §3): 피크 밴드에 향미 그라데이션, 헤드라인 옆에 산지 시그니처 닷.
-  // 스택 상태에서 보이는 유일한 영역이 밴드이므로, 여기가 카드의 "색 띠" 정체성을 전부 짊어진다.
-  const color = originSignature(g("ORIGIN"));
-  const dot = color ? `<span class="w-origin-dot" style="background:${color}"></span>` : "";
-  const grad = flavorGradient(g("TASTING_NOTE"));
-  const bandStyle = grad ? ` style="background-image:${grad}"` : "";
-  const archivedClass = b.ARCHIVED ? " archived" : "";
-  return `<div class="wcard${archivedClass}" tabindex="0" role="link"
-      aria-label="${escapeHtml(headline)} 상세보기" data-key="${g("KEY")}">
-    <button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>
-    <div class="w-band"${bandStyle}>
-      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
-      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
-    </div>
-    <div class="w-body">
-      ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}
-      ${note ? `<p class="w-note">${escapeHtml(note)}</p>` : ""}
-      ${foot ? `<div class="w-foot">${escapeHtml(foot)}</div>` : ""}
-    </div>
-  </div>`;
-}
-
-/** 보관(archived) 카드는 덱 최하단으로, 나머지는 최신 KEY 먼저 */
-function sortBeans(beans: HeadlineRow[]): HeadlineRow[] {
-  return beans.slice().sort((a, b) => {
-    if (!!a.ARCHIVED !== !!b.ARCHIVED) return a.ARCHIVED ? 1 : -1;
-    return String(b.KEY ?? "").localeCompare(String(a.KEY ?? ""));
-  });
 }
 
 function renderDeck(beans: HeadlineRow[]): void {
@@ -79,7 +28,9 @@ function renderDeck(beans: HeadlineRow[]): void {
     return;
   }
   el("deck-status").classList.add("hidden");
-  deck.innerHTML = sortBeans(beans).map(cardHTML).join("");
+  deck.innerHTML = sortBeans(beans)
+    .map((b) => walletCardHTML(b, { notes: notesEnabled, menu: true }))
+    .join("");
   // 카드 본문 클릭·엔터 = 바로 상세 이동. 메뉴 버튼(⋯)만 상세 이동을 막고 액션시트를 연다.
   for (const node of deck.querySelectorAll<HTMLElement>(".wcard")) {
     const key = node.dataset.key as string;

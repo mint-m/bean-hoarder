@@ -1,24 +1,21 @@
--- 데모 계정(유저코드 DEMO, 암호 0000, 복구키 F89E-5079-5A48-3F33-62B0) + 데모 원두
+-- 로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건.
 -- pass_hash는 구형(SHA-256) 포맷 — 첫 로그인 시 서버가 PBKDF2로 자동 업그레이드한다.
 --
--- ⚠️ DEMO는 자격증명이 공개돼 있어 서버가 **쓰기를 막는다**(packages/api/src/app.ts의 writeAllowed).
---    등록·수정·삭제가 필요한 자동 테스트는 아래 TEST 계정을 쓴다.
-INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
-  ('DEMO', 'ae399e68ab3b10ba60abbb7a9859e53785817f453f13528a2fd85557daf1ce47',
-   '0a915ff66685ba15421a8c45464e63172507de5b77851d660451a3215f1f1185');
+-- ⚠️ **원격 D1에 실행하지 말 것.** 암호가 저장소에 적혀 있어, 원격에 넣으면 누구나 로그인하는
+--    계정이 라이브에 생긴다. 서비스에 특별 취급되는 계정은 없다.
+--
+-- 데모는 여기 없다 — /demo 덱도 데모 카드도 apps/web/src/demo-beans.json으로 만드는 정적
+-- 페이지라 D1을 전혀 타지 않는다. 저작용 계정도 두지 않는다: 데모 콘텐츠가 사는 곳은
+-- 그 JSON 한 곳뿐이고, 형식 검증은 apps/web/src/demo-beans.test.ts가 맡는다.
 
--- 테스트 계정(유저코드 TEST, 암호 0000) — e2e 전용. 쓰기 제한이 없어 등록 동선을 끝까지 검증할 수 있다.
--- 로컬·e2e DB에만 넣는다. 원격 D1에 seed.sql을 실행하면 라이브에도 생기므로 주의할 것.
+-- e2e 전용 계정(유저코드 TEST, 암호 0000) — 쓰기 제한이 없어 등록 동선을 끝까지 검증한다.
 INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES
   ('TEST', '37d315b6d9de4369664a0f20c49a8d7b56703fc74245b5b83588fbe2ac6c98c6',
    'f3694ec983ba1134bb1b67d54b97924ea67642bd4bd0cd154993b41cfa6ed84a');
 
--- 데모 갱신을 반영하도록 INSERT OR REPLACE (재실행 시 기존 데모 행을 덮어씀)
-INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, producer, lot, washing_station,
-  variety, process, altitude, harvest, roast_date, package_date, net_weight, agtron,
-  tasting_note, memo, source_url) VALUES
-  ('DEMO26-001', 'DEMO', 'DANCHE', 'ETHIOPIA', 'Yirgacheffe, Gedeb', 'Smallholder farmers', 'Worka Sakaro',
-   'Gedeb CWS', '74158', 'Washed', '2100m', '25/26', '26.06.28', '26.07.03', '60g', '#95 (라이트)',
-   'Jasmine, bergamot, white peach',
-   '게뎁 지역 소농들의 체리를 워카 사카로 워싱스테이션에서 함께 가공한 커뮤니티 랏. 원산지 방문 중 진행한 블라인드 커핑에서 선정된 랏으로, 품종 74158은 에티오피아 JARC가 병충해 저항성으로 선발한 계열이다. 자스민과 베르가못의 화사한 향에 잘 익은 백도를 닮은 단맛과 무게감이 더해지고, 정제된 산미와 깔끔한 클린컵, 은은하게 이어지는 단맛의 여운이 특징이다.',
-   'https://example.com/beans/yirgacheffe-gedeb');
+-- 공개 조회(/{KEY}) 동선이 D1을 실제로 거치는지 확인하기 위한 고정 원두.
+-- 데모 카드는 정적 경로라 이 검증을 대신해 주지 못한다 — 그래서 API로 답하는 행이 따로 필요하다.
+INSERT OR REPLACE INTO beans (key, usercode, roastery, origin, region, variety, process,
+  altitude, roast_date, package_date, net_weight, agtron, tasting_note) VALUES
+  ('TEST26-001', 'TEST', 'E2E FIXTURE', 'ETHIOPIA', 'Yirgacheffe', 'Heirloom', 'Washed',
+   '2000m', '26.06.28', '26.07.03', '60g', '#95 (라이트)', 'Jasmine, bergamot');

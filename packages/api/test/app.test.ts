@@ -438,55 +438,6 @@ test("fetch: URL 형식 오류·비HTTP 프로토콜·내부망 주소는 400", 
   }
 });
 
-// 데모 계정은 유저코드·암호가 문서에 공개돼 있다. 쓰기를 열어 두면 사실상 인증 없는 무제한 계정이
-// 되므로 서버가 막는다 — 클라이언트에서 버튼을 숨기는 것만으로는 API 직접 호출을 못 막는다.
-test("데모 계정(DEMO)은 읽기만 가능하고 쓰기는 403으로 거부된다", async () => {
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES ('DEMO', ?, 'x')",
-  )
-    .bind(await sha256hex("DEMO:0000"))
-    .run();
-  const auth = { Authorization: "Bearer DEMO:0000" };
-
-  // 읽기는 열려 있다 — 데모의 목적(둘러보기)은 그대로다
-  const list = await api("/beans", { headers: auth });
-  expect(list.status).toBe(200);
-
-  // 쓰기는 전부 막힌다
-  for (const [path, init] of [
-    ["/beans", { method: "POST", headers: auth, body: JSON.stringify({ ROASTERY: "X", ORIGIN: "KENYA" }) }],
-    ["/import", { method: "POST", headers: auth, body: "KEY\n" }],
-    ["/logos", { method: "PUT", headers: auth, body: JSON.stringify({ roastery: "X", data_url: "d" }) }],
-    ["/fetch", { method: "POST", headers: auth, body: JSON.stringify({ url: "https://example.com" }) }],
-  ] as const) {
-    const res = await api(path, init as RequestInit);
-    expect(res.status, `${path}는 데모에게 막혀야 한다`).toBe(403);
-    expect(((await res.json()) as { error: string }).error).toContain("데모 계정은 둘러보기 전용");
-  }
-});
-
-// 자동 테스트가 쓰기까지 검증하려면 제한 없는 계정이 필요하다 — 시드의 TEST가 그 역할이다.
-test("TEST 계정은 쓰기 제한을 받지 않는다 (e2e가 등록 동선을 끝까지 검증할 수 있어야 한다)", async () => {
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES ('TEST', ?, 'x')",
-  )
-    .bind(await sha256hex("TEST:0000"))
-    .run();
-  const res = await api("/beans", {
-    method: "POST",
-    headers: { Authorization: "Bearer TEST:0000" },
-    body: JSON.stringify({
-      ROASTERY: "R",
-      ORIGIN: "KENYA",
-      VARIETY: "SL28",
-      PROCESS: "Washed",
-      ROAST_DATE: "26.01.01",
-      PACKAGE_DATE: "26.01.02",
-    }),
-  });
-  expect(res.status).not.toBe(403);
-});
-
 // AI 인식 대행 — 서비스 키로 대신 불러 주는 몫에만 한도가 걸린다.
 // 키가 없는 배포에서도 서비스는 살아 있어야 하므로 503 + fallback으로 알려 클라이언트가 규칙 기반으로 내려간다.
 test("AI 대행: 서비스 키가 없으면 503 + fallback (클라이언트가 규칙 기반으로 내려갈 수 있게)", async () => {
@@ -499,20 +450,6 @@ test("AI 대행: 서비스 키가 없으면 503 + fallback (클라이언트가 �
   expect(res.status).toBe(503);
   const body = (await res.json()) as { fallback?: boolean };
   expect(body.fallback).toBe(true);
-});
-
-test("AI 대행: 데모 계정은 서비스 키를 쓸 수 없다", async () => {
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO users (usercode, pass_hash, recovery_hash) VALUES ('DEMO', ?, 'x')",
-  )
-    .bind(await sha256hex("DEMO:0000"))
-    .run();
-  const res = await api("/extract", {
-    method: "POST",
-    headers: { Authorization: "Bearer DEMO:0000" },
-    body: JSON.stringify({ text: "Ethiopia Washed" }),
-  });
-  expect(res.status).toBe(403);
 });
 
 test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
