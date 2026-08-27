@@ -24,6 +24,6 @@ test("KEY의 꺾쇠는 마크업이 되지 않는다", () => {
 });
 
 test("보관 카드는 최하단으로, 나머지는 최신 KEY 먼저", () => {
-  const rows = [{ KEY: "AAAA26-001" }, { KEY: "AAAA26-003", ARCHIVED: 1 }, { KEY: "AAAA26-002" }];
+  const rows = [{ KEY: "AAAA26-001" }, { KEY: "AAAA26-003", ARCHIVED: true }, { KEY: "AAAA26-002" }];
   expect(sortBeans(rows).map((b) => b.KEY)).toEqual(["AAAA26-002", "AAAA26-001", "AAAA26-003"]);
 });
