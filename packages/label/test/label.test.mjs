@@ -9,6 +9,7 @@ import {
   buildQrSVG,
   DEFAULT_DESIGN,
   QR_DOT_OPTIONS,
+  qrSizeMM,
   SIZE_SPECS,
   SPEC_POOL,
   SUB_POOL,
@@ -318,6 +319,17 @@ test("QR 단독: 콰이엇존 2모듈이 이미지에 포함된다 (나머지는
     const first = /<rect x="([\d.]+)" y="([\d.]+)"/.exec(svg);
     assert.equal(Number(first[1]), 2 * module, `dots=${dots}: 좌측 콰이엇존 확보`);
     assert.equal(Number(first[2]), 2 * module, `dots=${dots}: 상단 콰이엇존 확보`);
+  }
+});
+
+// 랩의 QR 발급 화면은 "여기 적힌 mm가 곧 인쇄되는 mm"를 약속한다. 그 숫자를 직접 계산하던
+// 시절에는 콰이엇존이 빠져 화면 10.9mm / 파일 12.4mm로 갈렸다 — 라벨 소프트웨어에 원본 크기로
+// 얹는 사용자에게는 1.5mm가 그대로 어긋남이다. 두 값이 다시 갈라지면 여기서 걸린다.
+test("QR 단독: qrSizeMM이 실제 SVG 치수와 같다 (화면 표시와 파일이 갈라지지 않게)", () => {
+  for (const dots of QR_DOT_OPTIONS) {
+    const { size, moduleCount, svg } = buildQrSVG("TEST26-001", dots);
+    assert.equal(qrSizeMM(dots, moduleCount), size, `dots=${dots}: 표시 크기 = 파일 크기`);
+    assert.ok(svg.includes(`width="${size}mm"`), `dots=${dots}: SVG width 속성과도 일치`);
   }
 });
 

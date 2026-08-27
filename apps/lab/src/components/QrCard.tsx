@@ -4,13 +4,10 @@
 // "어떤 라벨 소프트웨어에 얹어도 스캔되는 QR"과 그 QR이 도착하는 상세 페이지다.
 //
 // 등록(KEY 확정)은 입력 화면이 맡고, 여기는 확정된 KEY로 만든 결과물만 보여준다 — 한 화면에 한 맥락.
-import { QR_DOT_OPTIONS, renderPngBlob } from "@bnhd/label";
+import { QR_DOT_OPTIONS, qrSizeMM, renderPngBlob } from "@bnhd/label";
 import { copyImage, copyText, download } from "../lib/format";
 import type { StatusLine } from "../types";
 import { CopyButton } from "./FormBits";
-
-/** 모듈 한 변의 mm — 203dpi 도트(0.125mm)의 정수배 (buildQrSVG와 같은 근거) */
-const DOT_MM = 0.125;
 
 interface Props {
   qr: { svg: string; content: string; moduleCount: number; codeSize: number; size: number };
@@ -83,7 +80,7 @@ export default function QrCard(p: Props) {
                     checked={p.qrDots === d}
                     onChange={() => p.setQrDots(d)}
                   />{" "}
-                  {(d * DOT_MM * p.qr.moduleCount).toFixed(1)}mm
+                  {qrSizeMM(d, p.qr.moduleCount).toFixed(1)}mm
                 </label>
               ))}
             </div>

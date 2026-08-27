@@ -580,6 +580,20 @@ export const QR_DOT_OPTIONS = [3, 4, 5];
 const QR_QUIET_MODULES = 2;
 
 /**
+ * 인쇄되는 QR 이미지 한 변의 mm — **콰이엇존 포함 전체**다.
+ *
+ * buildQrSVG가 쓰는 바로 그 식이라, 이 값을 화면에 적어 두면 파일과 어긋날 수 없다.
+ * 랩이 크기를 표시하려고 DOT을 손으로 다시 적던 것을 대신한다 — 203dpi 도트 피치나
+ * 콰이엇존을 바꾸면 SVG와 표시가 함께 움직여야 하고, 그러려면 식이 한 곳에 있어야 한다.
+ *
+ * @param {number} dots 모듈당 도트 수 (QR_DOT_OPTIONS)
+ * @param {number} moduleCount QR 한 변의 모듈 수 (buildQrSVG가 돌려주는 moduleCount)
+ */
+export function qrSizeMM(dots, moduleCount) {
+  return dots * DOT * (moduleCount + 2 * QR_QUIET_MODULES);
+}
+
+/**
  * 인쇄용 QR 단독 SVG.
  * @param {string} key 라벨 KEY (`{유저코드4}{연도2}-{순번3}`)
  * @param {number} dots 모듈당 도트 수 (QR_DOT_OPTIONS)
@@ -596,7 +610,7 @@ export function buildQrSVG(key, dots = 3) {
   const module = dots * DOT;
   const quiet = QR_QUIET_MODULES * module;
   const codeSize = module * n;
-  const size = codeSize + quiet * 2;
+  const size = qrSizeMM(dots, n);
 
   let rects = "";
   for (let r = 0; r < n; r++) {

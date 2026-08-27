@@ -611,11 +611,14 @@ export default function Workspace({
     if ((localStorage.getItem("bh_gemini_key") || "").trim()) return runAiRecognition(raw);
 
     setAutofillStatus({ msg: "AI 인식 중…", cls: "" });
-    const { status, body } = await call<{ fields: Record<string, string>; remaining: number }>("/api/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: raw }),
-    });
+    const { status, body } = await call<{ fields: Record<string, string>; remaining: number }>(
+      "/api/extract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: raw }),
+      },
+    );
     if (body?.ok && body.fields) {
       const ok = fillParsed(body.fields, "AI ", true);
       // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게

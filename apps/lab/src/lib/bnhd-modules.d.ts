@@ -34,6 +34,7 @@ declare module "@bnhd/label" {
     logoDataUrl?: string | null,
   ): { svg: string; content: string; moduleCount: number; W: number; H: number };
   export const QR_DOT_OPTIONS: number[];
+  export function qrSizeMM(dots: number, moduleCount: number): number;
   export function buildQrSVG(
     key: string,
     dots?: number,
