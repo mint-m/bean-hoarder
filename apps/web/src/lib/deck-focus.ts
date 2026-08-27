@@ -76,6 +76,10 @@ export function enableCardFocus(deck: HTMLElement): () => void {
     const runway = Math.max(0, Math.round(deck.clientHeight - room - cardH));
     deck.style.setProperty("--deck-runway", `${runway}px`);
     centers = cards.map((c) => offsetTopWithin(c, deck) + c.offsetHeight / 2);
+    // 순번은 CSS가 시차(transition-delay)를 계산하는 데 쓴다 — deck.css의 --w-stagger 참고
+    for (let n = 0; n < cards.length; n++) {
+      (cards[n] as HTMLElement).style.setProperty("--i", String(n));
+    }
   };
 
   /** 스크롤 경로에서 만지는 것은 scrollTop 하나뿐 — 바뀔 때만 클래스를 건드린다. */
@@ -89,6 +93,7 @@ export function enableCardFocus(deck: HTMLElement): () => void {
       (cards[active] as HTMLElement).classList.remove("active");
     }
     if (i >= 0) (cards[i] as HTMLElement).classList.add("active");
+    deck.style.setProperty("--active-i", String(i));
     active = i;
   };
 
@@ -116,6 +121,10 @@ export function enableCardFocus(deck: HTMLElement): () => void {
     observer.disconnect();
     if (raf) cancelAnimationFrame(raf);
     deck.style.removeProperty("--deck-runway");
-    for (const c of cards) c.classList.remove("active");
+    deck.style.removeProperty("--active-i");
+    for (const c of cards) {
+      c.classList.remove("active");
+      c.style.removeProperty("--i");
+    }
   };
 }

@@ -56,6 +56,10 @@ footer {
 .deck {
   --w-peek: 66px; /* 스택시 보이는 밴드 높이 */
   --w-card-h: 158px; /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치 */
+  /* 펼침 모션. 뒤 카드가 92px(=카드 높이 − 피크)을 이동하는데, 공통 --t(0.15s ease)로는 그 거리를
+     너무 빨리 끊어 "툭" 하고 판때기가 튀는 인상이 된다. 감속이 뚜렷한 곡선으로 조금 길게 끈다. */
+  --w-motion: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --w-stagger: 14ms; /* 아래 카드들이 차례로 비켜서게 하는 시차 (한 덩어리로 움직이면 무겁다) */
   display: flex;
   flex-direction: column;
   padding-top: 4px;
@@ -77,8 +81,8 @@ footer {
   margin-top: calc(var(--w-peek) - var(--w-card-h));
   position: relative;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
+    transform var(--w-motion),
+    box-shadow var(--w-motion);
 }
 .wcard:first-child {
   margin-top: 0;
@@ -97,6 +101,17 @@ footer {
 .wcard.active ~ .wcard,
 .wcard:focus-within ~ .wcard {
   transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+  /* 가까운 카드부터 차례로 비켜선다. 한 덩어리로 동시에 움직이면 카드가 아니라 판때기 하나가
+     미끄러지는 것처럼 보인다. 시차는 세 장 분량에서 멈춘다 — 더 끌면 굼떠 보인다.
+     --i(카드 순번)·--active-i(펼쳐진 카드)는 deck-focus.ts가 넣는다. 호버 경로에는 없으므로
+     기본값 0으로 떨어져 시차 없이 동시에 움직인다(마우스에서는 그 편이 또렷하다). */
+  transition-delay: min(calc((var(--i, 0) - var(--active-i, 0)) * var(--w-stagger)), 42ms);
+}
+/* 모션을 줄여 달라고 한 사용자에게는 펼침만 남기고 움직임을 없앤다 */
+@media (prefers-reduced-motion: reduce) {
+  .wcard {
+    transition: none;
+  }
 }
 /* 호버는 마우스가 있는 기기에서만 — 터치에서는 탭한 카드에 호버가 눌어붙어(sticky hover)
    중앙 펼침과 두 카드가 동시에 열린 것처럼 보인다. */
