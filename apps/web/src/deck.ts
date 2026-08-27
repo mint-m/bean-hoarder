@@ -2,6 +2,7 @@
 // 로그인한 사용자의 원두를 월렛 카드처럼 쌓아 보여주고, 카드 메뉴로 보관·삭제를 처리한다.
 import { buildHeadline, type HeadlineRow } from "@bnhd/schema/headline";
 import { type Account, loadSession, migrateLegacyPin } from "@bnhd/session";
+import { enableCenterFocus } from "./lib/deck-center";
 import { el, escapeHtml } from "./lib/dom";
 import { sortBeans, walletCardHTML } from "./lib/wallet-card";
 
@@ -16,8 +17,14 @@ function showStatus(html: string): void {
   node.classList.remove("hidden");
 }
 
+// 터치 기기의 중앙 카드 펼침 구독 — 필터·삭제로 카드가 다시 그려지면 옛 노드를 붙잡고 있으므로
+// 렌더마다 해제하고 다시 건다.
+let disposeCenterFocus: (() => void) | null = null;
+
 function renderDeck(beans: HeadlineRow[]): void {
   const deck = el("deck");
+  disposeCenterFocus?.();
+  disposeCenterFocus = null;
   if (!beans.length) {
     deck.innerHTML = "";
     showStatus(
@@ -49,6 +56,7 @@ function renderDeck(beans: HeadlineRow[]): void {
       openSheet(key);
     });
   }
+  disposeCenterFocus = enableCenterFocus(deck);
 }
 
 // ── 카드 탭 시 뜨는 메뉴: 상세보기 · 숨기기(보관) · 삭제 ──

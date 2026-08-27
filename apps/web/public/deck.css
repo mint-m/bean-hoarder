@@ -80,17 +80,31 @@ footer {
 .wcard:first-child {
   margin-top: 0;
 }
-/* 애플 월렛처럼: 호버·포커스한 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로
-   밀려 내려가 시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가
-   기본적으로 앞 카드 위에 그려지므로, 뒤 카드들을 비켜주기만 해도 호버한 카드가 온전히 드러난다. */
-.wcard:hover,
+/* 애플 월렛처럼: 펼쳐진 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로 밀려 내려가
+   시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가 기본적으로 앞 카드
+   위에 그려지므로, 뒤 카드들을 비켜주기만 해도 펼친 카드가 온전히 드러난다.
+
+   트리거는 기기마다 다르다: 마우스는 호버, 터치는 "중앙에 온 카드"(.active — lib/deck-center.ts).
+   보이는 결과는 하나여야 하므로 선언은 여기 한 벌만 두고 셀렉터만 나눈다. */
+.wcard.active,
 .wcard:focus-within {
   transform: translateY(-8px);
   box-shadow: var(--shadow-hover);
 }
-.wcard:hover ~ .wcard,
+.wcard.active ~ .wcard,
 .wcard:focus-within ~ .wcard {
   transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+}
+/* 호버는 마우스가 있는 기기에서만 — 터치에서는 탭한 카드에 호버가 눌어붙어(sticky hover)
+   중앙 펼침과 두 카드가 동시에 열린 것처럼 보인다. */
+@media (hover: hover) {
+  .wcard:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-hover);
+  }
+  .wcard:hover ~ .wcard {
+    transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+  }
 }
 /* 숨긴 카드는 덱의 가장 뒤(음수 z-index)로 가라앉혀 다른 카드 뒤에 깔리게 하고, 불투명하게
    채도만 낮춘다(투명하게 하면 겹친 뒤 카드가 비쳐 지저분해 보여서 opacity는 쓰지 않는다). */
@@ -133,6 +147,35 @@ footer {
 @media (hover: none) {
   .wcard-menu {
     opacity: 1;
+  }
+  /* ── 화면을 고정하고 본문만 스크롤한다 ──────────────────────────────
+     호버가 없는 기기에서는 중앙에 온 카드가 펼쳐진다(lib/deck-center.ts). 그러려면 "중앙"이
+     화면 안에 고정돼 있어야 하므로 페이지 전체가 흘러가게 두지 않는다 — 틀(톱바·푸터)은
+     제자리에 있고 본문(main)만 움직인다.
+     스크롤러를 .deck이 아니라 main으로 잡은 이유: 데모의 안내문(.lede)까지 고정하면 작은
+     폰에서 카드가 설 자리가 남지 않는다. 안내문도 함께 흘러가야 덱이 화면을 다 쓴다. */
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  main {
+    min-height: 0;
+    overflow-y: auto;
+    /* 덱 끝에서 페이지 전체가 딸려 스크롤되지 않게 (당겨서 새로고침도 함께 막힌다) */
+    overscroll-behavior: contain;
+    /* proximity — 가까울 때만 붙잡는다. mandatory로 하면 안내문을 읽는 중에도 카드로 끌려간다. */
+    scroll-snap-type: y proximity;
+    /* 카드의 offsetTop이 이 요소 기준이 되게 (deck-center.ts가 그 전제로 잰다) */
+    position: relative;
+    /* 마지막 카드도 중앙까지 올라올 수 있는 여유 — 실제 값은 deck-center.ts가 높이를 재서 넣는다 */
+    padding-bottom: var(--deck-pad, 0px);
+  }
+  /* 첫 카드가 중앙까지 내려올 여유 — 값은 deck-center.ts가 실측해 넣는다 */
+  .deck {
+    padding-top: var(--deck-pad-top, 4px);
+  }
+  .wcard {
+    scroll-snap-align: center;
   }
 }
 /* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
