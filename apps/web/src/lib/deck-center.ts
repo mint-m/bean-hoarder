@@ -42,10 +42,9 @@ export function enableCenterFocus(deck: HTMLElement): () => void {
   const noop = () => {};
   // 호버가 있는 기기는 :hover가 이미 같은 일을 한다 — 두 트리거가 겹치면 서로 싸운다.
   if (!window.matchMedia("(hover: none)").matches) return noop;
-  // 스크롤러는 페이지의 <main> — 덱만 따로 스크롤시키면 데모의 안내문(.lede)이 화면을 잡아먹어
-  // 정작 카드가 설 자리가 없다. 틀(톱바·푸터)은 고정되고 본문만 움직인다.
-  const scroller = deck.closest("main");
-  if (!scroller) return noop;
+  // 스크롤러는 덱 자신이다 — 페이지가 통째로 흘러가면 "중앙"이라는 기준이 함께 움직여, 카드를
+  // 훑는 동안 기준선이 화면 밖으로 나간다. 틀(톱바·안내문·푸터)은 고정되고 카드만 움직인다.
+  const scroller = deck;
   const cards = Array.from(deck.querySelectorAll<HTMLElement>(".wcard"));
   if (!cards.length) return noop;
 
@@ -60,7 +59,7 @@ export function enableCenterFocus(deck: HTMLElement): () => void {
     //  · 위: 첫 카드가 중앙까지 **내려올** 만큼. 맨 위에서 이미 중앙을 지나쳐 있으면 첫 카드는
     //    영원히 펼쳐지지 않는다 — 실제로 그 상태였다(카드 중심 289 < 화면 중심 331).
     // 카드 높이는 CSS(--w-card-h)가 정하므로 실측한다 — 여기 숫자를 또 적으면 둘이 갈라진다.
-    scroller.style.setProperty("--deck-pad", `${Math.max(0, Math.round(mid - first.offsetHeight / 2))}px`);
+    deck.style.setProperty("--deck-pad", `${Math.max(0, Math.round(mid - first.offsetHeight / 2))}px`);
     // 지금 걸려 있는 위 여백에 "중앙까지 모자란 만큼"을 더한다. 차이만 넣으면 리사이즈 때
     // 이미 들어간 여백을 잊고 값이 무너진다.
     const padTop = parseFloat(getComputedStyle(deck).paddingTop) || 0;
@@ -87,7 +86,7 @@ export function enableCenterFocus(deck: HTMLElement): () => void {
     scroller.removeEventListener("scroll", schedule);
     window.removeEventListener("resize", schedule);
     if (raf) cancelAnimationFrame(raf);
-    scroller.style.removeProperty("--deck-pad");
+    deck.style.removeProperty("--deck-pad");
     deck.style.removeProperty("--deck-pad-top");
     for (const c of cards) c.classList.remove("active");
   };
