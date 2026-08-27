@@ -76,6 +76,8 @@ export default function Workspace({
   const [aiNudge, setAiNudge] = useState(false);
   // 서비스 키로 남은 AI 인식 횟수 — 3회 이하로 떨어졌을 때만 알린다 (0이면 소진)
   const [aiQuotaLeft, setAiQuotaLeft] = useState<number | null>(null);
+  // 서비스 키 대행이 응답하지 못했다 — 사용자에겐 규칙 기반 결과만 보이므로 이유를 한 줄 남긴다
+  const [aiServiceDown, setAiServiceDown] = useState(false);
   const [stage, setStage] = useState<Stage>("input");
 
   // 화면 이동을 히스토리에 쌓아 브라우저 뒤로가기가 "이전 단계"로 동작하게 한다 —
@@ -391,6 +393,7 @@ export default function Workspace({
     setAiFilled(new Set());
     setAiNudge(false);
     setAiQuotaLeft(null);
+    setAiServiceDown(false);
     setStarted(false); // 인테이크(링크 붙여넣기)부터 다시
     setFormSeq((s) => s + 1); // 검증 스텝의 완료·건너뜀 상태 초기화
     pruneSelections(next);
@@ -620,6 +623,7 @@ export default function Workspace({
       },
     );
     if (body?.ok && body.fields) {
+      setAiServiceDown(false);
       const ok = fillParsed(body.fields, "AI ", true);
       // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게
       if (ok && typeof body.remaining === "number" && body.remaining <= 3) {
@@ -632,6 +636,9 @@ export default function Workspace({
     // 사용자에게 보이는 말이라 다듬는 순간 조건이 빗나가도 테스트는 전부 통과한다.
     // fallback 플래그로는 못 가른다 — 키 미설정(503)·호출 실패(502)도 같은 플래그를 준다.
     if (status === 429) setAiQuotaLeft(0);
+    // 키 미설정(503)·상위 호출 실패(502)는 우리 쪽 사정이다. 조용히 내려가면 사용자는 "AI가 원래
+    // 이 정도"라고 오해하고, 우리는 기능이 죽은 줄도 모른다 — 서버 로그와 짝이 되는 화면 신호다.
+    if (status === 502 || status === 503) setAiServiceDown(true);
     return fillParsed(parseBeanText(raw), "", false);
   }
 
@@ -689,6 +696,7 @@ export default function Workspace({
             filledCount={aiFilled.size}
             aiNudge={aiNudge}
             aiQuotaLeft={aiQuotaLeft}
+            aiServiceDown={aiServiceDown}
             onOpenSettings={() => {
               setAiNudge(false); // 한 번 안내했으면 충분하다
               onOpenSettings();

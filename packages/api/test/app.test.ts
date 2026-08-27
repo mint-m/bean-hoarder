@@ -2,7 +2,7 @@
 // Hono 이식본이 그대로 지키는지 실제 workerd + D1에서 검증한다.
 // 이 테스트가 곧 API 계약 문서다: 여기 담긴 상태 코드·메시지를 바꾸는 변경은 계약 파괴다.
 import { env } from "cloudflare:test";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import app from "../src/app";
 import { sha256hex } from "../src/lib/crypto";
 
@@ -450,6 +450,96 @@ test("AI 대행: 서비스 키가 없으면 503 + fallback (클라이언트가 �
   expect(res.status).toBe(503);
   const body = (await res.json()) as { fallback?: boolean };
   expect(body.fallback).toBe(true);
+});
+
+// ── 모델 폴백 — 같은 키라도 모델마다 404·429·503이 갈린다(AI_MODELS 주석 참고).
+// 하나만 부르던 시절 그 모델이 막히자 기능 전체가 조용히 죽었고, 클라이언트는 설계상 규칙 기반으로
+// 내려가므로 아무도 알아채지 못했다. 그래서 "다음 후보로 넘어간다"를 계약으로 못 박는다.
+async function extractWithKey(auth: { Authorization: string }): Promise<Response> {
+  return app.fetch(
+    new Request("https://bnhd.pages.dev/api/extract", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Ethiopia Gedeb Washed" }),
+    }),
+    { ...env, GEMINI_API_KEY: "test-key" } as typeof env,
+  );
+}
+
+/** Gemini generateContent 성공 응답 모양 — parseAiResponse가 읽는 경로만 채운다 */
+function aiOk(fields: Record<string, string>): Response {
+  return Response.json({
+    candidates: [{ content: { parts: [{ text: JSON.stringify(fields) }] } }],
+  });
+}
+
+test("AI 대행: 앞 후보가 429면 다음 모델로 넘어가 성공한다", async () => {
+  const { AI_MODELS } = await import("@bnhd/autofill/ai");
+  const user = await signupUser();
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
+    calls.push(String(input));
+    // 첫 후보만 막고(무료 등급 할당 0으로 실제 겪은 상황) 두 번째는 정상 응답
+    return Promise.resolve(
+      calls.length === 1
+        ? Response.json({ error: { message: "quota limit 0" } }, { status: 429 })
+        : aiOk({ ORIGIN: "ETHIOPIA" }),
+    );
+  });
+  try {
+    const res = await extractWithKey(user.auth);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; fields: Record<string, string> };
+    expect(body.ok).toBe(true);
+    expect(body.fields.ORIGIN).toBe("ETHIOPIA");
+    expect(calls.length).toBe(2);
+    expect(calls[0]).toContain(AI_MODELS[0] as string);
+    expect(calls[1]).toContain(AI_MODELS[1] as string);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("AI 대행: 후보가 전부 실패하면 502 + fallback이고 예약한 몫을 되돌린다", async () => {
+  const { AI_MODELS } = await import("@bnhd/autofill/ai");
+  const { remainingAiCalls } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const user = await signupUser();
+  const db = createDb(env.DB);
+  const before = await remainingAiCalls(db, user.usercode);
+  let calls = 0;
+  vi.stubGlobal("fetch", () => {
+    calls++;
+    return Promise.resolve(Response.json({ error: { message: "overloaded" } }, { status: 503 }));
+  });
+  try {
+    const res = await extractWithKey(user.auth);
+    expect(res.status).toBe(502);
+    expect((await res.json()) as { fallback?: boolean }).toMatchObject({ fallback: true });
+    expect(calls).toBe(AI_MODELS.length);
+    // 우리 쪽 사정으로 못 불러 준 것이므로 사용자 하루 몫은 그대로여야 한다
+    expect(await remainingAiCalls(db, user.usercode)).toBe(before);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+// 400은 모델이 아니라 우리가 잘못 보낸 것이다 — 후보를 바꿔도 같으므로 더 시도하지 않는다
+// (한 요청이 후보 수만큼 상위 호출을 곱해 마감 시한을 잡아먹지 않게).
+test("AI 대행: 400은 다음 후보로 넘어가지 않는다", async () => {
+  const user = await signupUser();
+  let calls = 0;
+  vi.stubGlobal("fetch", () => {
+    calls++;
+    return Promise.resolve(Response.json({ error: { message: "bad request" } }, { status: 400 }));
+  });
+  try {
+    const res = await extractWithKey(user.auth);
+    expect(res.status).toBe(502);
+    expect(calls).toBe(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {

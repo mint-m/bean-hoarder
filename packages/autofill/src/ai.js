@@ -6,8 +6,22 @@
 // 둘이 다른 프롬프트를 쓰면 "키를 넣었더니 결과가 달라진다"가 되므로 규칙은 반드시 하나여야 한다.
 // HTTP 호출 자체는 각자 담당한다 — 브라우저는 fetch + 사용자 키, 서버는 fetch + secret.
 
-/** 모델 — 두 경로가 같은 모델을 써야 결과가 일관된다. */
-export const AI_MODEL = "gemini-3.5-flash-lite";
+/**
+ * 모델 후보 — 앞에서부터 시도한다. 두 경로가 **같은 목록**을 써야 결과가 일관된다.
+ *
+ * 왜 하나가 아니라 목록인가: 같은 키라도 모델마다 되고 안 되고가 갈린다. 실제로 이 저장소의
+ * AI 리뷰 워크플로 로그에 404(그 키에 미제공)·429(무료 등급 할당이 0)·503(과부하)이 모델별로
+ * 다르게 찍혔다. 하나만 못 박아 두면 그 모델이 막히는 날 기능 전체가 조용히 죽는다.
+ */
+export const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"];
+
+/**
+ * 이 상위 응답이 "다음 후보로 넘어가면 될 일"인지.
+ * 모델에 매인 실패만 넘긴다 — 400(우리가 잘못 보냄)·401·403(키 문제)은 후보를 바꿔도 그대로다.
+ */
+export function shouldTryNextModel(status) {
+  return status === 404 || status === 429 || status >= 500;
+}
 
 export const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
