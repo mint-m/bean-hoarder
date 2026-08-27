@@ -119,7 +119,7 @@ async function deleteBeanFromDeck(key: string): Promise<void> {
   const { body } = await apiCall(`/api/bean/${key}`, { method: "DELETE" });
   if (body?.ok) {
     allBeans = allBeans.filter((b) => b.KEY !== key);
-    el("filter").classList.toggle("hidden", allBeans.length < 2);
+    hideFilterIfAlone();
     applyFilter();
   } else {
     alert(body?.error || "삭제하지 못했습니다.");
@@ -161,6 +161,19 @@ const SEARCH_FIELDS = [
   "MEMO",
 ];
 
+/**
+ * 원두가 1개 이하면 필터 입력을 감춘다 — 값도 함께 비운다.
+ *
+ * 값을 남기면 바로 뒤따르는 applyFilter()가 그 질의를 다시 읽어, 남은 원두가 질의에 안 맞을 때
+ * "검색 결과가 없습니다"만 뜨고 질의를 지울 컨트롤은 방금 숨겨진 상태가 된다(새로고침 말고는
+ * 되돌릴 길이 없다). 필터로 좁힌 뒤 그 카드를 삭제하면 바로 이 상태가 됐다.
+ */
+function hideFilterIfAlone(): void {
+  const filter = el<HTMLInputElement>("filter");
+  if (allBeans.length < 2) filter.value = "";
+  filter.classList.toggle("hidden", allBeans.length < 2);
+}
+
 function applyFilter(): void {
   const q = el<HTMLInputElement>("filter").value.trim().toLowerCase();
   if (!q) {
@@ -194,8 +207,8 @@ async function main(): Promise<void> {
     showStatus(body?.error || "목록을 불러오지 못했습니다.");
     return;
   }
-  allBeans = body.beans.sort((a, b) => String(b.KEY ?? "").localeCompare(String(a.KEY ?? ""))); // 최신 KEY 먼저
-  el("filter").classList.toggle("hidden", allBeans.length < 2);
+  allBeans = body.beans; // 정렬은 renderDeck의 sortBeans가 맡는다 (보관 최하단 + 최신 KEY 먼저)
+  hideFilterIfAlone();
   el("filter").addEventListener("input", applyFilter);
   el("note-toggle-row").classList.toggle("hidden", allBeans.length === 0);
   const noteToggle = el<HTMLInputElement>("note-toggle");
