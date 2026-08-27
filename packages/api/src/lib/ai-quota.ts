@@ -62,7 +62,13 @@ export async function reserveAiCall(db: Db, usercode: string): Promise<number | 
   if (acctCount > DAILY_PER_ACCOUNT) return null;
 
   const globalCount = await bump(globalBucket());
-  if (globalCount > DAILY_GLOBAL) return null;
+  if (globalCount > DAILY_GLOBAL) {
+    // 전역 한도에 막힌 것은 이 사용자의 잘못이 아니다 — 방금 예약한 계정 몫을 돌려준다.
+    // (releaseAiCall은 전역도 함께 내리지만 여기선 그게 맞다 — 이미 한도를 넘겨 올라간 값이라
+    // 되돌려도 한도와 같아 다음 요청은 계속 막힌다.)
+    await releaseAiCall(db, usercode);
+    return null;
+  }
 
   return DAILY_PER_ACCOUNT - acctCount;
 }

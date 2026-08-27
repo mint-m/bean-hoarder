@@ -471,7 +471,7 @@ test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 
 });
 
 test("AI 대행 할당량: 전역 한도는 계정이 달라도 함께 소진된다 (한 사람이 하루치를 독식하지 못하게)", async () => {
-  const { reserveAiCall, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
   const restore = setAiQuotaForTest(50, 2); // 전역 2회
   try {
@@ -483,6 +483,15 @@ test("AI 대행 할당량: 전역 한도는 계정이 달라도 함께 소진된
     expect(await reserveAiCall(db, a)).not.toBeNull();
     expect(await reserveAiCall(db, b)).not.toBeNull();
     expect(await reserveAiCall(db, b)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
+
+    // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
+    // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
+    // 소진하고 전역이 풀린 뒤에도 막힌다.
+    const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const before = await remainingAiCalls(db, c);
+    expect(await reserveAiCall(db, c)).toBeNull();
+    expect(await reserveAiCall(db, c)).toBeNull();
+    expect(await remainingAiCalls(db, c)).toBe(before);
   } finally {
     restore();
   }

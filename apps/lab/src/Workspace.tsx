@@ -611,7 +611,7 @@ export default function Workspace({
     if ((localStorage.getItem("bh_gemini_key") || "").trim()) return runAiRecognition(raw);
 
     setAutofillStatus({ msg: "AI 인식 중…", cls: "" });
-    const { body } = await call<{ fields: Record<string, string>; remaining: number }>("/api/extract", {
+    const { status, body } = await call<{ fields: Record<string, string>; remaining: number }>("/api/extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: raw }),
@@ -624,8 +624,11 @@ export default function Workspace({
       }
       return ok;
     }
-    // 한도 소진·키 미설정·호출 실패 — 규칙 기반으로 내려간다 (fallback 플래그는 서버가 준다)
-    if (body?.error?.includes("다 썼습니다")) setAiQuotaLeft(0);
+    // 한도 소진·키 미설정·호출 실패 — 규칙 기반으로 내려간다 (fallback 플래그는 서버가 준다).
+    // 소진 판정은 상태 코드로 한다: 서버가 429를 내는 경우는 이것뿐이고, 문구(AI_QUOTA_ERROR)는
+    // 사용자에게 보이는 말이라 다듬는 순간 조건이 빗나가도 테스트는 전부 통과한다.
+    // fallback 플래그로는 못 가른다 — 키 미설정(503)·호출 실패(502)도 같은 플래그를 준다.
+    if (status === 429) setAiQuotaLeft(0);
     return fillParsed(parseBeanText(raw), "", false);
   }
 
