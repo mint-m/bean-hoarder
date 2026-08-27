@@ -11,9 +11,6 @@
 // 내 원두 덱(/deck)과 정적 데모 덱(/demo)이 같은 카드(lib/wallet-card.ts)와 같은 스타일
 // (public/deck.css)을 쓰므로 인터랙션도 여기 한 벌만 둔다 — 한쪽만 고치면 데모가 실제와 달라진다.
 
-/** 덱의 기본 위 여백 (deck.css의 `.deck { padding-top }`) — 기준선이 이만큼 내려간다. */
-const TOP_GAP = 4;
-
 /**
  * 펼침을 옮기기 전에 요구하는 최소 우위(px).
  *
@@ -67,14 +64,17 @@ export function enableCardFocus(deck: HTMLElement): () => void {
   /**
    * 레이아웃에서 오는 값은 여기서만 읽는다. 스크롤 중에 재면 매 프레임 강제 리플로우가 걸리고,
    * 여백까지 다시 쓰면 브라우저가 스크롤 위치를 보정하면서 화면이 눈에 띄게 튄다.
-   * 카드 높이는 CSS(--w-card-h)가 정하므로 실측한다 — 여기 숫자를 또 적으면 둘이 갈라진다.
+   *
+   * 카드 높이(--w-card-h)도 첫 카드 위 여백(padding-top)도 CSS가 정한다 — 여기 숫자를 다시
+   * 적으면 둘이 갈라지므로 실측해서 쓴다. 기준선은 "그 여백만큼 내려온 자리에 선 첫 카드의 중심"이다.
    */
   const measure = (): void => {
     const cardH = (cards[0] as HTMLElement).offsetHeight;
-    line = TOP_GAP + cardH / 2;
-    // 마지막 카드도 기준선까지 올라올 수 있는 스크롤 여유 (이 여백이 곧 스크롤 범위다)
-    const pad = Math.max(0, Math.round(deck.clientHeight - line - cardH / 2));
-    deck.style.setProperty("--deck-pad-bottom", `${pad}px`);
+    const room = Number.parseFloat(getComputedStyle(deck).paddingTop) || 0;
+    line = room + cardH / 2;
+    // 마지막 카드도 기준선까지 올라오게 하는 활주로 — 이 높이가 곧 스크롤 범위다
+    const runway = Math.max(0, Math.round(deck.clientHeight - room - cardH));
+    deck.style.setProperty("--deck-runway", `${runway}px`);
     centers = cards.map((c) => offsetTopWithin(c, deck) + c.offsetHeight / 2);
   };
 
@@ -100,21 +100,22 @@ export function enableCardFocus(deck: HTMLElement): () => void {
       paint();
     });
   };
-  const onResize = (): void => {
-    measure();
-    paint();
-  };
-
   measure();
   paint();
   deck.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onResize);
+  // 창 리사이즈보다 넓게 잡는다 — 모바일에서 주소창이 접히며 100dvh가 변하는 것도, 덱이 뒤늦게
+  // 보이게 되는 것도 여기서 잡힌다(그때 잰 높이가 0이면 활주로가 0이 되어 스크롤이 막힌다).
+  const observer = new ResizeObserver(() => {
+    measure();
+    paint();
+  });
+  observer.observe(deck);
 
   return () => {
     deck.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onResize);
+    observer.disconnect();
     if (raf) cancelAnimationFrame(raf);
-    deck.style.removeProperty("--deck-pad-bottom");
+    deck.style.removeProperty("--deck-runway");
     for (const c of cards) c.classList.remove("active");
   };
 }

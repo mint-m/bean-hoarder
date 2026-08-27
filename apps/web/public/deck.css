@@ -177,8 +177,20 @@ footer {
     overflow-anchor: none;
     /* 카드의 offsetTop이 이 요소 기준이 되게 (deck-focus.ts가 그 전제로 잰다) */
     position: relative;
-    /* 마지막 카드도 기준선까지 올라올 여유 — 실제 값은 deck-focus.ts가 높이를 재서 넣는다 */
-    padding-bottom: var(--deck-pad-bottom, 0px);
+    /* 첫 카드 위 숨 쉴 틈. 기준선은 "이만큼 내려온 첫 카드의 중심"이라(deck-focus.ts가 이 값을
+       읽는다) 이 한 줄이 곧 펼침 위치를 정한다 — 0에 가까우면 카드가 안내문에 붙어 답답하고,
+       화면 절반까지 내리면 맨 위에서 첫 카드 앞이 통째로 비어 보인다. */
+    padding-top: var(--sp-7);
+  }
+  /* 스크롤 활주로 — 마지막 카드도 기준선까지 올라오게 한다.
+     ⚠️ padding-bottom으로 두면 안 된다. WebKit(모바일 사파리)은 스크롤 컨테이너가 flex일 때
+     하단 패딩을 스크롤 영역에 넣지 않아 **실기기에서 스크롤이 통째로 막힌다** — 에뮬레이터
+     (Chrome)는 포함해서 계산하므로 데스크톱 검증만으로는 잡히지 않는다. 실제로 그렇게 놓쳤다.
+     플렉스 아이템으로 두면 어느 엔진에서나 높이로 잡힌다. */
+  .deck::after {
+    content: "";
+    flex-shrink: 0;
+    height: var(--deck-runway, 0px);
   }
 }
 /* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
