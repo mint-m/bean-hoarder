@@ -43,11 +43,11 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: Wa
   const bandStyle = grad ? ` style="background-image:${grad}"` : "";
   const archivedClass = b.ARCHIVED ? " archived" : "";
   return `<div class="wcard${archivedClass}" tabindex="0" role="link"
-      aria-label="${escapeHtml(headline)} 상세보기" data-key="${g("KEY")}">
+      aria-label="${escapeHtml(headline)} 상세보기" data-key="${escapeHtml(g("KEY"))}">
     ${menu ? '<button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>' : ""}
     <div class="w-band"${bandStyle}>
       <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
-      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${g("KEY")}</span></div>
+      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${escapeHtml(g("KEY"))}</span></div>
     </div>
     <div class="w-body">
       ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}

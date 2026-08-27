@@ -15,6 +15,18 @@ export function escapeHtml(s: string): string {
   );
 }
 
+/**
+ * 링크에 넣어도 되는 URL만 통과시킨다 — 아니면 빈 문자열.
+ *
+ * `javascript:`(와 `data:`)는 href에 들어가는 순간 이 오리진에서 스크립트가 된다.
+ * 조회 페이지의 SOURCE_URL은 사용자가 적은 값이고 `?preview=`로는 인증 없이도 들어오므로,
+ * "우리가 그리는 링크의 스킴은 http(s)뿐"을 escapeHtml 옆 한 곳에서 못 박는다.
+ * `rel="noopener"`나 `target="_blank"`로는 막을 수 없는 종류다.
+ */
+export function safeHttpUrl(v: string): string {
+  return /^https?:\/\//i.test(v.trim()) ? v.trim() : "";
+}
+
 /** "26.07.03" → Date. 형식이 아니면 null. */
 export function parseDot(d: string): Date | null {
   const m = /^(\d{2})\.(\d{2})\.(\d{2})$/.exec(d || "");

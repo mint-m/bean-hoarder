@@ -4,7 +4,7 @@
 // 여기서 location.pathname을 읽어 KEY를 뽑는다. 그 계약은 e2e/routing.spec.ts가 지킨다.
 import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { flavorGradient, originSignature } from "./lib/coffee-color";
-import { daysSince, el, escapeHtml } from "./lib/dom";
+import { daysSince, el, escapeHtml, safeHttpUrl } from "./lib/dom";
 
 // jsQR 디코더(~130KB)는 타입만 정적으로 참조하고 런타임 코드는 스캔을 처음 열 때 지연 로드한다
 // (setupScanner의 open 참조). type-only import라 번들에는 들어가지 않는다 — 조회 진입(QR로
@@ -256,8 +256,10 @@ function render(row: HeadlineRow, isPreview: boolean): void {
   if (g("MEMO")) el("f-memo-body").textContent = g("MEMO");
 
   const src = el<HTMLAnchorElement>("f-source");
-  src.classList.toggle("hidden", !g("SOURCE_URL"));
-  if (g("SOURCE_URL")) src.href = g("SOURCE_URL");
+  // 스킴이 http(s)가 아니면 링크 자체를 걸지 않는다 — 아래 safeHttpUrl 주석 참고
+  const srcUrl = safeHttpUrl(g("SOURCE_URL"));
+  src.classList.toggle("hidden", !srcUrl);
+  if (srcUrl) src.href = srcUrl;
 
   document.title = `${headline} — BEAN-HOARDER${isPreview ? " (미리보기)" : ""}`;
 }
