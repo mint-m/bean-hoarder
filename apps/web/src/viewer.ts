@@ -38,7 +38,16 @@ function shortDate(v: string): string {
 function getCode(): string | null {
   const q = new URLSearchParams(location.search).get("c");
   if (q) return q.trim().toUpperCase();
-  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, "");
+  // 퍼센트 인코딩이 깨진 경로(잘려서 스캔된 QR, 손으로 친 주소)에서도 던지지 않는다 —
+  // Pages 폴백이 매치 없는 모든 경로를 여기로 보내므로 URIError가 올라가면 안내조차 못 띄우고
+  // "불러오는 중…" 상태로 멈춘다. 원문 그대로 두고 아래 KEY_RE 검사에 맡긴다.
+  let raw: string;
+  try {
+    raw = decodeURIComponent(location.pathname);
+  } catch (_e) {
+    raw = location.pathname;
+  }
+  const path = raw.replace(/^\/+|\/+$/g, "");
   return path && path !== "index.html" ? path.toUpperCase() : null;
 }
 

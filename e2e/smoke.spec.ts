@@ -16,6 +16,14 @@ test("공개 조회: ?c= 쿼리 진입도 같은 카드를 연다", async ({ pag
   await expect(page.locator("body")).toContainText("E2E FIXTURE");
 });
 
+// 퍼센트 인코딩이 깨진 경로 — 잘려서 스캔된 QR이나 손으로 친 주소가 여기로 온다.
+// Pages 폴백이 매치 없는 모든 경로에 조회 페이지를 주므로, getCode()의 decodeURIComponent가
+// 던지면 안내조차 못 띄우고 "불러오는 중…"에서 멈춘다(안내는 KEY_RE 검사 뒤에 있다).
+test("공개 조회: 깨진 퍼센트 인코딩 경로에서도 안내가 뜬다", async ({ page }) => {
+  await page.goto("/%E0%A4");
+  await expect(page.locator("body")).toContainText("올바른 코드 형식이 아닙니다");
+});
+
 // 데모는 "정적"이 요점이다 — D1도 API도 타지 않아야 라이브와 어긋날 여지가 없다.
 // 화면이 그려지는 것만 봐서는 그 요점이 지켜졌는지 알 수 없으므로(예전 구현도 그림은 그렸다)
 // /api/** 를 통째로 끊어 놓고 덱과 카드가 멀쩡한지 확인한다.
