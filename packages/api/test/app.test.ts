@@ -306,6 +306,56 @@ test("import: 내 KEY 복원(덮어쓰기), 타인 KEY·형식 오류는 skipped
   expect(againResult.updated).toBe(1);
 });
 
+// 백업의 목적은 "실수 삭제·악의적 변조를 백업 시점으로 되돌림"이다. 그런데 ARCHIVED가 CSV에
+// 아예 없어서 보관 상태만 그 규칙 밖에 있었다 — 빈 DB에 복원하면 접어둔 원두가 전부 되살아났다.
+test("export/import: 보관(archived) 상태가 백업을 통과한다", async () => {
+  const user = await signupUser();
+  const { data } = await addBean(user.auth);
+  const setArchived = (archived: boolean) =>
+    api(`/bean/${data.key}/archive`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+      headers: user.auth,
+    });
+
+  await setArchived(true);
+  const backup = await (await api("/export.csv", { headers: user.auth })).text();
+  expect(backup).toContain("COFFEE_NAME,ARCHIVED"); // 고정 후미 열
+  expect(backup).toContain(`${data.key},`);
+  expect(backup.trimEnd().endsWith(",1")).toBe(true); // boolean이 아니라 0/1 (엑셀 왕복 대비)
+
+  // 보관을 해제해 두고 백업으로 복원 → 백업 시점(보관됨)으로 돌아와야 한다
+  await setArchived(false);
+  const res = await api("/import", { method: "POST", body: backup, headers: user.auth });
+  expect(((await res.json()) as { updated: number }).updated).toBe(1);
+
+  const bean = (await (await api(`/bean/${data.key}`)).json()) as { bean: { ARCHIVED: boolean } };
+  expect(bean.bean.ARCHIVED).toBe(true);
+});
+
+// ARCHIVED 열이 생기기 전에 받아둔 백업 파일은 보관 상태를 "활성"이라 말하는 게 아니라
+// 모르는 것이다 — 없는 정보로 덮어쓰면 접어둔 원두가 옛 파일 한 번에 전부 되살아난다.
+test("import: ARCHIVED 열이 없는 옛 백업은 보관 상태를 덮어쓰지 않는다", async () => {
+  const user = await signupUser();
+  const { data } = await addBean(user.auth);
+  await api(`/bean/${data.key}/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived: true }),
+    headers: user.auth,
+  });
+
+  // 열 매핑은 위치가 아니라 이름 기준이라, 옛 형식은 부분 열로 재현할 수 있다
+  const legacy = `KEY,ROASTERY,ORIGIN,ROAST_DATE,PACKAGE_DATE\r\n${data.key},NEW ROASTERY,KENYA,26.06.28,26.07.03`;
+  const res = await api("/import", { method: "POST", body: legacy, headers: user.auth });
+  expect(((await res.json()) as { updated: number }).updated).toBe(1);
+
+  const bean = (await (await api(`/bean/${data.key}`)).json()) as {
+    bean: { ARCHIVED: boolean; ROASTERY: string };
+  };
+  expect(bean.bean.ROASTERY).toBe("NEW ROASTERY"); // 복원 자체는 확실히 일어났고
+  expect(bean.bean.ARCHIVED).toBe(true); // 보관 상태만 건드리지 않았다
+});
+
 test("import: 크기·행수·헤더 검증", async () => {
   const user = await signupUser();
 
@@ -385,5 +435,82 @@ test("fetch: URL 형식 오류·비HTTP 프로토콜·내부망 주소는 400", 
     const res = await api("/fetch", { ...jsonBody({ url }), headers: user.auth });
     expect(res.status, url).toBe(400);
     expect(((await res.json()) as { error: string }).error, url).toBe(error);
+  }
+});
+
+// AI 인식 대행 — 서비스 키로 대신 불러 주는 몫에만 한도가 걸린다.
+// 키가 없는 배포에서도 서비스는 살아 있어야 하므로 503 + fallback으로 알려 클라이언트가 규칙 기반으로 내려간다.
+test("AI 대행: 서비스 키가 없으면 503 + fallback (클라이언트가 규칙 기반으로 내려갈 수 있게)", async () => {
+  const user = await signupUser();
+  const res = await api("/extract", {
+    method: "POST",
+    headers: user.auth,
+    body: JSON.stringify({ text: "Ethiopia Washed" }),
+  });
+  expect(res.status).toBe(503);
+  const body = (await res.json()) as { fallback?: boolean };
+  expect(body.fallback).toBe(true);
+});
+
+test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
+  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const restore = setAiQuotaForTest(2, 100); // 계정 2회로 낮춰 경계를 바로 검증
+  try {
+    const db = createDb(env.DB);
+    const uc = `Q${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    expect(await remainingAiCalls(db, uc)).toBe(2);
+
+    expect(await reserveAiCall(db, uc)).toBe(1); // 1회차 → 1회 남음
+    expect(await reserveAiCall(db, uc)).toBe(0); // 2회차 → 0회 남음
+    expect(await reserveAiCall(db, uc)).toBeNull(); // 3회차 → 한도 초과
+    expect(await remainingAiCalls(db, uc)).toBe(0);
+  } finally {
+    restore();
+  }
+});
+
+test("AI 대행 할당량: 전역 한도는 계정이 달라도 함께 소진된다 (한 사람이 하루치를 독식하지 못하게)", async () => {
+  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const restore = setAiQuotaForTest(50, 2); // 전역 2회
+  try {
+    const db = createDb(env.DB);
+    // 전역 버킷은 날짜 단위 공유라 앞 테스트의 사용분이 남아 있을 수 있다 — 0으로 맞추고 시작
+    await env.DB.prepare("DELETE FROM ai_usage WHERE bucket LIKE 'global:%'").run();
+    const a = `G${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const b = `H${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    expect(await reserveAiCall(db, a)).not.toBeNull();
+    expect(await reserveAiCall(db, b)).not.toBeNull();
+    expect(await reserveAiCall(db, b)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
+
+    // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
+    // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
+    // 소진하고 전역이 풀린 뒤에도 막힌다.
+    const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const before = await remainingAiCalls(db, c);
+    expect(await reserveAiCall(db, c)).toBeNull();
+    expect(await reserveAiCall(db, c)).toBeNull();
+    expect(await remainingAiCalls(db, c)).toBe(before);
+  } finally {
+    restore();
+  }
+});
+
+test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리 잘못으로 사용자 몫을 깎지 않는다)", async () => {
+  const { reserveAiCall, releaseAiCall, remainingAiCalls, setAiQuotaForTest } = await import(
+    "../src/lib/ai-quota"
+  );
+  const { createDb } = await import("../src/db");
+  const restore = setAiQuotaForTest(3, 100);
+  try {
+    const db = createDb(env.DB);
+    const uc = `R${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    await reserveAiCall(db, uc);
+    expect(await remainingAiCalls(db, uc)).toBe(2);
+    await releaseAiCall(db, uc);
+    expect(await remainingAiCalls(db, uc)).toBe(3);
+  } finally {
+    restore();
   }
 });

@@ -1,0 +1,259 @@
+/* 월렛 덱 카드 — 내 원두 덱(/deck)과 정적 데모 덱(/demo)이 함께 쓴다.
+   두 페이지가 같은 카드를 보여줘야 하므로 인라인 <style>이 아니라 여기 한 곳에 둔다
+   (public/ 아래라 해시 없이 그대로 서빙된다 — theme.css와 같은 취급).
+
+   피크 밴드가 1급 설계 단위다 (DESIGN.md §7): 스택 상태에서 보이는 상단 띠(--w-peek)에
+   정체성(향미 그라데이션 + 산지 닷 + 헤드라인 + 핵심 메타)을 모두 싣는다 — Apple Wallet이
+   색 띠로 패스를 구별하는 방식. 카드 높이를 고정해 스택이 "색 띠 카탈로그"로 정렬되게 한다. */
+
+/* 덱 페이지 공통 크롬 — 두 페이지가 같은 폭·같은 헤더를 쓴다.
+   카드만 공유하고 틀은 각자 갖고 있으면, 한쪽 여백을 고칠 때 다른 쪽이 조용히 어긋난다. */
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 0 16px 40px;
+}
+.topbar {
+  width: 100%;
+  max-width: 460px;
+  padding: 18px 2px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.topbar .wordmark {
+  font-size: 16px;
+}
+.topbar .wordmark span {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--sub);
+  margin-left: 6px;
+}
+.topbar a.btn {
+  text-decoration: none;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+main {
+  width: 100%;
+  max-width: 460px;
+  flex: 1;
+}
+footer {
+  margin-top: 28px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--sub);
+}
+/* isolation: isolate — 숨긴(archived) 카드에 줄 음수 z-index가 덱 바깥(헤더·검색창 등)으로
+   새지 않고 이 컨테이너 안에서만 "맨 뒤"로 가라앉도록 자체 stacking context를 만든다. */
+.deck {
+  --w-peek: 66px; /* 스택시 보이는 밴드 높이 */
+  --w-card-h: 158px; /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치 */
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+  isolation: isolate;
+}
+.wcard {
+  display: block;
+  color: var(--ink);
+  cursor: pointer;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  height: var(--w-card-h);
+  overflow: hidden;
+  margin-top: calc(var(--w-peek) - var(--w-card-h));
+  position: relative;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.wcard:first-child {
+  margin-top: 0;
+}
+/* 애플 월렛처럼: 호버·포커스한 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로
+   밀려 내려가 시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가
+   기본적으로 앞 카드 위에 그려지므로, 뒤 카드들을 비켜주기만 해도 호버한 카드가 온전히 드러난다. */
+.wcard:hover,
+.wcard:focus-within {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-hover);
+}
+.wcard:hover ~ .wcard,
+.wcard:focus-within ~ .wcard {
+  transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+}
+/* 숨긴 카드는 덱의 가장 뒤(음수 z-index)로 가라앉혀 다른 카드 뒤에 깔리게 하고, 불투명하게
+   채도만 낮춘다(투명하게 하면 겹친 뒤 카드가 비쳐 지저분해 보여서 opacity는 쓰지 않는다). */
+.wcard.archived {
+  filter: grayscale(90%) brightness(0.94);
+  z-index: -1;
+}
+/* 카드 자체는 클릭·엔터 시 바로 상세 이동 — 메뉴는 호버 시 나타나는 별도 버튼으로만 연다.
+   우측 하단(RSTD/NET 줄 옆)은 늘 여유 공간이라 절대 위치로 얹어도 본문 레이아웃을 밀어내지 않는다. */
+.wcard-menu {
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fill-muted);
+  color: var(--sub);
+  font-size: 17px;
+  line-height: 1;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition:
+    opacity var(--t),
+    background var(--t);
+}
+.wcard:hover .wcard-menu,
+.wcard-menu:focus-visible {
+  opacity: 1;
+}
+.wcard-menu:hover {
+  background: var(--fill-muted-hover);
+}
+/* 터치 기기는 호버가 없으므로 메뉴 버튼을 항상 보이게 둔다 */
+@media (hover: none) {
+  .wcard-menu {
+    opacity: 1;
+  }
+}
+/* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
+.w-band {
+  height: var(--w-peek);
+  padding: 11px 18px 9px;
+  box-sizing: border-box;
+  background-color: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+/* 밴드와 본문이 칼같이 잘리면 띠가 덧댄 것처럼 보인다 — 아래쪽 몇 px만 본문 색으로 빠르게 풀어
+   경계를 지운다. 내용은 z-index로 위에 두어 이 페이드에 씻기지 않게 한다. */
+.w-band::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+  z-index: 0;
+}
+.w-band > * {
+  position: relative;
+  z-index: 1;
+}
+.w-band-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.w-origin-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+/* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다 */
+.w-origin-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-origin-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dday {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+/* 기본형 뒤에 둔다 — 재정의는 항상 나중에 와야 캐스케이드가 예측 가능하다 */
+.wcard.archived .dday {
+  display: none;
+}
+.w-band-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.w-roastery {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-key {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--sub);
+}
+/* 본문 — 카드를 뽑아냈을 때(호버·마지막 카드)만 온전히 보인다 */
+.w-body {
+  padding: 10px 18px 0;
+}
+.w-meta {
+  font-size: 12.5px;
+  color: var(--sub);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-note {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink);
+  margin: 5px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-foot {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--sub);
+  margin-top: 7px;
+}

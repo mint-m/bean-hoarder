@@ -1,5 +1,8 @@
 // Bean-Hoarder — 라벨 렌더러 단일 모듈 (@bnhd/label)
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
+// 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다 —
+// 라벨은 SVG라 대소문자 CSS가 없으므로 렌더 시점에 직접 .toUpperCase()를 건다.
+import { buildHeadline, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
 //
@@ -287,48 +290,6 @@ function specCell(S, x, y, label, value, size, ink) {
   );
 }
 
-// 라벨 인쇄용 축약: 괄호 속 상세 설명("Washed (36 hours ...)" 등)은
-// QR로 열리는 상세 페이지에서 전부 보여주므로 라벨엔 핵심 단어만 남긴다.
-const stripParen = (s) => s.replace(/\s*[(（][^)）]*[)）]?/g, "").trim();
-
-// ── 헤드라인(메인 식별자) 조합 ─────────────────────────────
-// 국가만으로는 비슷한 원두 구분이 어려워, 국가 + 가장 세부 장소 1개를 조합해 변별력을 높인다.
-// 장소 앵커 우선순위(가장 구체적 순): 워싱스테이션 > 생산자 > 지역. 랏(LOT)은 번호만으론 단독
-// 식별이 어려워 앵커 뒤에 보조로만 덧붙인다. 시그니쳐/블렌드명(COFFEE_NAME)이 있으면 그대로 대체.
-// 국가·장소엔 stripParen을 적용 — "블렌드 (여러 원산지 혼합)" → "블렌드".
-// deck.html·index.html의 bhHeadline(public/headline.js)이 이 규칙과 동일해야 한다.
-export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"];
-
-function headlinePlaceKey(row) {
-  for (const k of HEADLINE_PLACE_ORDER) {
-    if (stripParen((row[k] || "").trim())) return k;
-  }
-  return null;
-}
-
-export function buildHeadline(row) {
-  const g = (k) => stripParen((row[k] || "").trim());
-  const name = (row.COFFEE_NAME || "").trim();
-  if (name) return name.toUpperCase();
-  const pk = headlinePlaceKey(row);
-  const parts = [g("ORIGIN"), pk ? g(pk) : ""].filter(Boolean);
-  let head = parts.join(" ");
-  const lot = g("LOT");
-  if (lot) head = head ? `${head} · ${lot}` : lot;
-  return head.toUpperCase();
-}
-
-// 헤드라인이 이미 소비한 부제목 후보 필드 — 중복 표시를 막는다.
-// COFFEE_NAME 오버라이드 시엔 장소·랏을 헤드라인이 쓰지 않으므로 빈 배열(부제목에 그대로 노출).
-export function headlineUsedFields(row) {
-  if ((row.COFFEE_NAME || "").trim()) return [];
-  const used = [];
-  const pk = headlinePlaceKey(row);
-  if (pk) used.push(pk);
-  if (stripParen((row.LOT || "").trim())) used.push("LOT");
-  return used;
-}
-
 // 스펙 그리드를 줄 단위로 배치: 값이 칸 절반 폭에 들어가면 2열 한 줄, 넘치면 그 항목만
 // 전체 폭으로 단독 줄(최대 2줄 랩)을 차지한다 — 말줄임(…)으로 잘리는 대신 줄바꿈으로 전문을 보존한다.
 function layoutSpecRows(list, specValueSize, S, fullMaxW) {
@@ -415,7 +376,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
   // 국가 단독이 아니라 국가+세부장소[+랏] 조합(또는 시그니쳐/블렌드명)으로 변별력을 높인다.
   let yCur;
-  const origin = buildHeadline(row);
+  const origin = buildHeadline(row).toUpperCase();
   if (portrait) {
     const headLines = wrapN(origin, headlineSize, 0.68, headMax, S.headMaxLines || 2);
     let hy = S.headY;
@@ -598,6 +559,69 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<rect width="${W}" height="${H}" fill="#fff"/>\n${els.filter(Boolean).join("\n")}\n</svg>`;
   return { svg, content, moduleCount: n, W, H };
+}
+
+// ── QR 단독 (라벨 없이 QR만) ──────────────────────────────────
+// 라벨 레이아웃은 쓰는 사람마다 다르고 프린터 호환도 보장할 수 없다. 그래서 서비스가 책임지는 산출물은
+// "어떤 라벨 소프트웨어에 얹어도 스캔되는 QR"이고, 그 인쇄 기하를 여기서 라벨과 같은 근거로 만든다.
+// (랩에 복제하지 않는 이유 — BASE_URL·DOT·인코딩 모드가 갈라지면 인쇄된 라벨과 어긋난다.)
+
+/** 모듈당 도트 수 선택지 — DOT의 정수배라야 203dpi에서 모듈 경계가 픽셀에 정확히 떨어진다. */
+export const QR_DOT_OPTIONS = [3, 4, 5];
+
+/**
+ * 콰이엇존(여백) 모듈 수.
+ *
+ * QR 규격(ISO/IEC 18004)은 4모듈을 요구하지만, 이 이미지는 **라벨 위에 얹는 부품**이다 —
+ * 라벨의 흰 바탕이 나머지 여백을 대신해 주므로 이미지 자체는 2모듈만 갖는다. 4모듈로 내보내면
+ * 배치할 때 눈에 보이는 여백이 과해 라벨 레이아웃이 불편해진다.
+ * **전제**: QR 주변은 흰색이어야 한다. 어두운 배경·테두리에 바로 붙이면 스캔이 깨질 수 있다.
+ */
+const QR_QUIET_MODULES = 2;
+
+/**
+ * 인쇄되는 QR 이미지 한 변의 mm — **콰이엇존 포함 전체**다.
+ *
+ * buildQrSVG가 쓰는 바로 그 식이라, 이 값을 화면에 적어 두면 파일과 어긋날 수 없다.
+ * 랩이 크기를 표시하려고 DOT을 손으로 다시 적던 것을 대신한다 — 203dpi 도트 피치나
+ * 콰이엇존을 바꾸면 SVG와 표시가 함께 움직여야 하고, 그러려면 식이 한 곳에 있어야 한다.
+ *
+ * @param {number} dots 모듈당 도트 수 (QR_DOT_OPTIONS)
+ * @param {number} moduleCount QR 한 변의 모듈 수 (buildQrSVG가 돌려주는 moduleCount)
+ */
+export function qrSizeMM(dots, moduleCount) {
+  return dots * DOT * (moduleCount + 2 * QR_QUIET_MODULES);
+}
+
+/**
+ * 인쇄용 QR 단독 SVG.
+ * @param {string} key 라벨 KEY (`{유저코드4}{연도2}-{순번3}`)
+ * @param {number} dots 모듈당 도트 수 (QR_DOT_OPTIONS)
+ * @returns {{svg:string, content:string, moduleCount:number, codeSize:number, size:number}}
+ *   codeSize = QR 자체 한 변(mm), size = 콰이엇존 포함 전체(mm)
+ */
+export function buildQrSVG(key, dots = 3) {
+  const k = String(key || "").toUpperCase();
+  const content = `${BASE_URL}/${k}`;
+  const qr = qrcode(0, "M");
+  qr.addData(content, "Alphanumeric");
+  qr.make();
+  const n = qr.getModuleCount();
+  const module = dots * DOT;
+  const quiet = QR_QUIET_MODULES * module;
+  const codeSize = module * n;
+  const size = qrSizeMM(dots, n);
+
+  let rects = "";
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (qr.isDark(r, c)) {
+        rects += `<rect x="${(quiet + c * module).toFixed(4)}" y="${(quiet + r * module).toFixed(4)}" width="${module.toFixed(4)}" height="${module.toFixed(4)}" fill="#000"/>`;
+      }
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}mm" height="${size}mm" viewBox="0 0 ${size} ${size}">\n<rect width="${size}" height="${size}" fill="#fff"/>\n${rects}\n</svg>`;
+  return { svg, content, moduleCount: n, codeSize, size };
 }
 
 function b64EncodeUnicode(str) {

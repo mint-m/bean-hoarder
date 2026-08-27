@@ -28,14 +28,17 @@ declare module "@bnhd/label" {
     showLogo: boolean;
   }
   export const DEFAULT_DESIGN: LabelDesign;
-  export const HEADLINE_PLACE_ORDER: string[];
-  export function buildHeadline(row: Record<string, string>): string;
-  export function headlineUsedFields(row: Record<string, string>): string[];
   export function buildLabelSVG(
     row: Record<string, string>,
     design?: LabelDesign,
     logoDataUrl?: string | null,
   ): { svg: string; content: string; moduleCount: number; W: number; H: number };
+  export const QR_DOT_OPTIONS: number[];
+  export function qrSizeMM(dots: number, moduleCount: number): number;
+  export function buildQrSVG(
+    key: string,
+    dots?: number,
+  ): { svg: string; content: string; moduleCount: number; codeSize: number; size: number };
   export function renderCanvas(svg: string, dpi: number): Promise<HTMLCanvasElement>;
   export function renderPngBlob(svg: string, dpi: number): Promise<Blob>;
   export function verifyQr(svg: string, expectedContent: string, dpi?: number): Promise<{ ok: boolean }>;

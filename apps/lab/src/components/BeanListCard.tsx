@@ -1,6 +1,8 @@
-// 내 원두 목록 카드 — 수정/URL/삭제 + CSV 백업·복원 + 덱 링크.
+// 내 원두 목록 카드 — 수정/URL 복사/삭제 + CSV 백업·복원 + 덱 링크.
 import { useRef } from "react";
+import { copyText } from "../lib/format";
 import type { BeanPublicRow } from "../types";
+import { CopyButton } from "./FormBits";
 
 interface Props {
   beans: BeanPublicRow[] | null;
@@ -10,6 +12,7 @@ interface Props {
   onRefresh: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onBack: () => void;
 }
 
 export default function BeanListCard(p: Props) {
@@ -17,6 +20,11 @@ export default function BeanListCard(p: Props) {
 
   return (
     <div className="card">
+      <div className="stage-head">
+        <button type="button" className="stage-back" onClick={p.onBack}>
+          ← 등록으로
+        </button>
+      </div>
       <h2>내 원두 목록</h2>
       <div id="bean-list">
         {p.beans === null ? (
@@ -39,9 +47,7 @@ export default function BeanListCard(p: Props) {
                   <button type="button" onClick={() => p.onEdit(b.KEY)}>
                     수정
                   </button>
-                  <button type="button" onClick={() => window.open(`${p.site}/${b.KEY}`, "_blank")}>
-                    URL
-                  </button>
+                  <CopyButton label="URL 복사" onCopy={() => copyText(`${p.site}/${b.KEY}`)} />
                   <button type="button" className="danger" onClick={() => p.onDelete(b.KEY)}>
                     삭제
                   </button>
@@ -77,7 +83,7 @@ export default function BeanListCard(p: Props) {
         }}
       />
       <p className="hint" style={{ marginTop: 8 }}>
-        복원은 내 유저코드 KEY만 반영되며, 같은 KEY는 백업 내용으로 덮어씁니다.
+        복원은 내 KEY만 반영되고, 같은 KEY는 덮어씁니다.
       </p>
     </div>
   );

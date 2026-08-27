@@ -1,0 +1,211 @@
+/* Bean-Hoarder — 공용 디자인 토큰 & 기본 컴포넌트 (index / admin 공유)
+   컨셉: 모바일 보딩패스/월렛 — 화이트·블랙 베이스 + 포인트 컬러 하나 */
+
+:root {
+  /* 기본은 화이트 베이스 고정 — OS 다크 설정을 따라가지 않는다.
+     다크는 사용자가 랩 설정에서 켜는 선택지이며 :root[data-theme="dark"]로만 적용된다
+     (각 HTML의 head 인라인 스크립트가 localStorage를 읽어 미리 붙인다 — 깜빡임 방지). */
+  color-scheme: light;
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --ink: #101012;
+  --sub: #6a6a72; /* 보조 텍스트 — 라이트에서 --bg/--surface 위 AA(≥4.5:1) 확보 (구 #74747c는 --bg 위 4.2:1로 미달) */
+  --line: #e4e4e7;
+  --accent: #f04e1c; /* 포인트 컬러 (탠저린) */
+  --accent-hover: #d13f12;
+  --accent-ink: #ffffff;
+  --ok: #178744;
+  --bad: #d4341f;
+  --mono: "SF Mono", Consolas, Menlo, monospace;
+  --sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  --display: "Space Grotesk", "Pretendard Variable", Pretendard, sans-serif;
+
+  /* 반경 스케일 — 10px 카드, 7px 컨트롤(버튼·인풋), 999px 알약.
+     둥글기를 줄여 모던한 톤으로 (구 16/9는 몰개성한 "둥글둥글 카드" 인상 — DESIGN.md §6) */
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-pill: 999px;
+
+  /* 여백 스케일 — 컴포넌트 간격은 여기서 고른다. 기존 인라인 px 잔재는 점진 이관 (DESIGN.md §5) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* 커피 컬러(화면 전용) — 원두 맥락 화면에서 산지 색이 accent 자리를 대신한다. 기본값은 브랜드 accent.
+     실제 색 계산은 src/lib/coffee-color.ts(산지 시그니처 + 향미 그라데이션). 규칙은 DESIGN.md §3. */
+  --coffee-strip: var(--accent);
+
+  /* 파생 표면색 — --sub/--accent에서 자동 유도되어 라이트·다크 모두 자연스럽게 적응 */
+  --fill-muted: color-mix(in srgb, var(--sub) 16%, transparent); /* 중립 채움 (아이콘 버튼 등) */
+  --fill-muted-hover: color-mix(in srgb, var(--sub) 26%, transparent);
+  --hover: color-mix(in srgb, var(--sub) 12%, transparent); /* 행·시트 버튼 호버 */
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent); /* 은은한 강조 배경 */
+
+  --scrim: rgba(16, 16, 18, 0.5); /* 모달·바텀시트 뒤 배경막 (전 페이지 공통) */
+  --focus-ring: color-mix(in srgb, var(--accent) 45%, transparent);
+  --t: 0.15s ease; /* 공통 트랜지션 속도·이징 */
+  --shadow: 0 1px 2px rgba(16, 16, 18, 0.05), 0 16px 40px -20px rgba(16, 16, 18, 0.25);
+  --shadow-hover: 0 1px 2px rgba(16, 16, 18, 0.06), 0 10px 20px -14px rgba(16, 16, 18, 0.32);
+}
+
+/* 다크는 명시적 선택일 때만 (설정 → 테마). OS 설정은 보지 않는다 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --surface: #17171a;
+  --surface-2: #232327;
+  --ink: #f4f4f5;
+  --sub: #8e8e96;
+  --line: #2b2b30;
+  --accent: #ff6a3d;
+  --accent-hover: #ff8259;
+  --accent-ink: #17110d;
+  --ok: #5dbb80;
+  --bad: #f08575;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -20px rgba(0, 0, 0, 0.8);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 20px -14px rgba(0, 0, 0, 0.9);
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+  /* 한국어는 어절 단위로 끊는다. 브라우저 기본값(word-break: normal)은 한글을 글자 단위로 끊어
+     "커뮤니티"가 "커 / 뮤니티"로 갈라진다 — 읽는 리듬이 깨지므로 keep-all이 맞다.
+     대신 한 덩어리가 줄보다 길면(긴 URL·KEY 등) 넘치지 않게 그때만 강제로 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+a {
+  color: var(--accent);
+}
+code {
+  font-family: var(--mono);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 22px;
+  box-shadow: var(--shadow);
+}
+
+button,
+.btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  transition:
+    border-color var(--t),
+    background var(--t),
+    color var(--t);
+}
+button:hover,
+.btn:hover {
+  border-color: var(--ink);
+}
+button.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+button.primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+button.danger {
+  color: var(--bad);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="date"],
+input[type="search"],
+textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  transition: border-color var(--t);
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+/* 키보드 포커스 링 — 버튼·링크·탭 등 모든 조작 요소에 동일한 결로 (마우스 클릭엔 안 뜸) */
+button:focus-visible,
+.btn:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+::placeholder {
+  color: color-mix(in srgb, var(--sub) 70%, transparent);
+}
+textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--sub);
+  margin-top: 6px;
+  line-height: 1.55;
+}
+.error {
+  color: var(--bad);
+}
+.ok {
+  color: var(--ok);
+}
+.hidden {
+  /* biome-ignore lint/complexity/noImportantStyles: .hidden은 컴포넌트 표시 규칙을 이겨야 하는 유틸리티라 의도된 것 */
+  display: none !important;
+}

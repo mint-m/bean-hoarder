@@ -48,7 +48,7 @@ export const BEAN_FIELDS = [
   { column: "memo", csv: "MEMO" },
   { column: "source_url", csv: "SOURCE_URL" },
   // 시그니쳐·블렌드 네이밍(예: "푸루티 봉봉") — 값이 있으면 라벨/카드 헤드라인의 국가+지역 자동
-  // 조합을 대체한다(@bnhd/label buildHeadline). 선택 항목이라 required 없음. CSV 하위호환을 위해
+  // 조합을 대체한다(./headline buildHeadline). 선택 항목이라 required 없음. CSV 하위호환을 위해
   // 배열 맨 끝에 둔다(기존 백업엔 이 열이 없어도 import가 이름 기준 매핑으로 빈 값 처리).
   { column: "coffee_name", csv: "COFFEE_NAME" },
 ] as const satisfies readonly BeanFieldDef[];
@@ -62,8 +62,30 @@ const FIELD_DEFS: readonly BeanFieldDef[] = BEAN_FIELDS;
 /** D1 컬럼명 목록 (beans 테이블의 자유 필드, key/usercode/roastery/archived 제외) */
 export const FIELDS: readonly BeanColumn[] = BEAN_FIELDS.map((f) => f.column);
 
-/** CSV 백업 헤더 (KEY·ROASTERY 고정 선두 + 필드 순서) */
-export const CSV_HEADERS: readonly string[] = ["KEY", "ROASTERY", ...BEAN_FIELDS.map((f) => f.csv)];
+/**
+ * CSV 백업 헤더 — KEY·ROASTERY 고정 선두 + 필드 순서 + ARCHIVED 고정 후미.
+ *
+ * ARCHIVED는 자유 텍스트가 아니라 상태 플래그라 BEAN_FIELDS에 넣지 않고 여기서만 고정 열로
+ * 다룬다 (pickFields·필수 검사·라벨 파생이 전부 문자열 필드를 전제한다).
+ *
+ * ⚠️ 이 배열은 API 응답이 아니지만 **사용자가 보관 중인 백업 파일과의 계약**이다 —
+ * 열은 추가만, 위치는 맨 끝, 순서 변경 금지. 복원은 위치가 아니라 이름으로 매핑하므로
+ * 열이 없는 옛 백업도 그대로 복원된다 (COFFEE_NAME을 끝에 둔 것과 같은 이유).
+ */
+export const CSV_HEADERS: readonly string[] = [
+  "KEY",
+  "ROASTERY",
+  ...BEAN_FIELDS.map((f) => f.csv),
+  "ARCHIVED",
+];
+
+/**
+ * CSV의 ARCHIVED 셀 → boolean. 내보낼 때는 0/1로 쓰지만 사용자가 엑셀에서 열었다 저장하면
+ * TRUE/FALSE로 바뀌어 돌아오므로 둘 다 받는다. 빈 칸·해석 불가는 "보관 아님".
+ */
+export function parseArchivedCell(v: string): boolean {
+  return /^(1|true|y|yes)$/i.test(v.trim());
+}
 
 /** 등록·수정 필수 항목: column → 한국어 라벨 */
 export const REQUIRED_LABELS: Readonly<Record<string, string>> = Object.fromEntries(

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4f4f5">
+<!-- 저장된 테마를 첫 페인트 전에 적용 (깜빡임 방지라 블로킹 인라인 — 세 진입점에 같은 사본) -->
+<script>
+  try {
+    if (localStorage.getItem("bh_theme") === "dark") {
+      document.documentElement.dataset.theme = "dark";
+      document.querySelector('meta[name="theme-color"]').content = "#0a0a0b";
+    }
+  } catch (_e) {}
+</script>
+<title>BEAN-HOARDER — 내 원두 덱</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cellipse cx='24' cy='24' rx='14' ry='19' fill='%23f04e1c' transform='rotate(20 24 24)'/%3E%3Cpath d='M18 8C28 18 20 30 30 40' stroke='%23ffffff' stroke-width='4' fill='none' transform='rotate(20 24 24)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/deck.css">
+<style>
+  #filter { margin-bottom: 14px; }
+  .note-toggle {
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--sub);
+    margin: -6px 2px 14px; cursor: pointer; user-select: none;
+  }
+  .note-toggle input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  .status { text-align: center; padding: 48px 20px; color: var(--sub); font-size: 14px;
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+  /* ── 카드 탭 시 상세 이동 전 확인 메뉴 (상세보기·숨기기·삭제) ── */
+  .sheet-backdrop {
+    position: fixed; inset: 0; background: var(--scrim);
+    opacity: 0; pointer-events: none; transition: opacity var(--t); z-index: 100;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet-panel {
+    position: fixed; left: 50%; bottom: 0; width: 100%; max-width: 460px;
+    transform: translate(-50%, 100%); transition: transform .18s ease;
+    background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 -8px 30px rgba(16,16,18,.25);
+    padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 101;
+  }
+  .sheet-backdrop.open .sheet-panel { transform: translate(-50%, 0); }
+  .sheet-title {
+    font-size: 12px; color: var(--sub); text-align: center; padding: 10px 8px 12px;
+    border-bottom: 1px solid var(--line); margin-bottom: 6px;
+  }
+  .sheet-title b { color: var(--ink); }
+  .sheet-btn {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    font: inherit; font-size: 15px; color: var(--ink); padding: 13px 8px; cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+  .sheet-btn:hover, .sheet-btn:focus-visible { background: var(--hover); }
+  .sheet-btn.danger { color: var(--bad); }
+  .sheet-btn.cancel { color: var(--sub); margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="wordmark" href="/">Bean-Hoarder<span>DECK</span></a>
+  <a class="btn" href="/lab">랩 열기 →</a>
+</header>
+<main>
+  <input type="search" id="filter" placeholder="검색 — 산지, 로스터리, 키, 노트…" autocomplete="off" class="hidden">
+  <label id="note-toggle-row" class="note-toggle hidden">
+    <input type="checkbox" id="note-toggle" checked> 카드에 노트 표시
+  </label>
+  <div id="deck-status" class="status">불러오는 중…</div>
+  <div id="deck" class="deck"></div>
+</main>
+<footer>BEAN-HOARDER — 원두 소분 라벨 아카이브</footer>
+
+<div id="sheet-backdrop" class="sheet-backdrop">
+  <div class="sheet-panel" role="menu" aria-label="원두 카드 메뉴">
+    <div class="sheet-title" id="sheet-title"></div>
+    <button type="button" class="sheet-btn" data-act="detail">상세보기 →</button>
+    <button type="button" class="sheet-btn" data-act="edit">정보 수정 →</button>
+    <button type="button" class="sheet-btn" data-act="archive">숨기기</button>
+    <button type="button" class="sheet-btn danger" data-act="delete">삭제</button>
+    <button type="button" class="sheet-btn cancel" data-act="cancel">취소</button>
+  </div>
+</div>
+
+<script type="module" src="/src/deck.ts"></script>
+</body>
+</html>
