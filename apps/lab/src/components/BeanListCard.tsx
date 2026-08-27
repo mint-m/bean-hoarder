@@ -1,12 +1,9 @@
-// 내 원두 목록 카드 — 수정/URL 복사/삭제 + CSV 백업·복원 + 덱 링크.
+// 내 원두 목록 카드 — 수정/조회 페이지 열기/삭제 + CSV 백업·복원 + 덱 링크.
 import { useRef } from "react";
-import { copyText } from "../lib/format";
 import type { BeanPublicRow } from "../types";
-import { CopyButton } from "./FormBits";
 
 interface Props {
   beans: BeanPublicRow[] | null;
-  site: string;
   onEdit: (key: string) => void;
   onDelete: (key: string) => void;
   onRefresh: () => void;
@@ -47,7 +44,12 @@ export default function BeanListCard(p: Props) {
                   <button type="button" onClick={() => p.onEdit(b.KEY)}>
                     수정
                   </button>
-                  <CopyButton label="URL 복사" onCopy={() => copyText(`${p.site}/${b.KEY}`)} />
+                  {/* 주소를 복사해 어딘가에 붙여넣는 것보다, 그 화면을 바로 열어 보는 것이 이 자리에서
+                      실제로 하려던 일이다. 경로만 쓴다 — 절대 주소를 쓰면 프리뷰에서 눌러도
+                      프로덕션이 열려 방금 고친 화면을 확인할 수 없다. */}
+                  <button type="button" onClick={() => window.open(`/${b.KEY}`, "_blank", "noopener")}>
+                    열기 ↗
+                  </button>
                   <button type="button" className="danger" onClick={() => p.onDelete(b.KEY)}>
                     삭제
                   </button>

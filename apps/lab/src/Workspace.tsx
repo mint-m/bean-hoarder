@@ -788,7 +788,6 @@ export default function Workspace({
       {view === "list" && (
         <BeanListCard
           beans={beans}
-          site={SITE}
           onEdit={loadBeanForEdit}
           onDelete={deleteBean}
           onRefresh={refreshList}
