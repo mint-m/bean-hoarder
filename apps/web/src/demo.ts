@@ -8,7 +8,7 @@
 // 데모를 통째로 콘텐츠로 취급하면 그 질문이 사라진다. 바뀌는 시점은 배포뿐이다.
 import type { HeadlineRow } from "@bnhd/schema/headline";
 import demoBeans from "./demo-beans.json";
-import { enableCenterFocus } from "./lib/deck-center";
+import { enableCardFocus } from "./lib/deck-focus";
 import { el } from "./lib/dom";
 import { sortBeans, walletCardHTML } from "./lib/wallet-card";
 
@@ -32,6 +32,6 @@ for (const node of deck.querySelectorAll<HTMLElement>(".wcard")) {
   });
 }
 
-// 터치 기기에서는 호버가 없으므로 중앙에 온 카드가 펼쳐진다 — 덱과 같은 규칙을 그대로 쓴다.
+// 터치 기기에서는 호버가 없으므로 기준선에 온 카드가 펼쳐진다 — 덱과 같은 규칙을 그대로 쓴다.
 // (데모는 한 번만 그리므로 구독 해제가 필요 없다.)
-enableCenterFocus(deck);
+enableCardFocus(deck);
