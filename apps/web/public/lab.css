@@ -154,6 +154,15 @@ body {
   content: "";
   flex: 3;
 }
+/* 인증 화면만 더 위로. 이 화면에는 스페이서 위에 히어로(마크·제목·설명 두 줄)가 한 덩어리 더
+   얹혀 있어, 같은 2:3을 쓰면 히어로 높이만큼 정작 손이 가는 폼 카드가 아래로 밀린다.
+   히어로가 밀어낸 몫을 되돌리는 배분이다 — 카드 위치가 기준이지 스페이서가 기준이 아니다. */
+.auth-view::before {
+  flex: 1;
+}
+.auth-view::after {
+  flex: 4;
+}
 /* 화면 머리의 되돌아가기 — 브라우저 뒤로가기와 같은 곳으로 간다 */
 .stage-head {
   margin-bottom: var(--sp-3);
@@ -801,20 +810,21 @@ input.upper {
   grid-template-columns: 1fr;
   gap: var(--sp-3);
 }
+/* 히어로는 "여기가 어디인지"만 알려주면 되는 자리라 세로를 아낀다 — 이 화면의 주인공은 폼 카드다 */
 .auth-hero {
   text-align: center;
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
 }
 .auth-hero .beanmark {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   color: var(--accent);
 }
 .auth-hero h1 {
-  margin: 4px 0 6px;
+  margin: 2px 0 4px;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 26px;
+  font-size: 24px;
 }
 .auth-hero p {
   margin: 0;
