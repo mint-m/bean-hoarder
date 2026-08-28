@@ -18,7 +18,7 @@ import {
   WEIGHT_OPTIONS,
 } from "../lib/suggest";
 import type { FormKey, FormState } from "../types";
-import { Field, SuggestChips } from "./FormBits";
+import { DateStepper, Field, SuggestChips } from "./FormBits";
 
 type StepId = "identity" | "spec" | "dates" | "flavor" | "pack" | "detail";
 
@@ -203,12 +203,9 @@ export default function ReviewStepper(p: Props) {
             <Field label="로스팅일" required aux={roastAgeLabel(p.form.ROAST_DATE)} fromAi={ai("ROAST_DATE")}>
               <input type="date" {...bind("ROAST_DATE")} />
             </Field>
-            <SuggestChips
-              ariaLabel="로스팅일 추천"
-              options={dateChips()}
-              value={p.form.ROAST_DATE}
-              onPick={pick("ROAST_DATE")}
-            />
+            {/* 로스팅일은 절대 날짜보다 "며칠 전"으로 떠올리는 값이라 빼기 버튼을 겹쳐 누르게 한다.
+                위의 aux 라벨(D+N)이 누를 때마다 갱신돼 지금 어디까지 왔는지 보여준다. */}
+            <DateStepper ariaLabel="로스팅일 계산" value={p.form.ROAST_DATE} onChange={pick("ROAST_DATE")} />
             <Field label="패키징일" required fromAi={ai("PACKAGE_DATE")}>
               <input type="date" {...bind("PACKAGE_DATE")} />
             </Field>

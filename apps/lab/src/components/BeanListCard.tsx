@@ -69,8 +69,15 @@ export default function BeanListCard(p: Props) {
         <button type="button" onClick={() => fileRef.current?.click()}>
           CSV 백업 복원
         </button>
-        <button type="button" onClick={() => window.open("/deck", "_blank")}>
-          덱으로 보기 ↗
+        {/* 덱은 이 앱을 떠나 "보러 가는" 곳이라 같은 탭에서 이동한다 — 새 창으로 띄우면 탭이
+            쌓이고, 돌아오는 길이 브라우저 뒤로가기뿐이라 오히려 헤맨다. */}
+        <button
+          type="button"
+          onClick={() => {
+            location.href = "/deck";
+          }}
+        >
+          덱으로 보기 →
         </button>
       </div>
       <input

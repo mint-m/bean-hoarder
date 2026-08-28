@@ -18,6 +18,29 @@ export function isoOffset(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * ISO 날짜를 기준으로 상대 이동. 값이 비었거나 형식이 아니면 오늘에서 센다.
+ *
+ * 달 이동은 말일을 넘기지 않게 자른다 — 3/31에서 한 달을 빼면 2/31은 없으므로 브라우저 기본
+ * 동작은 3/3으로 넘어가 버린다. "한 달 전"을 눌렀는데 날짜가 앞으로 가면 계산기로 못 쓴다.
+ */
+export function shiftIso(iso: string, { days = 0, months = 0 }): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  const base = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+  base.setHours(0, 0, 0, 0);
+  if (months) {
+    const day = base.getDate();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + months);
+    // 옮긴 달의 말일 — 0일은 그 달의 마지막 날을 뜻한다
+    const last = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    base.setDate(Math.min(day, last));
+  }
+  if (days) base.setDate(base.getDate() + days);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${base.getFullYear()}-${p2(base.getMonth() + 1)}-${p2(base.getDate())}`;
+}
+
 /** 용량·고도: 숫자만 입력하면 저장 시 단위(g/m) 자동 부착 */
 export function withUnit(v: string, unit: string): string {
   const s = v.trim();

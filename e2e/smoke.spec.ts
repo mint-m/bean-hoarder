@@ -44,8 +44,8 @@ test("데모: API를 전부 끊어도 덱과 카드가 그대로 뜬다", async 
 });
 
 test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱에서 카드 확인", async ({ page }) => {
-  // 같은 원두를 다시 등록하면 확인 창이 뜬다(로스터리·산지·로스팅일 일치). e2e DB는 실행 간
-  // 유지되므로 두 번째 실행부터 실제로 걸린다 — 계속 진행을 선택해 원래 동선을 그대로 검증한다.
+  // 같은 원두를 다시 등록하면 확인 창이 뜬다(식별 필드가 전부 일치). e2e DB는 실행 간 유지되므로
+  // 두 번째 실행부터 실제로 걸린다 — 계속 진행을 선택해 원래 동선을 그대로 검증한다.
   page.on("dialog", (d) => d.accept());
   await page.goto("/lab/");
 
@@ -66,6 +66,16 @@ test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱�
   // 스텝 2(가공·품종)로 자동 이동
   await page.getByPlaceholder("Washed", { exact: true }).fill("Washed");
   await page.getByPlaceholder("SL9", { exact: true }).fill("SL28");
+
+  // 스텝 3(날짜) — 로스팅일은 빼기 버튼을 겹쳐 누르는 계산기다. 누적되지 않으면 "한 달 전에서
+  // 며칠 더" 같은 실제 사용이 성립하지 않으므로, 두 번 눌러 합이 맞는지 확인한다.
+  await page.getByRole("button", { name: /확인하고 다음/ }).click();
+  const roast = page.locator('input[type="date"]').first();
+  const before = await roast.inputValue();
+  await page.getByRole("button", { name: "−1주" }).click();
+  await page.getByRole("button", { name: "−3일" }).click();
+  const after = await roast.inputValue();
+  expect((Date.parse(before) - Date.parse(after)) / 86_400_000).toBe(10);
 
   // 등록(KEY 서버 채번) — 날짜는 기본값이 채워져 있어 그대로 통과한다.
   // 성공하면 화면이 'QR 발급'으로 넘어간다(한 화면에 한 맥락).

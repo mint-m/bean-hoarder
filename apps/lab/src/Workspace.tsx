@@ -20,6 +20,30 @@ import { geminiExtract } from "./lib/gemini";
 import { type BeanPublicRow, emptyForm, type FormKey, type FormState, type StatusLine } from "./types";
 
 const SITE = "https://bnhd.pages.dev";
+
+/**
+ * "같은 원두"를 가르는 필드 — 이 전부가 같을 때만 중복으로 본다.
+ *
+ * 헤드라인(@bnhd/schema/headline)이 쓰는 식별 필드에 품종·가공방식을 더한 것이다. 둘은 등록
+ * 필수라 늘 채워져 있고, 같은 로스터리·같은 산지·같은 날짜라도 이 둘이 다르면 다른 원두다.
+ */
+const DUP_KEYS = [
+  "ROASTERY",
+  "ORIGIN",
+  "COFFEE_NAME",
+  "REGION",
+  "PRODUCER",
+  "WASHING_STATION",
+  "LOT",
+  "VARIETY",
+  "PROCESS",
+  "ROAST_DATE",
+] as const;
+
+const norm = (v: unknown): string =>
+  String(v ?? "")
+    .trim()
+    .toUpperCase();
 const LOGO_MAX_LEN = 140_000; // 서버와 동일한 상한 (base64 문자 수 ≈ 원본 100KB)
 const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 
@@ -330,20 +354,18 @@ export default function Workspace({
       setStatus({ msg: `필수 항목을 입력하세요: ${missing.join(", ")}`, cls: "error" });
       return;
     }
-    // 같은 로스터리·산지·로스팅일이면 사실상 같은 봉지일 가능성이 높다. 소분해서 라벨을 더 만드는
-    // 정상 동작을 막지는 않고 한 번 확인만 받는다 — 실수로 두 번 등록하는 쪽이 훨씬 흔하다.
+    // 실수로 두 번 등록하는 것만 잡는다. 예전에는 로스터리·산지·로스팅일 셋으로 봤는데, 한
+    // 로스터리가 같은 날 콜롬비아를 여러 종 볶는 것은 흔한 일이라 **전혀 다른 원두가 계속 걸렸다**.
+    // 그래서 원두를 가르는 필드가 하나라도 다르면 다른 원두로 본다 — 같은 봉지를 두 번 등록하는
+    // 경우는 같은 출처에서 같은 값이 채워지므로 전부 일치해 여전히 걸린다.
+    // (출처 URL이 같은 경우는 인테이크가 가져오기 전에 먼저 걸러 낸다 — findByUrl)
     if (mode === "new") {
-      const dup = (beans || []).find(
-        (b) =>
-          (b.ROASTERY || "").trim().toUpperCase() === row.ROASTERY.toUpperCase() &&
-          (b.ORIGIN || "").trim().toUpperCase() === row.ORIGIN.toUpperCase() &&
-          (b.ROAST_DATE || "") === row.ROAST_DATE,
-      );
+      const dup = (beans || []).find((b) => DUP_KEYS.every((k) => norm(b[k]) === norm(row[k])));
       if (
         dup &&
         !confirm(
           `이미 같은 원두가 등록돼 있습니다 — ${dup.KEY}\n` +
-            `로스터리·산지·로스팅일이 모두 같습니다.\n\n` +
+            `이름·산지·품종·가공방식·로스팅일이 모두 같습니다.\n\n` +
             `소분해서 라벨을 더 만드는 경우라면 그대로 진행하세요. 새로 등록할까요?`,
         )
       ) {

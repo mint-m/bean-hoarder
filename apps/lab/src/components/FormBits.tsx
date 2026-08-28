@@ -1,7 +1,8 @@
-// 폼 공용 부품 — 필드 래퍼와 추천 칩.
+// 폼 공용 부품 — 필드 래퍼와 추천 칩, 날짜 스테퍼.
 // 검증 스텝(ReviewStepper)이 필드마다 같은 결(라벨·필수·AI 채움 표시·추천 칩)을 반복하므로
 // 그 반복을 여기 한 곳에 두고, 스텝 쪽은 "무엇을 묻는가"만 적게 한다.
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { isoOffset, shiftIso } from "../lib/format";
 
 export function Field({
   label,
@@ -139,6 +140,41 @@ export function SuggestChips({
           + {hidden}개 더
         </button>
       )}
+    </fieldset>
+  );
+}
+
+/**
+ * 날짜를 "며칠 전"으로 세는 입력 — 누를 때마다 그만큼 더 거슬러 올라간다(계산기처럼 누적).
+ *
+ * 로스팅일은 봉지를 보고 "한 달쯤 됐고 거기서 며칠 더"처럼 떠올리는 값이라, 절대 날짜 칩
+ * (오늘·3일 전…)으로는 한 번에 못 맞히고 결국 달력을 연다. 빼기를 겹쳐 누르면 달력 없이 닿는다.
+ * 되돌리는 길은 "오늘"이다 — 지나쳤으면 초기화하고 다시 세거나, 옆의 날짜 칸에서 직접 고친다.
+ */
+export function DateStepper({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  ariaLabel: string;
+}) {
+  const back = (opts: { days?: number; months?: number }) => () => onChange(shiftIso(value, opts));
+  return (
+    <fieldset className="chips-row" aria-label={ariaLabel}>
+      <button type="button" className="chip" onClick={() => onChange(isoOffset(0))}>
+        오늘
+      </button>
+      <button type="button" className="chip" onClick={back({ days: -3 })}>
+        −3일
+      </button>
+      <button type="button" className="chip" onClick={back({ days: -7 })}>
+        −1주
+      </button>
+      <button type="button" className="chip" onClick={back({ months: -1 })}>
+        −1개월
+      </button>
     </fieldset>
   );
 }
