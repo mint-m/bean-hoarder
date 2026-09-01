@@ -51,9 +51,30 @@ function offsetTopWithin(node: HTMLElement, deck: HTMLElement): number {
  * @returns 구독 해제 — 덱은 필터·삭제로 다시 렌더되므로 호출부가 렌더마다 이걸 부르고 다시 건다.
  */
 export function enableCardFocus(deck: HTMLElement): () => void {
-  const noop = () => {};
   // 호버가 있는 기기는 :hover가 이미 같은 일을 한다 — 두 트리거가 겹치면 서로 싸운다.
-  if (!window.matchMedia("(hover: none)").matches) return noop;
+  // 다만 **로드 시점의 값으로 한 번만 판단하면 안 된다.** 판정이 뒤집혀도(개발자도구의 기기 모드,
+  // 마우스를 뺀 투인원) 붙지 않은 채로 남아 스크롤 활주로가 0이 되고 덱이 통째로 안 움직인다.
+  // 미디어 질의를 계속 듣고 붙였다 뗀다.
+  const mq = window.matchMedia("(hover: none)");
+  let detach: (() => void) | null = null;
+  const sync = (): void => {
+    if (mq.matches && !detach) detach = attach(deck);
+    else if (!mq.matches && detach) {
+      detach();
+      detach = null;
+    }
+  };
+  mq.addEventListener("change", sync);
+  sync();
+  return () => {
+    mq.removeEventListener("change", sync);
+    detach?.();
+  };
+}
+
+/** 실제 구독 — 터치 기기일 때만 붙는다. */
+function attach(deck: HTMLElement): () => void {
+  const noop = () => {};
   const cards = Array.from(deck.querySelectorAll<HTMLElement>(".wcard"));
   if (!cards.length) return noop;
 
