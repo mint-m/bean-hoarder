@@ -376,7 +376,9 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
   // 국가 단독이 아니라 국가+세부장소[+랏] 조합(또는 시그니쳐/블렌드명)으로 변별력을 높인다.
   let yCur;
-  const origin = buildHeadline(row).toUpperCase();
+  // 헤드라인은 대문자로 강제하지 않는다 — 대문자는 같은 이름을 7% 넓게 만들어 잘림을 앞당기고,
+  // Yirgacheffe·La Cabaña 같은 고유명사의 결을 뭉갠다. 로스터리·KEY는 마이크로 캡스라 그대로 둔다.
+  const origin = buildHeadline(row);
   if (portrait) {
     const headLines = wrapN(origin, headlineSize, 0.68, headMax, S.headMaxLines || 2);
     let hy = S.headY;

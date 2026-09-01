@@ -142,16 +142,26 @@ test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮
   }
 });
 
-// 헤드라인 조합 규칙 단위 테스트는 @bnhd/schema/headline로 이동(단일 소스). 여기서는 그 규칙이
-// 라벨 SVG에 대문자로 렌더되는지(라벨 측 .toUpperCase())를 buildLabelSVG 테스트가 지킨다.
-
-test("헤드라인은 라벨 SVG에 대문자로 렌더된다 (라벨 측 toUpperCase 적용점)", () => {
+// 헤드라인 조합 규칙 단위 테스트는 @bnhd/schema/headline로 이동(단일 소스).
+// 여기서는 라벨이 그 결과를 **저장된 대소문자 그대로** 찍는지를 지킨다.
+//
+// 예전에는 라벨이 .toUpperCase()로 대문자를 강제했다. 그런데 대문자는 같은 이름을 7% 넓게 만들어
+// 잘림을 앞당기고(383px vs 355px), Yirgacheffe·La Cabaña 같은 고유명사의 결을 뭉갠다. 화면(덱·조회)의
+// 대문자 강제를 걷어내면서 라벨도 함께 풀어 인쇄물과 화면의 표기를 하나로 뒀다.
+// 대가: 사용자가 "colombia"라고 적으면 라벨에도 그대로 나간다 — 정규화 그물이 하나 사라진 셈이다.
+// 로스터리·KEY는 마이크로 캡스라 여전히 대문자로 찍는다(그 자리는 아래 다른 테스트가 지킨다).
+test("헤드라인은 저장된 대소문자 그대로 라벨에 렌더된다 (대문자 강제 없음)", () => {
   const d = designFor("40x20");
   const { svg } = buildLabelSVG(Object.assign({}, ROW, { COFFEE_NAME: "푸루티 봉봉" }), d);
   assert.ok(svg.includes("푸루티 봉봉"), "COFFEE_NAME 오버라이드가 헤드라인으로 렌더");
-  const { svg: svg2 } = buildLabelSVG({ ...ROW, COFFEE_NAME: "", ORIGIN: "colombia", REGION: "" }, d);
-  assert.ok(svg2.includes("COLOMBIA"), "국가 헤드라인은 대문자로 렌더");
-  assert.ok(!svg2.includes(">colombia<"), "원본 소문자는 라벨에 남지 않음");
+  const { svg: svg2 } = buildLabelSVG(
+    { ...ROW, COFFEE_NAME: "", ORIGIN: "COLOMBIA", REGION: "Pitalito, Huila" },
+    d,
+  );
+  // 40x20에서는 라벨 폭에 맞춰 "COLOMBIA Pitalit…"로 잘린다 — 대소문자만 본다.
+  // (대문자를 걷어낸 덕에 같은 폭에 7% 더 들어가므로 잘림 자체도 조금 늦춰진다)
+  assert.ok(svg2.includes("COLOMBIA Pitalit"), "지역의 원래 대소문자가 유지된다");
+  assert.ok(!svg2.includes("PITALIT"), "대문자로 바꾸지 않는다");
 });
 
 test("노트 렌더링 보장: 스펙이 많아도 테이스팅 노트는 드롭되지 않는다", () => {

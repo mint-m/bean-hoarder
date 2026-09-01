@@ -17,6 +17,8 @@ export interface WalletCardOptions {
 export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: WalletCardOptions): string {
   const g = (k: string) => String(b[k] ?? "").trim();
   const n = daysSince(g("ROAST_DATE"));
+  // 경과일은 아래 줄(로스터리·KEY 옆)에 둔다 — 윗줄을 통째로 헤드라인에 내주기 위해서다.
+  // 헤드라인이 카드의 정체성인데 배지가 그 폭의 5분의 1을 가져가 이름이 먼저 잘렸다.
   const dday = n != null ? `<span class="dday">D+${n}</span>` : "";
   // 헤드라인이 이미 쓴 필드(세부지역 등)는 메타에서 제외 — 라벨과 동일하게 중복 방지
   const usedInHead = headlineUsedFields(b);
@@ -46,8 +48,8 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: Wa
       aria-label="${escapeHtml(headline)} 상세보기" data-key="${escapeHtml(g("KEY"))}">
     ${menu ? '<button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>' : ""}
     <div class="w-band"${bandStyle}>
-      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
-      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${escapeHtml(g("KEY"))}</span></div>
+      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span></div>
+      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span>${dday}<span class="w-key">${escapeHtml(g("KEY"))}</span></div>
     </div>
     <div class="w-body">
       ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}

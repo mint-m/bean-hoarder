@@ -64,8 +64,12 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **헤드라인 조합 규칙은 `@bnhd/schema/headline` 한 곳뿐**(조회·덱·라벨이 함께 import). 두 가지가
   얽혀 있으니 주의: (1) 반드시 **서브패스** `@bnhd/schema/headline`로 가져온다 — 인덱스
   `@bnhd/schema`를 import하면 zod가 딸려와 조회·덱 번들이 부푼다(이 격리가 서브패스로 나눈 이유다).
-  (2) 이 함수는 **대문자화를 하지 않는다** — 조회·덱은 CSS `text-transform`으로, 라벨은 SVG라
-  호출부에서 `.toUpperCase()`를 직접 건다. 공유 함수에 대문자를 넣으면 화면이 이중으로 처리된다.
+  (2) 이 함수는 **대문자화를 하지 않는다**. 예전에는 호출부(조회·덱의 CSS `text-transform`, 라벨의
+  `.toUpperCase()`)가 각자 대문자를 걸었는데, **지금은 헤드라인에 아무도 걸지 않는다** — 대문자는
+  같은 이름을 7% 넓게 만들어(383px vs 355px) 카드·라벨 모두에서 잘림을 앞당기고, `Yirgacheffe`·
+  `La Cabaña` 같은 고유명사의 결을 뭉갠다. 로스터리·KEY는 마이크로 캡스(DESIGN.md §4)라 그대로
+  대문자다. 다시 대문자를 걸려면 **세 곳(덱 CSS·조회 CSS·라벨 SVG)을 함께** 손대야 하고, 공유
+  함수에 넣으면 화면이 이중으로 처리된다.
 - **`setState(updater)` 안에서 바깥 변수를 채우고 곧바로 읽지 말 것.** React는 대기 중인 업데이트가
   없을 때만 updater를 즉시 실행한다(eager state) — 직전에 다른 상태 변경이 있으면 렌더까지 미뤄진다.
   그래서 "updater 안에서 결과를 모으고 호출 직후 그 값으로 성공을 판정"하면 **되다 안 되다** 한다.

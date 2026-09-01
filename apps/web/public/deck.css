@@ -55,7 +55,10 @@ footer {
    새지 않고 이 컨테이너 안에서만 "맨 뒤"로 가라앉도록 자체 stacking context를 만든다. */
 .deck {
   --w-peek: 66px; /* 스택시 보이는 밴드 높이 */
-  --w-card-h: 158px; /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치 */
+  /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치다:
+     펼쳤을 때 밴드가 두 줄로 85px까지 자라므로 85 + 본문 79 = 164가 하한이고, 2px 여유를 얹었다.
+     한 화면에 보이는 카드 수는 이 값이 아니라 --w-peek이 정하므로(4.8 → 4.7장) 밀도 비용은 없다. */
+  --w-card-h: 166px;
   /* 펼침 모션. 뒤 카드가 92px(=카드 높이 − 피크)을 옮겨 가므로 곡선이 결을 좌우한다 — 길이보다
      곡선이 체감 속도를 정한다. 실기기에서 양쪽 끝을 다 밟아 보고 가운데로 정착한 값이다:
        · easeOutQuint 0.28s (0.22, 1, 0.36, 1) → 거리의 40%를 시간의 10%에 지나가 "휙" 튀었다
@@ -100,6 +103,13 @@ footer {
 .wcard:focus-within {
   transform: translateY(-8px);
   box-shadow: var(--shadow-hover);
+  /* 펼쳐진 카드만 헤드라인을 두 줄까지 편다. 스택의 밀도는 --w-peek 하나가 정하므로, 두 줄을
+     펼침에만 허용하면 한 화면에 보이는 카드 수를 전혀 내주지 않고 이름만 온전해진다. */
+  --band-h: auto;
+  --head-wrap: normal;
+  --head-display: -webkit-box;
+  --label-align: flex-start;
+  --dot-shift: 5px;
 }
 .wcard.active ~ .wcard,
 .wcard:focus-within ~ .wcard {
@@ -122,6 +132,11 @@ footer {
   .wcard:hover {
     transform: translateY(-8px);
     box-shadow: var(--shadow-hover);
+    --band-h: auto;
+    --head-wrap: normal;
+    --head-display: -webkit-box;
+    --label-align: flex-start;
+    --dot-shift: 5px;
   }
   .wcard:hover ~ .wcard {
     transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
@@ -221,7 +236,8 @@ footer {
 }
 /* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
 .w-band {
-  height: var(--w-peek);
+  /* 스택에서는 피크 높이로 고정, 펼쳐진 카드에서만 늘어난다(--band-h) */
+  height: var(--band-h, var(--w-peek));
   padding: 11px 18px 9px;
   box-sizing: border-box;
   background-color: var(--surface-2);
@@ -253,25 +269,34 @@ footer {
   gap: 10px;
   justify-content: space-between;
 }
+/* 헤드라인은 대문자로 강제하지 않는다 — 같은 이름이 7% 넓어져 잘림이 앞당겨지고(383px vs 355px),
+   Yirgacheffe·La Cabaña 같은 고유명사의 결이 뭉개진다. 아래 .w-roastery처럼 마이크로 캡스로
+   쓰는 자리는 그대로 둔다(DESIGN.md §4의 마이크로 규칙). */
 .w-origin-label {
   display: inline-flex;
-  align-items: center;
+  align-items: var(--label-align, center);
   gap: 9px;
   min-width: 0;
   font-family: var(--display);
   font-weight: 700;
   font-size: 21px;
   line-height: 1.05;
-  text-transform: uppercase;
 }
-/* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다 */
+/* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다.
+   스택에서는 한 줄 말줄임, 펼쳐졌을 때만 두 줄(--head-wrap/--head-display).
+   -webkit-line-clamp는 display:-webkit-box일 때만 효력이 있어 항상 적어 둬도 무해하다. */
 .w-origin-text {
   min-width: 0;
-  white-space: nowrap;
+  white-space: var(--head-wrap, nowrap);
+  display: var(--head-display, block);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .w-origin-dot {
+  /* 두 줄로 펼쳐지면 닷이 가운데로 내려가 첫 줄과 어긋난다 — 그때만 첫 줄 높이에 맞춘다 */
+  margin-top: var(--dot-shift, 0);
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -282,6 +307,8 @@ footer {
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  /* 아래 줄은 baseline 정렬이라, 테두리가 있는 알약은 가운데로 맞춰야 줄이 흔들려 보이지 않는다 */
+  align-self: center;
   color: var(--sub);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
@@ -298,6 +325,9 @@ footer {
   gap: 10px;
 }
 .w-roastery {
+  /* 남는 폭을 먹어 D+N·KEY를 오른쪽으로 민다 — 셋이 space-between으로 흩어지면 배지가 허공에 뜬다 */
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
