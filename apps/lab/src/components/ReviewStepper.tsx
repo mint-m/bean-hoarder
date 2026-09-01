@@ -3,7 +3,7 @@
 // 17칸을 한 화면에 늘어놓으면 "무엇부터"가 사라진다. 그래서 등록에 필요한 순서(필수 → 표현 → 상세)로
 // 스텝을 쪼개고 한 번에 하나만 연다. 각 스텝은 건너뛸 수 있고(완결성보다 흐름이 우선), 최종 필수 검사는
 // 등록 시점의 Workspace.save()가 그대로 맡는다 — 여기서 막지 않는다.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { capitalizeNoteSegments, isoToDot } from "../lib/format";
 import {
   appendNote,
@@ -65,6 +65,11 @@ interface Props {
   onRoasteryBlur: () => void;
   /** 편집 진입처럼 이미 값이 다 있는 경우 — 전 스텝을 완료로 열어두고 필요한 것만 펴게 한다 */
   allDone?: boolean;
+  /**
+   * 등록이 필수 항목 때문에 막혔을 때 호출부가 보내는 신호 — 그 필드가 있는 스텝을 열고 데려간다.
+   * `seq`는 같은 필드로 두 번 막혀도 다시 반응하게 하는 일련번호다(값이 같으면 effect가 안 돈다).
+   */
+  focusField?: { key: FormKey; seq: number };
 }
 
 /**
@@ -102,6 +107,26 @@ export default function ReviewStepper(p: Props) {
   const [openId, setOpenId] = useState<StepId | null>(p.allDone ? null : (STEPS[0] as StepDef).id);
   const [done, setDone] = useState<Set<StepId>>(() => new Set(p.allDone ? STEPS.map((s) => s.id) : []));
   const [skipped, setSkipped] = useState<Set<StepId>>(new Set());
+  // 확인을 시도한 스텝 — 여기서만 빈 필수 칸을 붉게 표시한다. 아직 손대지 않은 스텝까지 빨갛게
+  // 물들이면 "훑어보는 중"인 화면이 처음부터 오류 화면처럼 보인다.
+  const [attempted, setAttempted] = useState<Set<StepId>>(new Set());
+  // 막힘 안내를 다시 흔들기 위한 일련번호 — 문단을 이 값으로 키잉해 다시 마운트한다.
+  // (클래스만 다시 붙이면 CSS 애니메이션은 재생되지 않는다)
+  const [blockedSeq, setBlockedSeq] = useState(0);
+  const sections = useRef(new Map<StepId, HTMLElement | null>());
+
+  // 등록이 막히면 호출부가 첫 미충족 필드를 보낸다 — 그 스텝을 열고 화면까지 데려간다.
+  // 지금까지는 "필수 항목을 입력하세요: 품종, 소분일" 문구만 뜨고 그 칸을 사용자가 직접 찾아야 했다.
+  const focusSeq = p.focusField?.seq;
+  const focusKey = p.focusField?.key;
+  useEffect(() => {
+    if (!focusSeq || !focusKey) return;
+    const step = STEPS.find((s) => s.keys.includes(focusKey));
+    if (!step) return;
+    setOpenId(step.id);
+    setAttempted((a) => new Set(a).add(step.id));
+    sections.current.get(step.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusSeq, focusKey]);
 
   const bind = (key: FormKey) => ({
     value: p.form[key],
@@ -118,7 +143,25 @@ export default function ReviewStepper(p: Props) {
     setOpenId(next ? next.id : null);
   }
 
+  /** 이 스텝에서 아직 비어 있는 필수 칸 */
+  function missingOf(step: StepDef): FormKey[] {
+    return step.required.filter((k) => !(p.form[k] || "").trim());
+  }
+
   function confirm(id: StepId) {
+    const step = STEPS.find((s) => s.id === id) as StepDef;
+    // "확인하고 다음"은 이 스텝을 봤다는 선언이므로, 필수가 빈 채로 완료가 되면 그 선언이 거짓이 된다.
+    // 대신 헤더로 다른 스텝을 여는 길은 막지 않는다 — 뒤를 보고 앞을 정하는 것이 이 화면의 일이다.
+    if (missingOf(step).length) {
+      setAttempted((a) => new Set(a).add(id));
+      setBlockedSeq((n) => n + 1);
+      return;
+    }
+    setAttempted((a) => {
+      const n = new Set(a);
+      n.delete(id);
+      return n;
+    });
     setDone((d) => new Set(d).add(id));
     setSkipped((s) => {
       const n = new Set(s);
@@ -139,11 +182,14 @@ export default function ReviewStepper(p: Props) {
   }
 
   function body(step: StepDef) {
+    // 확인을 시도했는데 비어 있는 필수 칸만 붉게 — 값이 들어오는 순간 저절로 풀린다(파생 상태).
+    const iv = (k: FormKey) =>
+      attempted.has(step.id) && step.required.includes(k) && !(p.form[k] || "").trim();
     switch (step.id) {
       case "identity":
         return (
           <>
-            <Field label="로스터리" required fromAi={ai("ROASTERY")}>
+            <Field label="로스터리" required invalid={iv("ROASTERY")} fromAi={ai("ROASTERY")}>
               <input
                 type="text"
                 list="dl-roastery"
@@ -161,7 +207,7 @@ export default function ReviewStepper(p: Props) {
                 onPick={pick("ROASTERY")}
               />
             )}
-            <Field label="국가(산지)" required fromAi={ai("ORIGIN")}>
+            <Field label="국가(산지)" required invalid={iv("ORIGIN")} fromAi={ai("ORIGIN")}>
               <input type="text" list="dl-origin" placeholder="ETHIOPIA" {...bind("ORIGIN")} />
             </Field>
             <SuggestChips
@@ -180,7 +226,7 @@ export default function ReviewStepper(p: Props) {
       case "spec":
         return (
           <>
-            <Field label="가공방식" required fromAi={ai("PROCESS")}>
+            <Field label="가공방식" required invalid={iv("PROCESS")} fromAi={ai("PROCESS")}>
               <input type="text" list="dl-process" placeholder="Washed" {...bind("PROCESS")} />
             </Field>
             <SuggestChips
@@ -190,7 +236,7 @@ export default function ReviewStepper(p: Props) {
               value={p.form.PROCESS}
               onPick={pick("PROCESS")}
             />
-            <Field label="품종" required fromAi={ai("VARIETY")}>
+            <Field label="품종" required invalid={iv("VARIETY")} fromAi={ai("VARIETY")}>
               <input type="text" list="dl-variety" placeholder="SL9" {...bind("VARIETY")} />
             </Field>
             <SuggestChips
@@ -206,13 +252,19 @@ export default function ReviewStepper(p: Props) {
       case "dates":
         return (
           <>
-            <Field label="로스팅일" required aux={roastAgeLabel(p.form.ROAST_DATE)} fromAi={ai("ROAST_DATE")}>
+            <Field
+              label="로스팅일"
+              required
+              invalid={iv("ROAST_DATE")}
+              aux={roastAgeLabel(p.form.ROAST_DATE)}
+              fromAi={ai("ROAST_DATE")}
+            >
               <input type="date" {...bind("ROAST_DATE")} />
             </Field>
             {/* 로스팅일은 절대 날짜보다 "며칠 전"으로 떠올리는 값이라 빼기 버튼을 겹쳐 누르게 한다.
                 위의 aux 라벨(D+N)이 누를 때마다 갱신돼 지금 어디까지 왔는지 보여준다. */}
             <DateStepper ariaLabel="로스팅일 계산" value={p.form.ROAST_DATE} onChange={pick("ROAST_DATE")} />
-            <Field label="소분일" required fromAi={ai("PACKAGE_DATE")}>
+            <Field label="소분일" required invalid={iv("PACKAGE_DATE")} fromAi={ai("PACKAGE_DATE")}>
               <input type="date" {...bind("PACKAGE_DATE")} />
             </Field>
             {/* 이 필드는 "로스터가 포장한 날"로 오해하기 쉽다(실제로 그렇게 읽은 적이 있다).
@@ -358,13 +410,19 @@ export default function ReviewStepper(p: Props) {
         const open = openId === step.id;
         const isDone = done.has(step.id);
         const isSkipped = skipped.has(step.id);
-        const missing = step.required.filter((k) => !(p.form[k] || "").trim());
+        const missing = missingOf(step);
         const summary = summarize(step, p.form);
         const last = idx === STEPS.length - 1;
+        // 값은 차 있는데 아직 확인하지 않은 스텝 — AI가 채운 초안이 그대로 놓인 상태다.
+        // 확인한 스텝과 똑같이 보이면 이 화면이 하는 일(사람이 승인했는가)이 화면에서 사라진다.
+        const isPending = !isDone && !isSkipped && !missing.length && !!summary;
         return (
           <section
             key={step.id}
-            className={`step${open ? " open" : ""}${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}`}
+            ref={(el) => {
+              sections.current.set(step.id, el);
+            }}
+            className={`step${open ? " open" : ""}${isDone ? " done" : ""}${isSkipped ? " skipped" : ""}${isPending ? " pending" : ""}`}
           >
             <button
               type="button"
@@ -378,13 +436,23 @@ export default function ReviewStepper(p: Props) {
                 {missing.length > 0 ? (
                   <span className="step-missing">필수 {missing.length}칸 비어 있음</span>
                 ) : (
-                  summary || (isSkipped ? "건너뜀" : "")
+                  <>
+                    {summary || (isSkipped ? "건너뜀" : "")}
+                    {isPending && <span className="step-pending">확인 전</span>}
+                  </>
                 )}
               </span>
             </button>
             {open && (
               <div className="step-body">
                 {body(step)}
+                {/* 막힌 이유를 그 자리에서 말한다. 반복해서 눌러도 다시 흔들리도록 일련번호로 키잉한다 —
+                    클래스만 다시 붙이면 CSS 애니메이션이 재생되지 않아 "눌러도 아무 일이 없다"가 된다. */}
+                {attempted.has(step.id) && missing.length > 0 && (
+                  <p key={blockedSeq} className="step-blocked">
+                    필수 {missing.length}칸을 채워야 확인할 수 있습니다.
+                  </p>
+                )}
                 <div className="step-foot">
                   <button type="button" className="step-skip" onClick={() => skip(step.id)}>
                     건너뛰기

@@ -9,6 +9,7 @@ export function Field({
   required,
   aux,
   fromAi,
+  invalid,
   children,
 }: {
   label: string;
@@ -16,11 +17,13 @@ export function Field({
   aux?: string;
   /** AI가 채운 값 — 사용자가 눈으로 확인해야 하는 자리라는 표시 */
   fromAi?: boolean;
+  /** 확인을 시도했는데 비어 있는 필수 칸 — 어디를 채워야 하는지 가리킨다 */
+  invalid?: boolean;
   children: ReactNode;
 }) {
   return (
     // 입력을 label로 감싼다(암묵적 연결) — 라벨 클릭이 곧 포커스가 되고 id를 짜낼 필요가 없다.
-    <label className="field">
+    <label className={`field${invalid ? " invalid" : ""}`}>
       <span className="field-head">
         <span className="field-name">
           {label}

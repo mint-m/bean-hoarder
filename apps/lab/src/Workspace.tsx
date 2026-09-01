@@ -102,6 +102,9 @@ export default function Workspace({
   const [aiQuotaLeft, setAiQuotaLeft] = useState<number | null>(null);
   // 서비스 키 대행이 응답하지 못했다 — 사용자에겐 규칙 기반 결과만 보이므로 이유를 한 줄 남긴다
   const [aiServiceDown, setAiServiceDown] = useState(false);
+  // 등록이 필수 항목에서 막혔을 때 검증 스텝에 보내는 신호 — 그 칸이 있는 스텝을 열고 데려간다
+  const [focusField, setFocusField] = useState<{ key: FormKey; seq: number } | undefined>();
+  const focusSeq = useRef(1);
   const [stage, setStage] = useState<Stage>("input");
 
   // 화면 이동을 히스토리에 쌓아 브라우저 뒤로가기가 "이전 단계"로 동작하게 한다 —
@@ -344,14 +347,23 @@ export default function Workspace({
   // ── 저장 / 초기화 / 편집 / 삭제 ─────────────────────────────
   async function save() {
     const missing: string[] = [];
-    if (!row.ROASTERY) missing.push("로스터리");
-    if (!row.ORIGIN) missing.push("국가(산지)");
-    if (!row.VARIETY) missing.push("품종");
-    if (!row.PROCESS) missing.push("가공방식");
-    if (!row.ROAST_DATE) missing.push("로스팅일");
-    if (!row.PACKAGE_DATE) missing.push("소분일");
+    let firstMissing: FormKey | null = null;
+    const need = (filled: string, key: FormKey, label: string) => {
+      if (filled) return;
+      missing.push(label);
+      firstMissing ??= key;
+    };
+    need(row.ROASTERY, "ROASTERY", "로스터리");
+    need(row.ORIGIN, "ORIGIN", "국가(산지)");
+    need(row.VARIETY, "VARIETY", "품종");
+    need(row.PROCESS, "PROCESS", "가공방식");
+    need(row.ROAST_DATE, "ROAST_DATE", "로스팅일");
+    need(row.PACKAGE_DATE, "PACKAGE_DATE", "소분일");
     if (missing.length) {
       setStatus({ msg: `필수 항목을 입력하세요: ${missing.join(", ")}`, cls: "error" });
+      // 문구만 띄우면 그 칸을 사용자가 직접 찾아야 한다 — 첫 미충족 칸이 있는 스텝으로 데려간다.
+      // seq는 같은 칸으로 두 번 막혀도 다시 반응하게 하는 일련번호다.
+      if (firstMissing) setFocusField({ key: firstMissing, seq: focusSeq.current++ });
       return;
     }
     // 실수로 두 번 등록하는 것만 잡는다. 예전에는 로스터리·산지·로스팅일 셋으로 봤는데, 한
@@ -736,6 +748,7 @@ export default function Workspace({
                 withLogo={withLogo}
                 onRoasteryBlur={handleRoasteryBlur}
                 allDone={mode === "edit"}
+                focusField={focusField}
               />
 
               {/* 입력 화면의 결론 — 등록해야 KEY가 나오고, KEY가 나와야 QR을 만들 수 있다 */}

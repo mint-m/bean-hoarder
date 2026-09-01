@@ -542,6 +542,65 @@ details.acc > summary {
 .step-missing {
   color: var(--bad);
 }
+/* 값은 찼는데 아직 확인하지 않은 스텝 — 완료와 한눈에 갈려야 이 화면이 하는 일(사람이 승인했는가)이
+   화면에 남는다. 마크는 점선으로, 요약 끝에는 작은 배지로. */
+.step.pending .step-mark {
+  border-style: dashed;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.step-pending {
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.step.skipped .step-mark {
+  opacity: 0.5;
+}
+/* 확인이 막힌 이유 — 버튼 바로 위에서 말한다. 한 번 흔들어 눈이 가게 하고 그 뒤엔 조용히 남는다 */
+.step-blocked {
+  margin: var(--sp-3) 0 0;
+  color: var(--bad);
+  font-size: 12.5px;
+  animation: shake 0.32s ease;
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+/* 채워야 할 칸 — 입력 테두리로 가리킨다. 값이 들어오는 순간 저절로 풀린다(파생 상태). */
+.field.invalid input,
+.field.invalid textarea {
+  border-color: var(--bad);
+}
+.field.invalid .field-name {
+  color: var(--bad);
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-blocked {
+    animation: none;
+  }
+}
 .step-body {
   padding-bottom: var(--sp-4);
 }
