@@ -156,6 +156,16 @@ test("등록: 필수 항목 누락 400 (메시지에 누락 라벨), 성공 시 
     "필수 항목 누락: 국가(산지), 품종, 로스팅일",
   );
 
+  // 라벨은 스키마(BEAN_FIELDS)에서 파생되므로 오류 문구가 곧 계약이다. PACKAGE_DATE의 표시 이름을
+  // "패키징일"에서 "소분일"로 바꾼 것은 의도된 변경이라(로스터가 포장한 날이 아니라 내가 나눠 담은
+  // 날), 그 사실을 여기 남긴다 — 저장 키는 PACKAGE_DATE 그대로다.
+  const noPack = await api("/beans", {
+    ...jsonBody({ ROASTERY: "R", ORIGIN: "KENYA", VARIETY: "SL28", PROCESS: "P", ROAST_DATE: "26.07.01" }),
+    headers: user.auth,
+  });
+  expect(noPack.status).toBe(400);
+  expect(((await noPack.json()) as { error: string }).error).toBe("필수 항목 누락: 소분일");
+
   const first = await addBean(user.auth);
   expect(first.data.key).toBe(`${user.usercode}${YY}-001`);
   const second = await addBean(user.auth, { ORIGIN: "COLOMBIA" });

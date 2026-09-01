@@ -8,11 +8,11 @@ import { capitalizeNoteSegments, isoToDot } from "../lib/format";
 import {
   appendNote,
   CHIP_LIMIT,
-  dateChips,
   HARVEST_OPTIONS,
   NOTE_OPTIONS,
   ORIGIN_OPTIONS,
   PROCESS_OPTIONS,
+  packageDateChips,
   ROASTPOINT_OPTIONS,
   VARIETY_OPTIONS,
   WEIGHT_OPTIONS,
@@ -41,7 +41,7 @@ const STEPS: StepDef[] = [
   { id: "spec", title: "가공 · 품종", keys: ["PROCESS", "VARIETY"], required: ["PROCESS", "VARIETY"] },
   {
     id: "dates",
-    title: "로스팅일 · 패키징일",
+    title: "로스팅일 · 소분일",
     keys: ["ROAST_DATE", "PACKAGE_DATE"],
     required: ["ROAST_DATE", "PACKAGE_DATE"],
   },
@@ -67,7 +67,12 @@ interface Props {
   allDone?: boolean;
 }
 
-/** 로스팅 후 며칠 지났는지 — 조회 카드가 보여주는 D+N을 입력 시점에 미리 알려준다 */
+/**
+ * 로스팅 후 며칠 지났는지 — 조회 카드가 보여주는 경과일을 입력 시점에 미리 알려준다.
+ *
+ * 날짜 스테퍼(DateStepper)의 상태 표시를 겸한다. 버튼은 "얼마씩 움직일지"만 말하므로 **지금 어디인지는
+ * 이 한 줄이 혼자 말해야 한다** — 그래서 D+N 대신 사람이 쓰는 말과 실제 날짜를 함께 보여준다.
+ */
 function roastAgeLabel(iso: string): string | undefined {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
   if (!m) return undefined;
@@ -75,7 +80,8 @@ function roastAgeLabel(iso: string): string | undefined {
   const now = new Date();
   const days = Math.floor((now.setHours(0, 0, 0, 0) - then.getTime()) / 86_400_000);
   if (days < 0) return "아직 오지 않은 날짜";
-  return days === 0 ? "오늘 로스팅" : `오늘 기준 D+${days}`;
+  const when = days === 0 ? "오늘 로스팅" : `로스팅 ${days}일 전`;
+  return `${when} · ${isoToDot(iso)}`;
 }
 
 /** 접힌 스텝의 한 줄 요약 — 값이 있는 것만, 날짜는 라벨과 같은 표기(26.08.19)로 */
@@ -206,12 +212,15 @@ export default function ReviewStepper(p: Props) {
             {/* 로스팅일은 절대 날짜보다 "며칠 전"으로 떠올리는 값이라 빼기 버튼을 겹쳐 누르게 한다.
                 위의 aux 라벨(D+N)이 누를 때마다 갱신돼 지금 어디까지 왔는지 보여준다. */}
             <DateStepper ariaLabel="로스팅일 계산" value={p.form.ROAST_DATE} onChange={pick("ROAST_DATE")} />
-            <Field label="패키징일" required fromAi={ai("PACKAGE_DATE")}>
+            <Field label="소분일" required fromAi={ai("PACKAGE_DATE")}>
               <input type="date" {...bind("PACKAGE_DATE")} />
             </Field>
+            {/* 이 필드는 "로스터가 포장한 날"로 오해하기 쉽다(실제로 그렇게 읽은 적이 있다).
+                저장 키는 PACKAGE_DATE 그대로이고 바뀐 것은 부르는 이름뿐이라, 뜻을 여기서 못 박는다. */}
+            <p className="hint">원두를 받아 소분해 담은 날 — 로스터가 포장한 날이 아닙니다.</p>
             <SuggestChips
-              ariaLabel="패키징일 추천"
-              options={dateChips()}
+              ariaLabel="소분일 추천"
+              options={packageDateChips()}
               value={p.form.PACKAGE_DATE}
               onPick={pick("PACKAGE_DATE")}
             />

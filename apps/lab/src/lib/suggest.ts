@@ -87,14 +87,18 @@ export const NOTE_OPTIONS = [
   "Winey",
 ];
 
-/** 날짜 추천 — 달력을 열지 않고 흔한 값(오늘·며칠 전)을 한 번에 넣는다. */
-export function dateChips(): { label: string; value: string }[] {
+/**
+ * 소분일 추천 — 달력을 열지 않고 흔한 값을 한 번에 넣는다.
+ *
+ * 소분일은 "내가 원두를 받아 나눠 담은 날"이라 거의 오늘이거나 며칠 안쪽이다. 그래서 절대 날짜
+ * 칩이 스테퍼보다 빠르고, 셋이면 충분하다. 로스팅일은 성격이 달라(몇 주~몇 달 전) 누적 스테퍼가
+ * 맡는다 — 이 목록을 거기에 쓰지 않는다.
+ */
+export function packageDateChips(): { label: string; value: string }[] {
   return [
     { label: "오늘", value: isoOffset(0) },
     { label: "어제", value: isoOffset(-1) },
     { label: "3일 전", value: isoOffset(-3) },
-    { label: "1주 전", value: isoOffset(-7) },
-    { label: "2주 전", value: isoOffset(-14) },
   ];
 }
 

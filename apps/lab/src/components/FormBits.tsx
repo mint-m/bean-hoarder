@@ -149,7 +149,13 @@ export function SuggestChips({
  *
  * 로스팅일은 봉지를 보고 "한 달쯤 됐고 거기서 며칠 더"처럼 떠올리는 값이라, 절대 날짜 칩
  * (오늘·3일 전…)으로는 한 번에 못 맞히고 결국 달력을 연다. 빼기를 겹쳐 누르면 달력 없이 닿는다.
- * 되돌리는 길은 "오늘"이다 — 지나쳤으면 초기화하고 다시 세거나, 옆의 날짜 칸에서 직접 고친다.
+ *
+ * 버튼 라벨은 **얼마씩 움직일지**만 말한다. 눌린 횟수를 라벨에 담으면(1일 전 → 2일 전 …) 상태가
+ * 버튼 셋에 흩어져, `1일 전 ×7`과 `일주일 전 ×1`이 같은 날짜인데 다르게 보인다. 게다가 AI가
+ * 채웠을 때·날짜 칸을 직접 고쳤을 때 그 표시가 실제와 어긋난다. 상태는 날짜 하나뿐이므로
+ * 지금 어디인지는 필드 옆 라벨(로스팅 34일 전 · 07.26)이 혼자 말한다.
+ *
+ * 되돌리기는 직전 한 번을 취소한다 — 연타 중 잘못 눌렀을 때 대가가 "처음부터 다시"가 되지 않게.
  */
 export function DateStepper({
   value,
@@ -160,20 +166,40 @@ export function DateStepper({
   onChange: (iso: string) => void;
   ariaLabel: string;
 }) {
-  const back = (opts: { days?: number; months?: number }) => () => onChange(shiftIso(value, opts));
+  // 직전 값 하나만 기억한다. 여러 단계 실행취소는 이 자리에 과한 장치다 — 지나쳤으면 "오늘"로
+  // 초기화하고 다시 세는 길이 이미 있다.
+  const [prev, setPrev] = useState<string | null>(null);
+  const step = (next: string) => {
+    setPrev(value);
+    onChange(next);
+  };
+  const back = (opts: { days?: number; months?: number }) => () => step(shiftIso(value, opts));
   return (
     <fieldset className="chips-row" aria-label={ariaLabel}>
-      <button type="button" className="chip" onClick={() => onChange(isoOffset(0))}>
+      <button type="button" className="chip" onClick={() => step(isoOffset(0))}>
         오늘
       </button>
-      <button type="button" className="chip" onClick={back({ days: -3 })}>
-        −3일
+      <button type="button" className="chip" onClick={back({ days: -1 })}>
+        1일 전
       </button>
       <button type="button" className="chip" onClick={back({ days: -7 })}>
-        −1주
+        일주일 전
       </button>
       <button type="button" className="chip" onClick={back({ months: -1 })}>
-        −1개월
+        한 달 전
+      </button>
+      <button
+        type="button"
+        className="chip chip-undo"
+        aria-label="직전 선택 되돌리기"
+        disabled={prev === null}
+        onClick={() => {
+          if (prev === null) return;
+          onChange(prev);
+          setPrev(null);
+        }}
+      >
+        ↺
       </button>
     </fieldset>
   );

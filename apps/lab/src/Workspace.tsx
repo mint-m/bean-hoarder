@@ -349,7 +349,7 @@ export default function Workspace({
     if (!row.VARIETY) missing.push("품종");
     if (!row.PROCESS) missing.push("가공방식");
     if (!row.ROAST_DATE) missing.push("로스팅일");
-    if (!row.PACKAGE_DATE) missing.push("패키징일");
+    if (!row.PACKAGE_DATE) missing.push("소분일");
     if (missing.length) {
       setStatus({ msg: `필수 항목을 입력하세요: ${missing.join(", ")}`, cls: "error" });
       return;

@@ -72,10 +72,14 @@ test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱�
   await page.getByRole("button", { name: /확인하고 다음/ }).click();
   const roast = page.locator('input[type="date"]').first();
   const before = await roast.inputValue();
-  await page.getByRole("button", { name: "−1주" }).click();
-  await page.getByRole("button", { name: "−3일" }).click();
+  await page.getByRole("button", { name: "일주일 전" }).click();
+  await page.getByRole("button", { name: "1일 전" }).click();
   const after = await roast.inputValue();
-  expect((Date.parse(before) - Date.parse(after)) / 86_400_000).toBe(10);
+  expect((Date.parse(before) - Date.parse(after)) / 86_400_000).toBe(8);
+
+  // 되돌리기는 직전 한 번만 취소한다 — 연타 중 오탭의 대가가 "처음부터 다시"가 되지 않게 하는 장치다
+  await page.getByRole("button", { name: "직전 선택 되돌리기" }).click();
+  expect((Date.parse(before) - Date.parse(await roast.inputValue())) / 86_400_000).toBe(7);
 
   // 등록(KEY 서버 채번) — 날짜는 기본값이 채워져 있어 그대로 통과한다.
   // 성공하면 화면이 'QR 발급'으로 넘어간다(한 화면에 한 맥락).
