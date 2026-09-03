@@ -5,6 +5,7 @@
 // 도착하는 상세 페이지"라서 이 순서다.
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
 import { buildLabelSVG, buildQrSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
+import { canonicalizeNotes } from "@bnhd/schema/flavor";
 import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BeanListCard from "./components/BeanListCard";
@@ -564,7 +565,9 @@ export default function Workspace({
         continue;
       }
       // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
-      next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(v) : v;
+      // 노트는 영문 표기로 되돌린 뒤 담는다 — AI가 "파인애플"을 주는 일이 있었고, 그대로 저장되면
+      // 라벨에 한글이 찍히고 같은 향미가 카드마다 달라진다. 어휘 밖의 말은 그대로 둔다.
+      next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(canonicalizeNotes(v)) : v;
       filled.push(FIELD_LABELS_KO[field] || field);
       filledKeys.add(key);
     }

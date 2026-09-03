@@ -2,7 +2,14 @@
 // 저장 형식(콤마 목록)은 AI 자동 채우기·CSV 복원·조회 카드 칩이 함께 쓰는 계약이라 함께 못 박는다.
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { FLAVOR_NOTES, parseNotes, searchNotes, serializeNotes } from "./flavor";
+import {
+  canonicalizeNotes,
+  canonicalNote,
+  FLAVOR_NOTES,
+  parseNotes,
+  searchNotes,
+  serializeNotes,
+} from "./flavor";
 
 const ens = (q: string) => searchNotes(q, 20).map((n) => n.en);
 
@@ -54,4 +61,47 @@ test("콤마 목록 왕복 — 공백을 다듬고 중복을 지운다", () => {
     "Honey Peach",
     "White Grape",
   ]);
+});
+
+// ── 표기 정규화 ────────────────────────────────────────────────
+// AI가 "Pineapple" 대신 "파인애플"을 주는 일이 실제로 있었다. 그대로 저장되면 인쇄 라벨에 한글이
+// 찍히고, 같은 향미가 카드마다 다르게 적히고, 카드 색을 정하는 계열 정규식이 못 알아본다.
+
+test("한글로 들어온 노트를 영문 표기로 되돌린다", () => {
+  assert.equal(canonicalNote("파인애플"), "Pineapple");
+  assert.equal(canonicalNote("자스민"), "Jasmine");
+  assert.equal(canonicalNote("황도"), "Yellow Peach");
+  assert.equal(canonicalNote("다크초콜릿"), "Dark Chocolate");
+});
+
+test("별칭으로 들어와도 되돌린다", () => {
+  assert.equal(canonicalNote("재스민"), "Jasmine"); // Jasmine의 별칭
+  assert.equal(canonicalNote("카라멜"), "Caramel");
+});
+
+test("영문 표기는 대소문자·공백만 다듬는다", () => {
+  assert.equal(canonicalNote("pineapple"), "Pineapple");
+  assert.equal(canonicalNote("  DARK  CHOCOLATE "), "Dark Chocolate");
+});
+
+// 부분 일치를 허용하면 "Honey Peach"가 "Honey"나 "Peach"로 뭉개진다.
+test("완전 일치만 본다 — 어휘 밖의 말은 그대로 둔다", () => {
+  assert.equal(canonicalNote("Honey Peach"), "Honey Peach");
+  assert.equal(canonicalNote("복숭아 사탕"), "복숭아 사탕");
+  assert.equal(canonicalNote(""), "");
+});
+
+// 같은 말이 여러 항목에 걸리면 ko가 alias를 이긴다 — "복숭아"는 Peach의 이름이자
+// Yellow/White Peach의 별칭이고, "카시스"는 Cassis의 이름이자 Black Currant의 별칭이다.
+test("이름이 별칭을 이긴다", () => {
+  assert.equal(canonicalNote("복숭아"), "Peach");
+  assert.equal(canonicalNote("카시스"), "Cassis");
+});
+
+test("콤마 목록 전체를 되돌리고 중복을 지운다", () => {
+  assert.equal(
+    canonicalizeNotes("파인애플, 자스민, Pineapple, 알수없는향"),
+    "Pineapple, Jasmine, 알수없는향",
+  );
+  assert.equal(canonicalizeNotes(""), "");
 });

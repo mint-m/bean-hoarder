@@ -189,3 +189,34 @@ export function parseNotes(s: string): string[] {
 export function serializeNotes(tokens: readonly string[]): string {
   return parseNotes(tokens.join(",")).join(", ");
 }
+
+// ── 표기 정규화 ────────────────────────────────────────────────
+// 한글 표기가 저장되면 세 곳이 함께 어긋난다: 인쇄 라벨에 한글이 찍히고, 같은 향미가 카드마다
+// 다르게 적히고, 조회 카드의 색을 정하는 계열 정규식이 어휘 밖의 말을 못 알아본다.
+// AI가 "Pineapple" 대신 "파인애플"을 주는 일이 실제로 있었다 — 프롬프트로 부탁하는 것만으로는
+// 막을 수 없으므로, 폼에 들어오기 전에 되돌린다.
+
+/** 어휘 조회표: 정규화한 표기 → 저장할 영문. en > ko > alias 순으로 우선한다. */
+const BY_TEXT: ReadonlyMap<string, string> = (() => {
+  const m = new Map<string, string>();
+  // 뒤에서 덮어쓰지 않도록 우선순위가 낮은 것부터 넣는다
+  for (const n of FLAVOR_NOTES) for (const a of n.alias ?? []) m.set(norm(a), n.en);
+  for (const n of FLAVOR_NOTES) m.set(norm(n.ko), n.en);
+  for (const n of FLAVOR_NOTES) m.set(norm(n.en), n.en);
+  return m;
+})();
+
+/**
+ * 노트 하나를 어휘의 영문 표기로 되돌린다 — 목록에 없으면 그대로 둔다.
+ *
+ * **완전 일치만** 본다. 부분 일치를 허용하면 "Honey Peach"가 "Honey"나 "Peach"로 뭉개진다.
+ */
+export function canonicalNote(note: string): string {
+  const t = String(note ?? "").trim();
+  return BY_TEXT.get(norm(t)) ?? t;
+}
+
+/** 콤마 목록 전체를 되돌린다 — 자동 채우기·붙여넣기가 들어오는 길목에서 쓴다. */
+export function canonicalizeNotes(value: string): string {
+  return serializeNotes(parseNotes(value).map(canonicalNote));
+}

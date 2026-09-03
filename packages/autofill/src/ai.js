@@ -68,7 +68,9 @@ export const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에�
   (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 "#숫자 (한글표현)" 형식으로 변환한다:
   ${roastLevelsForPrompt()}.
   아무 단서도 없으면 생략한다.
-- TASTING_NOTE: 콤마로 구분한 짧은 노트.
+- TASTING_NOTE: 콤마로 구분한 짧은 노트. **반드시 영문 표기**로 쓴다 — 원문이 한국어여도
+  영문으로 옮긴다 (파인애플 → "Pineapple", 자스민 → "Jasmine", 다크 초콜릿 → "Dark Chocolate").
+  라벨 인쇄와 기존 데이터가 영문 표기를 전제한다.
 - MEMO: 산지·농장의 배경 스토리, 또는 PROCESS·VARIETY 등 다른 필드에 넣기엔 너무 긴 상세 설명
   (발효 시간, 건조 방식, 컵핑 히스토리 등 문단형 서술)이 있으면 2~3문장으로 한국어 요약, 없으면 생략.
 - ROAST_DATE, PACKAGE_DATE는 추출하지 않는다.
