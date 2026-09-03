@@ -5,7 +5,7 @@
 // 도착하는 상세 페이지"라서 이 순서다.
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
 import { buildLabelSVG, buildQrSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
-import { canonicalizeNotes } from "@bnhd/schema/flavor";
+import { canonicalizeNotes, parseNotes, serializeNotes } from "@bnhd/schema/flavor";
 import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BeanListCard from "./components/BeanListCard";
@@ -440,6 +440,12 @@ export default function Workspace({
     const b = beans?.find((x) => x.KEY === key);
     if (!b) return;
     const g = (k: string) => String(b[k] || "");
+    // 저장된 노트에 한글 표기가 섞여 있을 수 있다 — 자동 채우기가 "파인애플"을 넣던 시절에 등록된
+    // 원두다. 폼으로 들어오는 모든 길이 같은 규칙을 지나게 한다(fillParsed와 같은 이유).
+    // 여기서는 아무것도 저장하지 않는다. 바뀐 표기는 노트 칩으로 눈에 보이고, 반영은 저장할 때다.
+    const notes = canonicalizeNotes(g("TASTING_NOTE"));
+    // 공백·중복만 다듬은 형태와 견줘, 표기가 실제로 바뀐 경우에만 알린다
+    const retyped = notes !== serializeNotes(parseNotes(g("TASTING_NOTE")));
     const next: FormState = {
       ROASTERY: g("ROASTERY"),
       ORIGIN: g("ORIGIN"),
@@ -456,7 +462,7 @@ export default function Workspace({
       PACKAGE_DATE: dotToIso(g("PACKAGE_DATE")),
       NET_WEIGHT: g("NET_WEIGHT").replace(/g$/, ""),
       AGTRON: g("AGTRON"),
-      TASTING_NOTE: g("TASTING_NOTE"),
+      TASTING_NOTE: notes,
       MEMO: g("MEMO"),
       SOURCE_URL: g("SOURCE_URL"),
     };
@@ -464,7 +470,10 @@ export default function Workspace({
     setLogo((cur) => (cur.source === "manual" ? { dataUrl: null, source: null } : cur)); // 저장된 로고 우선
     setMode("edit");
     setConfirmedKey(key);
-    setStatus({ msg: `${key} 를 수정 중입니다.`, cls: "ok" });
+    setStatus({
+      msg: `${key} 를 수정 중입니다.${retyped ? " 플레이버 노트 표기를 영문으로 맞췄습니다 — 저장하면 반영됩니다." : ""}`,
+      cls: "ok",
+    });
     setAiFilled(new Set()); // 저장된 값이므로 "AI가 채운 미확인 값"이 아니다
     setStarted(true); // 이미 값이 다 있으니 인테이크는 건너뛴다
     setFormSeq((s) => s + 1); // 전 스텝을 완료 상태로 다시 구성
