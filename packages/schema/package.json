@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./headline": "./src/headline.ts"
+    "./headline": "./src/headline.ts",
+    "./roast": "./src/roast.ts",
+    "./flavor": "./src/flavor.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

@@ -2,7 +2,7 @@
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
 // 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다 —
 // 라벨은 SVG라 대소문자 CSS가 없으므로 렌더 시점에 직접 .toUpperCase()를 건다.
-import { buildHeadline, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
+import { buildHeadline, displayValue, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
 //
@@ -34,7 +34,7 @@ export const SPEC_POOL = [
   ["NET_WEIGHT", "NET", "용량"],
   ["PROCESS", "PROC", "가공"],
   ["VARIETY", "VAR", "품종"],
-  ["AGTRON", "RSTP", "로스팅 포인트"],
+  ["AGTRON", "RSTP", "로스팅 레벨"],
   ["ALTITUDE", "ALT", "고도"],
   ["HARVEST", "CROP", "수확시기"],
 ];
@@ -416,7 +416,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const labelOf = (k) => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
   const specVal = (f) => {
     if (f === "AGTRON") return g(f).split(/\s+/)[0];
-    if (f === "PROCESS" || f === "VARIETY") return stripParen(g(f));
+    if (f === "PROCESS" || f === "VARIETY") return displayValue(g(f));
     return g(f);
   };
   const allSpecs = design.specFields

@@ -3,14 +3,21 @@
 // 17칸을 한 화면에 늘어놓으면 "무엇부터"가 사라진다. 그래서 등록에 필요한 순서(필수 → 표현 → 상세)로
 // 스텝을 쪼개고 한 번에 하나만 연다. 각 스텝은 건너뛸 수 있고(완결성보다 흐름이 우선), 최종 필수 검사는
 // 등록 시점의 Workspace.save()가 그대로 맡는다 — 여기서 막지 않는다.
+
+import { parseRoastLevel } from "@bnhd/schema/roast";
 import { useEffect, useRef, useState } from "react";
-import { capitalizeNoteSegments, isoToDot } from "../lib/format";
+import { isoToDot } from "../lib/format";
 import {
   appendNote,
+  BLEND_VALUE,
+  blendCascade,
   CHIP_LIMIT,
+  type ChipOption,
   HARVEST_OPTIONS,
   NOTE_OPTIONS,
   ORIGIN_OPTIONS,
+  optionLabel,
+  optionValue,
   PROCESS_OPTIONS,
   packageDateChips,
   ROASTPOINT_OPTIONS,
@@ -18,6 +25,7 @@ import {
   WEIGHT_OPTIONS,
 } from "../lib/suggest";
 import type { FormKey, FormState } from "../types";
+import FlavorPicker from "./FlavorPicker";
 import { DateStepper, Field, SuggestChips } from "./FormBits";
 
 type StepId = "identity" | "spec" | "dates" | "flavor" | "pack" | "detail";
@@ -46,7 +54,7 @@ const STEPS: StepDef[] = [
     required: ["ROAST_DATE", "PACKAGE_DATE"],
   },
   { id: "flavor", title: "플레이버 · 커피 이름", keys: ["TASTING_NOTE", "COFFEE_NAME"], required: [] },
-  { id: "pack", title: "용량 · 로스팅 포인트", keys: ["NET_WEIGHT", "AGTRON"], required: [] },
+  { id: "pack", title: "용량 · 로스팅 레벨", keys: ["NET_WEIGHT", "AGTRON"], required: [] },
   {
     id: "detail",
     title: "상세 (선택)",
@@ -136,6 +144,25 @@ export default function ReviewStepper(p: Props) {
   const ai = (key: FormKey) => p.aiFilled.has(key);
   const pick = (key: FormKey) => (v: string) => p.updateField(key, v);
 
+  /**
+   * 국가는 혼자 바뀌지 않는다 — 블렌드가 되고 풀리는 것을 가공·품종이 따라간다(blendCascade).
+   * 칩과 직접 입력·datalist 선택이 모두 이 길을 타야 한다. datalist에서 고른 값도 onChange로 오므로
+   * 값을 기준으로 판단하는 이 한 곳이 세 경로를 다 덮는다.
+   */
+  function setOrigin(next: string) {
+    const patch = blendCascade(p.form.ORIGIN, next, p.form);
+    p.updateField("ORIGIN", next);
+    for (const [k, v] of Object.entries(patch)) p.updateField(k as FormKey, v);
+  }
+
+  /** 칩 풀을 그대로 datalist로 — 값과 표시가 다른 항목(블렌드)은 설명을 label로 붙인다 */
+  const dlOptions = (opts: readonly ChipOption[]) =>
+    opts.map((o) => {
+      const v = optionValue(o);
+      const l = optionLabel(o);
+      return <option key={v} value={v} label={l === v ? undefined : l} />;
+    });
+
   /** 다음으로 열 스텝 = 아직 확인하지 않은 가장 가까운 뒤 스텝. 없으면 모두 접는다. */
   function advance(from: StepId) {
     const i = STEPS.findIndex((s) => s.id === from);
@@ -208,14 +235,21 @@ export default function ReviewStepper(p: Props) {
               />
             )}
             <Field label="국가(산지)" required invalid={iv("ORIGIN")} fromAi={ai("ORIGIN")}>
-              <input type="text" list="dl-origin" placeholder="ETHIOPIA" {...bind("ORIGIN")} />
+              <input
+                type="text"
+                list="dl-origin"
+                placeholder="ETHIOPIA"
+                value={p.form.ORIGIN}
+                onChange={(e) => setOrigin(e.target.value)}
+              />
             </Field>
             <SuggestChips
               ariaLabel="산지 추천"
               options={ORIGIN_OPTIONS}
               limit={CHIP_LIMIT}
+              pin={BLEND_VALUE}
               value={p.form.ORIGIN}
-              onPick={pick("ORIGIN")}
+              onPick={setOrigin}
             />
             <Field label="세부 지역" fromAi={ai("REGION")}>
               <input type="text" placeholder="Yirgacheffe, Gedeb" {...bind("REGION")} />
@@ -233,6 +267,7 @@ export default function ReviewStepper(p: Props) {
               ariaLabel="가공방식 추천"
               options={PROCESS_OPTIONS}
               limit={CHIP_LIMIT}
+              pin={BLEND_VALUE}
               value={p.form.PROCESS}
               onPick={pick("PROCESS")}
             />
@@ -243,6 +278,7 @@ export default function ReviewStepper(p: Props) {
               ariaLabel="품종 추천"
               options={VARIETY_OPTIONS}
               limit={CHIP_LIMIT}
+              pin={BLEND_VALUE}
               value={p.form.VARIETY}
               onPick={pick("VARIETY")}
             />
@@ -282,20 +318,15 @@ export default function ReviewStepper(p: Props) {
       case "flavor":
         return (
           <>
+            {/* 문자열을 치는 대신 노트를 고른다 — 고른 것은 지울 수 있는 블록이 되고 콤마는
+                저장 형식으로만 남는다. 검색은 영문·한글 양쪽으로 되고 저장값은 영문이다. */}
             <Field label="플레이버 노트" fromAi={ai("TASTING_NOTE")}>
-              <textarea
-                placeholder="Magnolia, Honey Peach, Bergamot"
-                value={p.form.TASTING_NOTE}
-                onChange={(e) => p.updateField("TASTING_NOTE", e.target.value)}
-                onBlur={(e) => {
-                  const v = capitalizeNoteSegments(e.target.value);
-                  if (v !== e.target.value) p.updateField("TASTING_NOTE", v);
-                }}
-              />
+              <FlavorPicker value={p.form.TASTING_NOTE} onChange={(v) => p.updateField("TASTING_NOTE", v)} />
             </Field>
-            {/* 노트는 교체가 아니라 누적 — 누를 때마다 콤마 목록에 덧붙는다 */}
+            {/* 검색은 포커스해야 보인다 — 무엇을 고를 수 있는지 한눈에 알리는 자리는 여기다.
+                누르면 교체가 아니라 누적(appendNote). */}
             <SuggestChips
-              ariaLabel="플레이버 추천 (누르면 추가)"
+              ariaLabel="자주 쓰는 플레이버 (누르면 추가)"
               options={NOTE_OPTIONS}
               limit={6}
               onPick={(v) => p.updateField("TASTING_NOTE", appendNote(p.form.TASTING_NOTE, v))}
@@ -325,7 +356,9 @@ export default function ReviewStepper(p: Props) {
               value={p.form.NET_WEIGHT}
               onPick={pick("NET_WEIGHT")}
             />
-            <Field label="로스팅 포인트" fromAi={ai("AGTRON")}>
+            {/* 부르는 이름은 "로스팅 레벨" — 애그트론 숫자는 로스터의 계측값이고 읽는 맥락은
+                "얼마나 볶았나"다. 저장값(#120 (울트라라이트))과 컬럼은 그대로다. */}
+            <Field label="로스팅 레벨" fromAi={ai("AGTRON")}>
               <input
                 type="text"
                 list="dl-roastpoint"
@@ -333,11 +366,21 @@ export default function ReviewStepper(p: Props) {
                 {...bind("AGTRON")}
               />
             </Field>
+            {/* 숫자 목록을 훑는 대신 실제 원두 색으로 고른다 (이슈 #25) */}
             <SuggestChips
-              ariaLabel="로스팅 포인트 추천"
+              ariaLabel="로스팅 레벨 추천"
               options={ROASTPOINT_OPTIONS}
               value={p.form.AGTRON}
               onPick={pick("AGTRON")}
+              renderChip={(o) => {
+                const lv = parseRoastLevel(optionValue(o));
+                return (
+                  <>
+                    {lv && <span className="chip-swatch" style={{ background: lv.swatch }} />}
+                    {optionLabel(o)}
+                  </>
+                );
+              }}
             />
           </>
         );
@@ -475,26 +518,10 @@ export default function ReviewStepper(p: Props) {
           </option>
         ))}
       </datalist>
-      <datalist id="dl-origin">
-        {ORIGIN_OPTIONS.map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
-      <datalist id="dl-process">
-        {PROCESS_OPTIONS.map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
-      <datalist id="dl-variety">
-        {VARIETY_OPTIONS.map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
-      <datalist id="dl-roastpoint">
-        {ROASTPOINT_OPTIONS.map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
+      <datalist id="dl-origin">{dlOptions(ORIGIN_OPTIONS)}</datalist>
+      <datalist id="dl-process">{dlOptions(PROCESS_OPTIONS)}</datalist>
+      <datalist id="dl-variety">{dlOptions(VARIETY_OPTIONS)}</datalist>
+      <datalist id="dl-roastpoint">{dlOptions(ROASTPOINT_OPTIONS)}</datalist>
       <datalist id="dl-harvest">
         {HARVEST_OPTIONS.map((v) => (
           <option key={v} value={v} />

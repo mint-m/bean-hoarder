@@ -3,7 +3,7 @@
 // 두 페이지는 데이터 출처만 다르다(로그인 세션의 D1 목록 / 저장소에 고정된 데모 데이터).
 // 보이는 카드는 같아야 하므로 마크업은 여기 한 곳에서만 만든다 — 짝이 되는 스타일은
 // public/deck.css에 있고, 클래스 이름이 그 파일과의 계약이다.
-import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { buildHeadline, displayValue, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { flavorGradient, originSignature } from "./coffee-color";
 import { daysSince, escapeHtml } from "./dom";
 
@@ -27,7 +27,7 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: Wa
   const usedInHead = headlineUsedFields(b);
   const meta = ["REGION", "VARIETY", "PROCESS"]
     .filter((k) => !usedInHead.includes(k))
-    .map(g)
+    .map((k) => displayValue(g(k)))
     .filter(Boolean)
     .join(" · ");
   const foot = [

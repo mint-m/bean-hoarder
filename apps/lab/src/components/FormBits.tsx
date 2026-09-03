@@ -3,6 +3,7 @@
 // 그 반복을 여기 한 곳에 두고, 스텝 쪽은 "무엇을 묻는가"만 적게 한다.
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { isoOffset, shiftIso } from "../lib/format";
+import { type ChipOption, optionLabel, optionValue } from "../lib/suggest";
 
 export function Field({
   label,
@@ -98,49 +99,66 @@ export function SuggestChips({
   onPick,
   ariaLabel,
   limit,
+  pin,
+  renderChip,
 }: {
-  /** 문자열이면 값=표시, 객체면 표시와 값을 따로 (날짜처럼 "오늘 → 2026-08-17") */
-  options: readonly (string | { label: string; value: string })[];
+  options: readonly ChipOption[];
   /** 현재 값 — 일치하는 칩을 선택 상태로 보인다 */
   value?: string;
   onPick: (value: string) => void;
   ariaLabel: string;
   /** 처음에 보여줄 개수 — 나머지는 "+" 버튼으로 편다. 없으면 전부 보인다 */
   limit?: number;
+  /**
+   * 순서상 뒤에 있어도 항상 보여야 하는 값.
+   *
+   * 블렌드가 세 목록 모두 맨 끝이라 `+14개 더`를 눌러야 나왔는데, 그건 자주 쓰는 값을 앞에
+   * 두려는 `limit`의 취지와는 다른 문제다 — 블렌드는 드물어서 뒤에 있는 게 아니라 **국가와 종류가
+   * 다른 갈림길**이라 뒤에 있다. 순서는 그대로 두고 노출만 고정한다.
+   */
+  pin?: string;
+  /** 칩 내용 커스터마이즈 (로스팅 레벨의 색 스와치처럼) — 없으면 라벨 텍스트만 */
+  renderChip?: (o: ChipOption) => ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   // 자주 쓰는 것만 먼저 보인다 — 선택지를 다 펼쳐 두면 고르는 일 자체가 일이 된다.
-  // 단, 현재 값이 뒤쪽 칩이면 접힌 채로도 선택 상태가 보이도록 함께 끌어올린다.
-  const shown =
-    limit && !expanded
-      ? options.filter((o, i) => {
-          if (i < limit) return true;
-          const val = typeof o === "string" ? o : o.value;
-          return value?.trim() === val;
-        })
-      : options;
-  const hidden = options.length - shown.length;
+  // 단, 현재 값이나 pin이 뒤쪽 칩이면 접힌 채로도 보이도록 함께 끌어올린다.
+  const collapsed = limit
+    ? options.filter((o, i) => {
+        if (i < limit) return true;
+        const val = optionValue(o);
+        return value?.trim() === val || pin === val;
+      })
+    : options;
+  // 감춘 개수는 **접힌 상태 기준으로** 센다. 펼친 뒤 다시 계산하면 0이 되어 버튼이 사라지고,
+  // 그러면 되돌아갈 길이 없어진다 (예전 동작).
+  const hiddenCount = options.length - collapsed.length;
+  const shown = expanded ? options : collapsed;
 
   return (
     // 관련 컨트롤 묶음이라 fieldset — role="group"을 흉내내는 대신 시맨틱 요소를 쓴다
     <fieldset className="chips-row" aria-label={ariaLabel}>
       {shown.map((o) => {
-        const label = typeof o === "string" ? o : o.label;
-        const val = typeof o === "string" ? o : o.value;
+        const val = optionValue(o);
         return (
           <button
-            key={label}
+            key={optionLabel(o)}
             type="button"
             className={`chip${value?.trim() === val ? " on" : ""}`}
             onClick={() => onPick(val)}
           >
-            {label}
+            {renderChip ? renderChip(o) : optionLabel(o)}
           </button>
         );
       })}
-      {hidden > 0 && (
-        <button type="button" className="chip chip-more" onClick={() => setExpanded(true)}>
-          + {hidden}개 더
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          className="chip chip-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "접기" : `+ ${hiddenCount}개 더`}
         </button>
       )}
     </fieldset>

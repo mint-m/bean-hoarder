@@ -67,7 +67,7 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 10,
     c: 0.15,
     l: 0.6,
-    re: /berr|strawberr|cherr|grape(?!fruit)|cassis|plum|currant|베리|딸기|체리|포도|자두/i,
+    re: /berr|strawberr|cherr|grape(?!fruit)|cassis|plum|prune|currant|베리|딸기|체리|포도|자두/i,
   },
   {
     name: "citrus",
@@ -88,7 +88,7 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 330,
     c: 0.12,
     l: 0.68,
-    re: /floral|jasmine|rose|lavender|hibiscus|chamomile|blossom|flower|플로럴|자스민|재스민|장미|라벤더|히비스커스|캐모마일|꽃/i,
+    re: /floral|jasmine|rose|lavender|hibiscus|chamomile|blossom|flower|magnolia|osmanthus|플로럴|자스민|재스민|장미|라벤더|히비스커스|캐모마일|목련|금목서|계화|꽃/i,
   },
   { name: "chocolate", hue: 55, c: 0.07, l: 0.45, re: /chocolat|cocoa|cacao|초콜|카카오|코코아/i },
   {
@@ -96,14 +96,14 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 70,
     c: 0.09,
     l: 0.58,
-    re: /nut|almond|hazel|peanut|caramel|toffee|brown sugar|honey|maple|butterscotch|넛|아몬드|헤이즐|땅콩|캐러멜|카라멜|흑설탕|꿀|메이플/i,
+    re: /nut|almond|hazel|peanut|pecan|caramel|toffee|brown sugar|molasses|vanilla|honey|maple|butterscotch|넛|아몬드|헤이즐|땅콩|피칸|캐러멜|카라멜|흑설탕|당밀|바닐라|꿀|메이플/i,
   },
   {
     name: "spice",
     hue: 110,
     c: 0.08,
     l: 0.52,
-    re: /spice|cinnamon|clove|herb|black tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|허브|홍차|얼그레이|시더/i,
+    re: /spice|cinnamon|clove|cardamom|ginger|pepper|herb|black tea|green tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|카다멈|생강|후추|허브|홍차|녹차|얼그레이|시더/i,
   },
   {
     name: "stonegreen",
@@ -129,21 +129,33 @@ function moodColor(f: Omit<FlavorFamily, "name" | "re">, alpha: number, dark: bo
 }
 
 /**
+ * 노트 문자열에서 향미 계열을 찾는다 — 등장 순서대로 최대 3개.
+ *
+ * 그라데이션 생성과 나눠 둔 이유: 어휘(@bnhd/schema/flavor)의 모든 노트가 계열 하나에는 걸리는지를
+ * 테스트가 전수로 확인해야 하는데, 그라데이션 쪽은 테마를 읽느라 DOM이 필요하다.
+ */
+/**
  * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
  * 검출된 계열을 노트 등장 순서대로 최대 3색. 매칭 없으면 중립 웜브라운, 노트가 비면 null.
  * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
  */
+export function matchFlavorFamilies(notes: string): FlavorFamily[] {
+  const raw = (notes || "").trim();
+  if (!raw) return [];
+  return FAMILIES.map((f) => ({ f, at: raw.search(f.re) }))
+    .filter((x) => x.at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .slice(0, 3)
+    .map((x) => x.f);
+}
+
 export function flavorGradient(notes: string): string | null {
   const raw = (notes || "").trim();
   if (!raw) return null;
   const dark = isDark();
   const alpha = dark ? 0.2 : 0.14;
 
-  const hits = FAMILIES.map((f) => ({ f, at: raw.search(f.re) }))
-    .filter((x) => x.at >= 0)
-    .sort((a, b) => a.at - b.at)
-    .slice(0, 3)
-    .map((x) => x.f);
+  const hits = matchFlavorFamilies(raw);
 
   const single = hits.length === 1 ? hits[0] : hits.length === 0 ? NEUTRAL : null;
   const stops = single

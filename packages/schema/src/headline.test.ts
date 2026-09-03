@@ -4,7 +4,13 @@
 // 검증한다. 라벨 SVG에 대문자로 찍히는지는 @bnhd/label의 buildLabelSVG 테스트가 지킨다.
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { buildHeadline, HEADLINE_PLACE_ORDER, headlineUsedFields, stripParen } from "./headline";
+import {
+  buildHeadline,
+  displayValue,
+  HEADLINE_PLACE_ORDER,
+  headlineUsedFields,
+  stripParen,
+} from "./headline";
 
 test("헤드라인: 국가 + 가장 세부 장소, 앵커 우선순위 워싱스테이션 > 생산자 > 지역", () => {
   assert.equal(buildHeadline({ ORIGIN: "ETHIOPIA", REGION: "Yirgacheffe" }), "ETHIOPIA Yirgacheffe");
@@ -52,4 +58,17 @@ test("headlineUsedFields: 헤드라인이 소비한 필드 목록 (부제목 중
 
 test("HEADLINE_PLACE_ORDER는 구체적 → 광역 순서 (라벨·화면이 같은 규칙을 쓰는지 고정)", () => {
   assert.deepEqual(HEADLINE_PLACE_ORDER, ["WASHING_STATION", "PRODUCER", "REGION"]);
+});
+
+// 조회 카드 한 장에 "블렌드 (여러 원산지 혼합)"·"(여러 가공방식 혼합)"·"(여러 품종 혼합)"이 셋 뜨던
+// 자리. 괄호를 아무 값에서나 떼면 안 되므로 블렌드만 걸린다는 것을 함께 못 박는다.
+test("displayValue: 블렌드의 괄호 설명만 떼고 나머지 괄호는 정보로 남긴다", () => {
+  assert.equal(displayValue("블렌드 (여러 원산지 혼합)"), "블렌드");
+  assert.equal(displayValue("블렌드 (여러 가공방식 혼합)"), "블렌드");
+  assert.equal(displayValue("블렌드"), "블렌드");
+  // 괄호가 정보인 필드는 그대로 둔다
+  assert.equal(displayValue("Sewda (Micro)"), "Sewda (Micro)");
+  assert.equal(displayValue("#75 (미디움라이트)"), "#75 (미디움라이트)");
+  assert.equal(displayValue("Anaerobic (72h)"), "Anaerobic (72h)");
+  assert.equal(displayValue(""), "");
 });

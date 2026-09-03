@@ -106,8 +106,22 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
 - **적용**: 그라데이션은 **구조적 자리**에만 얹는다 — 상세 카드의 아이덴티티 밴드(§7)와 덱 카드의
   피크 밴드(§7). 본문·스텁 영역에는 얹지 않는다.
 
+### 로스팅 레벨 — 원두 색 견본
+- 애그트론 6단계(`#120 울트라라이트` … `#45 다크`)에 **실제 분쇄 원두 색에 가까운 단색**을 하나씩 준다.
+  국가·향미와 달리 이 색은 무드가 아니라 **사실**이다 — 그래서 생성하지 않고 손으로 고정한 표다.
+- **구현**: OKLCH, 밝기가 애그트론 순서를 그대로 따른다(숫자가 클수록 밝다). 값의 단일 소스는
+  [packages/schema/src/roast.ts](packages/schema/src/roast.ts) — 등록 폼·조회 카드·AI 프롬프트가 함께 쓴다.
+- **적용**: 등록 폼의 로스팅 레벨 추천 칩(`.chip-swatch`)과 조회 카드 티켓 행의 `ROAST` 값 앞
+  (`.roast-swatch`) — 9~10px 닷. 랩에 커피 컬러를 얹지 않는다는 위 원칙의 **예외**인데, 이것은 원두를
+  구별하는 색이 아니라 **고르는 값 자체의 모습**이기 때문이다(숫자 목록을 훑는 대신 색으로 고른다).
+- 밝은 쪽 스와치는 흰 배경에, 어두운 쪽은 검은 배경에 묻힌다 — 양쪽 테마에서 중간 회색 테두리
+  한 겹으로 윤곽을 지킨다.
+
 > 구현 노트: 국가·향미 엔진 모두 [apps/web/src/lib/coffee-color.ts](apps/web/src/lib/coffee-color.ts)
-> (`originSignature` · `flavorGradient`). 규칙의 단일 소스는 이 문서 — 계열표를 바꾸면 코드도 함께 고친다.
+> (`originSignature` · `flavorGradient` · `matchFlavorFamilies`), 로스팅 레벨은
+> [packages/schema/src/roast.ts](packages/schema/src/roast.ts). 규칙의 단일 소스는 이 문서 —
+> 계열표를 바꾸면 코드도 함께 고친다. 반대로 **향미 어휘**(`@bnhd/schema/flavor`)에 노트를 더할 때는
+> 계열 정규식에 걸리는지 `apps/web/src/lib/flavor-coverage.test.ts`가 전수로 검사한다.
 
 ## 4. 타이포그래피
 

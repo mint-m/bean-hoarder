@@ -6,6 +6,8 @@
 // 둘이 다른 프롬프트를 쓰면 "키를 넣었더니 결과가 달라진다"가 되므로 규칙은 반드시 하나여야 한다.
 // HTTP 호출 자체는 각자 담당한다 — 브라우저는 fetch + 사용자 키, 서버는 fetch + secret.
 
+import { roastLevelsForPrompt } from "@bnhd/schema/roast";
+
 /**
  * 모델 후보 — 앞에서부터 시도한다. 두 경로가 **같은 목록**을 써야 결과가 일관된다.
  *
@@ -64,7 +66,7 @@ export const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에�
 - HARVEST: 수확시기 (예: "25/26", "25.12-26.01").
 - AGTRON: 로스팅 포인트. 라이트~다크 표현(Light/Medium/City/Full City/Vienna/French roast 등)이나 숫자
   (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 "#숫자 (한글표현)" 형식으로 변환한다:
-  #120(울트라라이트), #95(라이트), #75(미디움라이트), #65(미디움), #55(미디움다크), #45(다크).
+  ${roastLevelsForPrompt()}.
   아무 단서도 없으면 생략한다.
 - TASTING_NOTE: 콤마로 구분한 짧은 노트.
 - MEMO: 산지·농장의 배경 스토리, 또는 PROCESS·VARIETY 등 다른 필드에 넣기엔 너무 긴 상세 설명

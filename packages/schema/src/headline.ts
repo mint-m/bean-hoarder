@@ -21,6 +21,21 @@ export function stripParen(s: string): string {
     .trim();
 }
 
+/**
+ * 값을 화면·라벨에 그대로 쓸 수 있게 다듬는다 — 지금은 블렌드의 괄호 설명만 떼어낸다.
+ *
+ * 등록 폼은 "블렌드 (여러 원산지 혼합)"을 통째로 저장하던 시절이 있어, 조회 카드 한 장에
+ * "블렌드 (여러 원산지 혼합)"·"(여러 가공방식 혼합)"·"(여러 품종 혼합)"이 셋 뜬다. 헤드라인만
+ * stripParen을 타고 서브라인·스펙 줄·라벨은 날값을 쓰기 때문이다.
+ *
+ * stripParen을 아무 값에나 거는 대신 **블렌드로 시작하는 값에만** 거는 이유: 괄호가 정보인
+ * 필드가 있다. LOT "Sewda (Micro)", AGTRON "#75 (미디움라이트)"에서 괄호를 떼면 값이 상한다.
+ */
+export function displayValue(v: string): string {
+  const s = String(v ?? "").trim();
+  return s.startsWith("블렌드") ? stripParen(s) : s;
+}
+
 const g = (row: HeadlineRow, k: string): string => stripParen(String(row[k] ?? "").trim());
 
 function placeKey(row: HeadlineRow): string | null {
