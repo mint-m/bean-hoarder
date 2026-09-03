@@ -6,6 +6,7 @@ import {
   appendNote,
   BLEND_VALUE,
   blendCascade,
+  collectMyNotes,
   fitChipCount,
   isBlend,
   optionValue,
@@ -179,4 +180,30 @@ test("ordered면 목록 순서를 그대로 지킨다", () => {
   expect(r.shown.map(optionValue)).toEqual(OPTS);
   // 같은 입력을 정렬 켠 채로 주면 순서가 바뀐다 — 끄는 것이 의미가 있다는 확인
   expect(visibleChips(OPTS, { value: "co" }).shown.map(optionValue)[0]).toBe("COLOMBIA");
+});
+
+// ── 내가 쓴 노트 ──────────────────────────────────────────────
+// 공용 어휘를 런타임에 늘리는 대신, 본인이 등록한 원두에서 파생한다(오염이 남에게 안 번진다).
+
+const bean = (TASTING_NOTE: string) => ({ TASTING_NOTE });
+
+test("어휘에 없는 노트만, 자주 쓴 순으로 모은다", () => {
+  const beans = [
+    bean("Pineapple, Kombucha"),
+    bean("Kombucha, Sugarcane"),
+    bean("Kombucha"),
+    bean("Sugarcane"),
+  ];
+  // Pineapple은 내장 어휘라 빠진다
+  expect(collectMyNotes(beans)).toEqual(["Kombucha", "Sugarcane"]);
+});
+
+test("옛 한글 표기는 접어서 센다 — 어휘에 있으면 결국 빠진다", () => {
+  expect(collectMyNotes([bean("파인애플, Pineapple, 자스민")])).toEqual([]);
+});
+
+test("같은 수면 이름순, 빈 목록은 빈 배열", () => {
+  expect(collectMyNotes([bean("Zeta, Alpha")])).toEqual(["Alpha", "Zeta"]);
+  expect(collectMyNotes(null)).toEqual([]);
+  expect(collectMyNotes([bean("")])).toEqual([]);
 });

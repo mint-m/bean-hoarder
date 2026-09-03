@@ -70,6 +70,8 @@ interface Props {
   aiFilled: Set<FormKey>;
   roasteryOptions: string[];
   withLogo: Set<string>;
+  /** 내가 전에 쓴 노트 — 내장 어휘에 없는 것만(collectMyNotes) */
+  myNotes: string[];
   onRoasteryBlur: () => void;
   /** 편집 진입처럼 이미 값이 다 있는 경우 — 전 스텝을 완료로 열어두고 필요한 것만 펴게 한다 */
   allDone?: boolean;
@@ -321,7 +323,11 @@ export default function ReviewStepper(p: Props) {
             {/* 문자열을 치는 대신 노트를 고른다 — 고른 것은 지울 수 있는 블록이 되고 콤마는
                 저장 형식으로만 남는다. 검색은 영문·한글 양쪽으로 되고 저장값은 영문이다. */}
             <Field label="플레이버 노트" plain fromAi={ai("TASTING_NOTE")}>
-              <FlavorPicker value={p.form.TASTING_NOTE} onChange={(v) => p.updateField("TASTING_NOTE", v)} />
+              <FlavorPicker
+                value={p.form.TASTING_NOTE}
+                onChange={(v) => p.updateField("TASTING_NOTE", v)}
+                myNotes={p.myNotes}
+              />
             </Field>
             {/* 검색은 포커스해야 보인다 — 무엇을 고를 수 있는지 한눈에 알리는 자리는 여기다.
                 누르면 교체가 아니라 누적(appendNote). */}

@@ -2,6 +2,7 @@
 // 폼 컴포넌트가 아니라 여기 모아두는 이유: 스텝 구성이 바뀌어도 값 자체는 그대로 유지돼야 하고,
 // 무엇이 보이는지를 정하는 계산(rankChips·visibleChips·fitChipCount)이 여기 함께 있어야
 // 테스트가 잡기 때문이다.
+import { canonicalNote, FLAVOR_NOTES, parseNotes } from "@bnhd/schema/flavor";
 import { ROAST_LEVELS, roastLevelValue } from "@bnhd/schema/roast";
 import { isoOffset } from "./format";
 
@@ -249,4 +250,35 @@ export function fitChipCount(
     best = k;
   }
   return best;
+}
+
+// ── 내가 쓴 향미 노트 ──────────────────────────────────────────
+
+const CURATED = new Set(FLAVOR_NOTES.map((n) => n.en.toLowerCase()));
+
+/**
+ * 등록된 원두에서 **내장 어휘에 없는** 노트를 모은다 — 자주 쓴 순.
+ *
+ * 새 저장소를 두지 않고 등록된 원두에서 파생하는 이유는 로스터리 추천과 같다: 오타가 남에게 번지지
+ * 않고, 원두를 지우면 노트도 함께 사라지고, "어느 쪽이 원본이냐"가 생기지 않는다. 공용 어휘를
+ * 런타임에 늘리지 않으므로 색 보증 테스트(flavor-coverage)도 계속 의미를 갖는다.
+ *
+ * 어휘에 있는 것은 뺀다 — 피커가 이미 정식 후보로 보여주므로 중복이다. 옛 한글 표기는
+ * canonicalNote로 접어서 세므로 "파인애플"이 따로 세어지지 않는다.
+ */
+export function collectMyNotes(beans: readonly Record<string, unknown>[] | null): string[] {
+  const seen = new Map<string, { display: string; count: number }>();
+  for (const b of beans ?? []) {
+    for (const raw of parseNotes(String(b.TASTING_NOTE ?? ""))) {
+      const note = canonicalNote(raw);
+      const key = note.toLowerCase();
+      if (!note || CURATED.has(key)) continue;
+      const cur = seen.get(key);
+      if (cur) cur.count += 1;
+      else seen.set(key, { display: note, count: 1 });
+    }
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.count - a.count || a.display.localeCompare(b.display))
+    .map((v) => v.display);
 }

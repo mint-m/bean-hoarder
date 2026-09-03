@@ -19,6 +19,7 @@ import { api } from "./lib/api";
 import { insertByPriority, loadDesign, saveDesign } from "./lib/design";
 import { capitalizeNoteSegments, dotToIso, download, isoToDot, withUnit } from "./lib/format";
 import { geminiExtract } from "./lib/gemini";
+import { collectMyNotes } from "./lib/suggest";
 import { type BeanPublicRow, emptyForm, type FormKey, type FormState, type StatusLine } from "./types";
 
 const SITE = "https://bnhd.pages.dev";
@@ -716,6 +717,10 @@ export default function Workspace({
 
   // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩이 쓴다
   const withLogo = useMemo(() => new Set(Object.keys(logosMap)), [logosMap]);
+  // 내가 전에 쓴 노트 — 로스터리 추천과 같은 방식으로 등록된 원두에서 파생한다(새 저장소를 두지
+  // 않으므로 오타가 남에게 번지지 않고, 원두를 지우면 노트도 함께 사라진다).
+  const myNotes = useMemo(() => collectMyNotes(beans), [beans]);
+
   const roasteryOptions = useMemo(() => {
     const fromBeans = (beans || []).map((b) => (b.ROASTERY || "").trim().toUpperCase()).filter(Boolean);
     const sorted = [...new Set([...withLogo, ...fromBeans])].sort();
@@ -764,6 +769,7 @@ export default function Workspace({
                 aiFilled={aiFilled}
                 roasteryOptions={roasteryOptions}
                 withLogo={withLogo}
+                myNotes={myNotes}
                 onRoasteryBlur={handleRoasteryBlur}
                 allDone={mode === "edit"}
                 focusField={focusField}

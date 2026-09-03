@@ -151,7 +151,7 @@ export default function IntakeCard(p: Props) {
 
       <textarea
         className="intake-input"
-        placeholder={"[상품 링크] 혹은 [텍스트] 붙혀넣기"}
+        placeholder={"원두 [링크] 또는 [정보/노트] 붙여넣기"}
         value={p.autofillText}
         onChange={(e) => p.setAutofillText(e.target.value)}
         onKeyDown={(e) => {

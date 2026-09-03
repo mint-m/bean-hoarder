@@ -6,19 +6,38 @@
 //
 // **저장값은 영문**이다(@bnhd/schema/flavor). 한글은 검색을 돕는 보조어일 뿐 — 이 값이 인쇄 라벨에
 // 그대로 찍히고 조회 카드의 색을 정한다. 목록에 없는 향미는 친 그대로 들어간다(막지 않는다).
-import { type FlavorNote, parseNotes, searchNotes, serializeNotes } from "@bnhd/schema/flavor";
+import { parseNotes, searchNotes, serializeNotes } from "@bnhd/schema/flavor";
 import { useId, useRef, useState } from "react";
 import { capitalizeNoteSegments } from "../lib/format";
 
 const MENU_MAX = 8;
+/** 내 노트에 늘 남겨 두는 자리 — 내장 어휘가 목록을 다 채워 밀어내지 않게 한다 */
+const MINE_RESERVED = 3;
+
+/** 후보 한 줄 — 내장 어휘든 내 노트든 담기는 값 하나와 곁들이는 설명 하나다 */
+interface Candidate {
+  value: string;
+  hint: string;
+  mine?: boolean;
+}
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 export default function FlavorPicker({
   value,
   onChange,
+  myNotes = [],
 }: {
   /** 저장 형식 그대로의 콤마 목록 — AI 채움·CSV 복원분이 그대로 들어온다 */
   value: string;
   onChange: (next: string) => void;
+  /**
+   * 내가 전에 쓴 노트 — 내장 어휘에 없는 것만, 자주 쓴 순(collectMyNotes).
+   *
+   * 어휘를 런타임에 늘리는 대신 등록된 원두에서 파생한다. 목록에 없는 향미를 한 번 손으로 적고 나면
+   * 다음부터는 다시 적을 필요도, 다르게 적을 위험도 없어진다.
+   */
+  myNotes?: readonly string[];
 }) {
   const tokens = parseNotes(value);
   const [query, setQuery] = useState("");
@@ -28,8 +47,25 @@ export default function FlavorPicker({
   const menuId = useId();
 
   const has = (v: string) => tokens.some((t) => t.toLowerCase() === v.toLowerCase());
+
+  // 내 노트 중 검색어에 걸리는 것 (빈 검색어면 자주 쓴 순 앞에서부터)
+  const q = norm(query);
+  const mineHits = open
+    ? myNotes.filter((n) => !has(n) && (!q || norm(n).includes(q))).slice(0, MINE_RESERVED)
+    : [];
+  // 내장 어휘가 먼저다 — 표준 표기를 쓰게 하는 것이 목록의 목적이므로, 내 노트는 그 뒤에 붙는다.
+  // 다만 자리를 미리 떼어 둔다. 안 그러면 어휘가 여덟 줄을 다 채워 내 노트가 영영 안 보인다.
   // 이미 고른 것은 후보에서 뺀다 — 눌러도 아무 일이 없는 줄이 남으면 목록을 못 믿게 된다
-  const results: FlavorNote[] = open ? searchNotes(query, MENU_MAX).filter((n) => !has(n.en)) : [];
+  const curated: Candidate[] = open
+    ? searchNotes(query, MENU_MAX)
+        .filter((n) => !has(n.en))
+        .slice(0, MENU_MAX - mineHits.length)
+        .map((n) => ({ value: n.en, hint: n.ko }))
+    : [];
+  const results: Candidate[] = [
+    ...curated,
+    ...mineHits.map((n) => ({ value: n, hint: "내 노트", mine: true })),
+  ];
   const typed = capitalizeNoteSegments(query.trim());
   /**
    * 목록에 없는 향미 — 친 그대로 담는 탈출구.
@@ -52,7 +88,7 @@ export default function FlavorPicker({
   /** 지금 강조된 줄을 담는다. 후보가 없으면 친 값 그대로. */
   function commit() {
     const picked = results[active];
-    if (picked) add(picked.en);
+    if (picked) add(picked.value);
     else if (typed) add(typed);
   }
 
@@ -119,17 +155,17 @@ export default function FlavorPicker({
           <div className="notepick-menu" id={menuId} role="listbox">
             {results.map((n, i) => (
               <button
-                key={n.en}
+                key={n.value}
                 type="button"
                 role="option"
                 aria-selected={i === active}
                 className={`notepick-opt${i === active ? " on" : ""}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(i)}
-                onClick={() => add(n.en)}
+                onClick={() => add(n.value)}
               >
-                {n.en}
-                <span className="notepick-ko">{n.ko}</span>
+                {n.value}
+                <span className={`notepick-ko${n.mine ? " mine" : ""}`}>{n.hint}</span>
               </button>
             ))}
             {showNew && (
