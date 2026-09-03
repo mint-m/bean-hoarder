@@ -696,7 +696,7 @@ export default function Workspace({
     [beans],
   );
 
-  // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩·datalist가 쓴다
+  // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩이 쓴다
   const withLogo = useMemo(() => new Set(Object.keys(logosMap)), [logosMap]);
   const roasteryOptions = useMemo(() => {
     const fromBeans = (beans || []).map((b) => (b.ROASTERY || "").trim().toUpperCase()).filter(Boolean);

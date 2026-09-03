@@ -146,22 +146,14 @@ export default function ReviewStepper(p: Props) {
 
   /**
    * 국가는 혼자 바뀌지 않는다 — 블렌드가 되고 풀리는 것을 가공·품종이 따라간다(blendCascade).
-   * 칩과 직접 입력·datalist 선택이 모두 이 길을 타야 한다. datalist에서 고른 값도 onChange로 오므로
-   * 값을 기준으로 판단하는 이 한 곳이 세 경로를 다 덮는다.
+   * 칩을 누르든 직접 치든 모두 이 길을 타야 한다 — 값을 기준으로 판단하는 이 한 곳이 두 경로를
+   * 다 덮는다.
    */
   function setOrigin(next: string) {
     const patch = blendCascade(p.form.ORIGIN, next, p.form);
     p.updateField("ORIGIN", next);
     for (const [k, v] of Object.entries(patch)) p.updateField(k as FormKey, v);
   }
-
-  /** 칩 풀을 그대로 datalist로 — 값과 표시가 다른 항목(블렌드)은 설명을 label로 붙인다 */
-  const dlOptions = (opts: readonly ChipOption[]) =>
-    opts.map((o) => {
-      const v = optionValue(o);
-      const l = optionLabel(o);
-      return <option key={v} value={v} label={l === v ? undefined : l} />;
-    });
 
   /** 다음으로 열 스텝 = 아직 확인하지 않은 가장 가까운 뒤 스텝. 없으면 모두 접는다. */
   function advance(from: StepId) {
@@ -219,7 +211,7 @@ export default function ReviewStepper(p: Props) {
             <Field label="로스터리" required invalid={iv("ROASTERY")} fromAi={ai("ROASTERY")}>
               <input
                 type="text"
-                list="dl-roastery"
+                autoComplete="off"
                 placeholder="SEY"
                 {...bind("ROASTERY")}
                 onBlur={p.onRoasteryBlur}
@@ -232,6 +224,8 @@ export default function ReviewStepper(p: Props) {
                 limit={CHIP_LIMIT}
                 value={p.form.ROASTERY}
                 onPick={pick("ROASTERY")}
+                // 저장된 로고가 있는 로스터리 표시 — 걷어낸 datalist가 지고 있던 정보다
+                renderChip={(o) => (p.withLogo.has(optionValue(o)) ? `★ ${optionLabel(o)}` : optionLabel(o))}
               />
             )}
             <Field
@@ -243,7 +237,7 @@ export default function ReviewStepper(p: Props) {
             >
               <input
                 type="text"
-                list="dl-origin"
+                autoComplete="off"
                 placeholder="ETHIOPIA"
                 value={p.form.ORIGIN}
                 onChange={(e) => setOrigin(e.target.value)}
@@ -258,7 +252,7 @@ export default function ReviewStepper(p: Props) {
               onPick={setOrigin}
             />
             <Field label="세부 지역" fromAi={ai("REGION")}>
-              <input type="text" placeholder="Yirgacheffe, Gedeb" {...bind("REGION")} />
+              <input type="text" autoComplete="off" placeholder="Yirgacheffe, Gedeb" {...bind("REGION")} />
             </Field>
           </>
         );
@@ -267,7 +261,7 @@ export default function ReviewStepper(p: Props) {
         return (
           <>
             <Field label="가공방식" required invalid={iv("PROCESS")} fromAi={ai("PROCESS")}>
-              <input type="text" list="dl-process" placeholder="Washed" {...bind("PROCESS")} />
+              <input type="text" autoComplete="off" placeholder="Washed" {...bind("PROCESS")} />
             </Field>
             <SuggestChips
               ariaLabel="가공방식 추천"
@@ -278,7 +272,7 @@ export default function ReviewStepper(p: Props) {
               onPick={pick("PROCESS")}
             />
             <Field label="품종" required invalid={iv("VARIETY")} fromAi={ai("VARIETY")}>
-              <input type="text" list="dl-variety" placeholder="SL9" {...bind("VARIETY")} />
+              <input type="text" autoComplete="off" placeholder="SL9" {...bind("VARIETY")} />
             </Field>
             <SuggestChips
               ariaLabel="품종 추천"
@@ -342,7 +336,12 @@ export default function ReviewStepper(p: Props) {
               aux="시그니쳐·블렌드명 — 넣으면 라벨·카드 제목이 됩니다"
               fromAi={ai("COFFEE_NAME")}
             >
-              <input type="text" placeholder="비우면 국가+세부지역으로 자동 표시" {...bind("COFFEE_NAME")} />
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder="비우면 국가+세부지역으로 자동 표시"
+                {...bind("COFFEE_NAME")}
+              />
             </Field>
           </>
         );
@@ -368,7 +367,7 @@ export default function ReviewStepper(p: Props) {
             <Field label="로스팅 레벨" fromAi={ai("AGTRON")}>
               <input
                 type="text"
-                list="dl-roastpoint"
+                autoComplete="off"
                 placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"
                 {...bind("AGTRON")}
               />
@@ -402,12 +401,12 @@ export default function ReviewStepper(p: Props) {
             <div className="row2">
               <Field label="고도" fromAi={ai("ALTITUDE")}>
                 <span className="unit-wrap">
-                  <input type="text" placeholder="1900-2100" {...bind("ALTITUDE")} />
+                  <input type="text" autoComplete="off" placeholder="1900-2100" {...bind("ALTITUDE")} />
                   <span className="unit">m</span>
                 </span>
               </Field>
               <Field label="수확시기" fromAi={ai("HARVEST")}>
-                <input type="text" list="dl-harvest" placeholder="25/26" {...bind("HARVEST")} />
+                <input type="text" autoComplete="off" placeholder="25/26" {...bind("HARVEST")} />
               </Field>
             </div>
             <SuggestChips
@@ -418,18 +417,18 @@ export default function ReviewStepper(p: Props) {
             />
             <div className="row2">
               <Field label="생산자 / 농장" fromAi={ai("PRODUCER")}>
-                <input type="text" placeholder="Daniel Caro Lopez" {...bind("PRODUCER")} />
+                <input type="text" autoComplete="off" placeholder="Daniel Caro Lopez" {...bind("PRODUCER")} />
               </Field>
               <Field label="랏 (로트명)" fromAi={ai("LOT")}>
-                <input type="text" placeholder="Sewda Premium" {...bind("LOT")} />
+                <input type="text" autoComplete="off" placeholder="Sewda Premium" {...bind("LOT")} />
               </Field>
             </div>
             <div className="row2">
               <Field label="워싱스테이션" fromAi={ai("WASHING_STATION")}>
-                <input type="text" placeholder="Sewda" {...bind("WASHING_STATION")} />
+                <input type="text" autoComplete="off" placeholder="Sewda" {...bind("WASHING_STATION")} />
               </Field>
               <Field label="원본 페이지 URL" fromAi={ai("SOURCE_URL")}>
-                <input type="url" placeholder="https://..." {...bind("SOURCE_URL")} />
+                <input type="url" autoComplete="off" placeholder="https://..." {...bind("SOURCE_URL")} />
               </Field>
             </div>
             <Field
@@ -520,24 +519,6 @@ export default function ReviewStepper(p: Props) {
           </section>
         );
       })}
-
-      {/* 자유 입력 자동완성 — 칩이 보여주는 건 앞쪽 몇 개뿐이라 전체 목록은 여기가 맡는다 */}
-      <datalist id="dl-roastery">
-        {p.roasteryOptions.map((n) => (
-          <option key={n} value={n}>
-            {p.withLogo.has(n) ? "★ 저장된 로고" : ""}
-          </option>
-        ))}
-      </datalist>
-      <datalist id="dl-origin">{dlOptions(ORIGIN_OPTIONS)}</datalist>
-      <datalist id="dl-process">{dlOptions(PROCESS_OPTIONS)}</datalist>
-      <datalist id="dl-variety">{dlOptions(VARIETY_OPTIONS)}</datalist>
-      <datalist id="dl-roastpoint">{dlOptions(ROASTPOINT_OPTIONS)}</datalist>
-      <datalist id="dl-harvest">
-        {HARVEST_OPTIONS.map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
     </div>
   );
 }

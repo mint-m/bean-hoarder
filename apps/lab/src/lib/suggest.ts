@@ -1,6 +1,7 @@
-// 입력 추천값 — 타이핑을 줄이기 위한 칩·datalist 공용 옵션 풀.
-// 폼 컴포넌트가 아니라 여기 모아두는 이유: 같은 풀을 칩(한 번 눌러 채우기)과 datalist(자유 입력
-// 자동완성)가 함께 쓰고, 스텝 구성이 바뀌어도 값 자체는 그대로 유지되기 때문이다.
+// 입력 추천값 — 타이핑을 줄이기 위한 칩 옵션 풀.
+// 폼 컴포넌트가 아니라 여기 모아두는 이유: 스텝 구성이 바뀌어도 값 자체는 그대로 유지돼야 하고,
+// 무엇이 보이는지를 정하는 계산(rankChips·visibleChips·fitChipCount)이 여기 함께 있어야
+// 테스트가 잡기 때문이다.
 import { ROAST_LEVELS, roastLevelValue } from "@bnhd/schema/roast";
 import { isoOffset } from "./format";
 
@@ -8,14 +9,14 @@ const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 const PREV_YY = String(Number(YY) - 1).padStart(2, "0");
 
 /**
- * 칩으로 먼저 보여줄 개수 — 나머지는 펼치기 버튼이나 타이핑(datalist)이 맡는다.
+ * 칩으로 먼저 보여줄 **상한** — 실제 개수는 잰 폭이 정한다(fitChipCount). 나머지는 펼치기 버튼이 맡는다.
  *
  * 6이던 것을 4로 내렸다. 375px에서 6칸이면 어느 줄이든 두세 줄로 흘러넘쳐, 스텝 하나가 칩 벽으로
  * 보인다. 고르는 일을 돕자고 둔 것이 고르기 전에 피로를 주면 목적을 잃는다.
  */
 export const CHIP_LIMIT = 4;
 
-/** 문자열이면 값=표시, 객체면 표시와 값을 따로 (칩·datalist가 같은 풀을 쓴다) */
+/** 문자열이면 값=표시, 객체면 표시와 값을 따로 (날짜의 "오늘 → 2026-08-17", 로스팅 레벨 등) */
 export type ChipOption = string | { label: string; value: string };
 export const optionValue = (o: ChipOption): string => (typeof o === "string" ? o : o.value);
 export const optionLabel = (o: ChipOption): string => (typeof o === "string" ? o : o.label);
@@ -191,9 +192,8 @@ export function rankChips(options: readonly ChipOption[], value?: string): reado
  * 접힌 칩 줄에 무엇이 보이는가.
  *
  * 두 가지를 함께 한다.
- *  1. **일치도 정렬**(rankChips) — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다. 칩과
- *     datalist가 같은 풀을 쓰는데, 지금까지는 타이핑이 datalist만 좁히고 칩 줄은 그대로여서
- *     둘이 따로 놀았다.
+ *  1. **일치도 정렬**(rankChips) — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다.
+ *     이 정렬이 걷어낸 datalist의 자리를 대신한다 — 전체 목록을 훑는 일은 펼치기가 맡는다.
  *  2. **자리 배분** — limit는 접었을 때 보일 칩의 **총량**이다. 고정 노출(pin)과 현재 값은 그 안에서
  *     자리를 먼저 가져가고, 남는 만큼만 앞에서 채운다. pin을 예산 밖의 덤으로 두면 줄 수가 늘어
  *     limit를 내린 의미가 없어진다.

@@ -471,7 +471,6 @@ details.acc > summary {
    빈 칸이 크게 벌어져 있으면 그 자체로 "많이 써야 하나" 하는 인상을 준다. */
 .intake-input {
   min-height: 0;
-  height: 46px;
   font-size: 14px;
 }
 .intake-act {
