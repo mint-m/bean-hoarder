@@ -171,3 +171,12 @@ test("한 개도 안 들어가도 최소 하나는 보인다", () => {
 test("limit이 상한으로 남는다", () => {
   expect(fit({ rowWidth: 9999, moreWidth: 0 }, { limit: 2 })).toBe(2);
 });
+
+// 순서 자체가 정보인 줄 — 로스팅 레벨은 밝음에서 어두움으로 가는 척도라, 친 글자에 따라 칩이
+// 앞뒤로 옮겨 다니면 색을 눈으로 훑어 고르는 일이 성립하지 않는다.
+test("ordered면 목록 순서를 그대로 지킨다", () => {
+  const r = visibleChips(OPTS, { value: "co", ordered: true });
+  expect(r.shown.map(optionValue)).toEqual(OPTS);
+  // 같은 입력을 정렬 켠 채로 주면 순서가 바뀐다 — 끄는 것이 의미가 있다는 확인
+  expect(visibleChips(OPTS, { value: "co" }).shown.map(optionValue)[0]).toBe("COLOMBIA");
+});

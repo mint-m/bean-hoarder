@@ -243,7 +243,7 @@ function render(row: HeadlineRow, isPreview: boolean): void {
   // 로스팅은 레벨이 앞선다 — 애그트론 숫자는 로스터의 계측값이고, 카드를 읽는 사람이 알고 싶은
   // 것은 "얼마나 볶았나"다. 색 견본이 그 축을 한눈에 말하고, 못 알아본 값은 원문 그대로 둔다.
   const roast = parseRoastLevel(g("AGTRON"));
-  const roastText = roast ? roast.ko : g("AGTRON").replace(/\s*\(.*\)\s*$/, "");
+  const roastText = roast ? roast.en : g("AGTRON").replace(/\s*\(.*\)\s*$/, "");
   el("f-roastpt-box").classList.toggle("hidden", !roastText);
   if (roastText) {
     const dd = el("f-roastpt");

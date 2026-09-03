@@ -114,7 +114,7 @@ export const VARIETY_OPTIONS: readonly ChipOption[] = [
  * 6단계의 단일 소스는 @bnhd/schema/roast (프롬프트·라벨·조회 카드가 함께 쓴다).
  */
 export const ROASTPOINT_OPTIONS: readonly ChipOption[] = ROAST_LEVELS.map((l) => ({
-  label: l.ko,
+  label: l.en,
   value: roastLevelValue(l),
 }));
 
@@ -203,9 +203,9 @@ export function rankChips(options: readonly ChipOption[], value?: string): reado
  */
 export function visibleChips(
   options: readonly ChipOption[],
-  opts: { limit?: number; pin?: string; value?: string; expanded?: boolean } = {},
+  opts: { limit?: number; pin?: string; value?: string; expanded?: boolean; ordered?: boolean } = {},
 ): { shown: readonly ChipOption[]; hiddenCount: number } {
-  const ranked = rankChips(options, opts.value);
+  const ranked = opts.ordered ? options : rankChips(options, opts.value);
 
   if (!opts.limit) return { shown: ranked, hiddenCount: 0 };
 

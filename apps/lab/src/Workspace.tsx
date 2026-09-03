@@ -6,6 +6,7 @@
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
 import { buildLabelSVG, buildQrSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
 import { canonicalizeNotes, parseNotes, serializeNotes } from "@bnhd/schema/flavor";
+import { canonicalRoast } from "@bnhd/schema/roast";
 import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BeanListCard from "./components/BeanListCard";
@@ -461,7 +462,7 @@ export default function Workspace({
       ROAST_DATE: dotToIso(g("ROAST_DATE")),
       PACKAGE_DATE: dotToIso(g("PACKAGE_DATE")),
       NET_WEIGHT: g("NET_WEIGHT").replace(/g$/, ""),
-      AGTRON: g("AGTRON"),
+      AGTRON: canonicalRoast(g("AGTRON")),
       TASTING_NOTE: notes,
       MEMO: g("MEMO"),
       SOURCE_URL: g("SOURCE_URL"),
@@ -576,7 +577,12 @@ export default function Workspace({
       // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
       // 노트는 영문 표기로 되돌린 뒤 담는다 — AI가 "파인애플"을 주는 일이 있었고, 그대로 저장되면
       // 라벨에 한글이 찍히고 같은 향미가 카드마다 달라진다. 어휘 밖의 말은 그대로 둔다.
-      next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(canonicalizeNotes(v)) : v;
+      next[key] =
+        field === "TASTING_NOTE"
+          ? capitalizeNoteSegments(canonicalizeNotes(v))
+          : field === "AGTRON"
+            ? canonicalRoast(v)
+            : v;
       filled.push(FIELD_LABELS_KO[field] || field);
       filledKeys.add(key);
     }

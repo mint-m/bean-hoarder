@@ -113,6 +113,7 @@ export function SuggestChips({
   ariaLabel,
   limit,
   pin,
+  ordered,
   renderChip,
 }: {
   options: readonly ChipOption[];
@@ -130,6 +131,13 @@ export function SuggestChips({
    * 다른 갈림길**이라 뒤에 있다. 순서는 그대로 두고 노출만 고정한다.
    */
   pin?: string;
+  /**
+   * 목록 순서를 그대로 지킨다 — 칸에 친 글자로 재정렬하지 않는다.
+   *
+   * 순서 자체가 정보인 줄이 있다. 로스팅 레벨은 밝음에서 어두움으로 가는 척도라, 친 글자에 따라
+   * 칩이 앞뒤로 옮겨 다니면 색을 눈으로 훑어 고르는 일이 불가능해진다.
+   */
+  ordered?: boolean;
   /** 칩 내용 커스터마이즈 (로스팅 레벨의 색 스와치처럼) — 없으면 라벨 텍스트만 */
   renderChip?: (o: ChipOption) => ReactNode;
 }) {
@@ -151,18 +159,22 @@ export function SuggestChips({
   const known = !!layout.current.rowWidth && options.every((o) => widths.current.has(optionValue(o)));
   // 아직 못 잰 폭이 있으면 후보를 전부 그린다 — 그림만 감추고 자리는 그대로 둔다.
   const measuring = !!limit && !expanded && !known;
-  const fit = measuring
-    ? undefined
-    : fitChipCount(options, (o) => widths.current.get(optionValue(o)) ?? 0, layout.current, {
-        limit,
-        pin,
-        value,
-      });
+  // limit이 없으면 자르지 않는다 — 재는 것은 한도를 **어디에 둘지** 정하는 일이지 한도를 만드는
+  // 일이 아니다. (잰 값을 그대로 한도로 쓰는 바람에 limit을 뺀 줄까지 두 칸으로 잘렸다.)
+  const fit =
+    !limit || measuring
+      ? undefined
+      : fitChipCount(options, (o) => widths.current.get(optionValue(o)) ?? 0, layout.current, {
+          limit,
+          pin,
+          value: ordered ? undefined : value,
+        });
   const { shown, hiddenCount } = visibleChips(options, {
     limit: measuring ? undefined : (fit ?? limit),
     pin,
     value,
     expanded,
+    ordered,
   });
 
   // 그려진 칩의 폭을 캐시에 담는다. 페인트 전에 끝내야 부푼 줄이 보이지 않으므로 useLayoutEffect다.
@@ -183,8 +195,11 @@ export function SuggestChips({
     const more = row.querySelector<HTMLElement>(".chip-more");
     const next = {
       gap: Number.parseFloat(getComputedStyle(row).columnGap) || 0,
-      moreWidth: more?.offsetWidth || l.moreWidth,
-      rowWidth: row.clientWidth,
+      // 더보기 버튼의 폭은 자기 라벨에 달렸다("+0" → "+17" → "접기"). 잰 값을 그대로 받으면
+      // 폭이 바뀌고 → 개수가 바뀌고 → 라벨이 바뀌어 다시 폭이 바뀐다. 넓어질 때만 받아 수렴시킨다.
+      moreWidth: Math.max(more?.offsetWidth ?? 0, l.moreWidth),
+      // 아직 배치되지 않아 폭이 0이면 기록하지 않는다 — 0을 받으면 영영 재는 상태에 머문다
+      rowWidth: row.clientWidth || l.rowWidth,
     };
     if (next.gap !== l.gap || next.moreWidth !== l.moreWidth || next.rowWidth !== l.rowWidth) {
       layout.current = next;

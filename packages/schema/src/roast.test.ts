@@ -1,12 +1,18 @@
 // 로스팅 레벨 파싱 — 폼 칩·조회 카드 스와치·라벨이 모두 이 함수 하나로 값을 읽는다.
-// 저장 형식("#120 (울트라라이트)")은 인쇄된 라벨·기존 행과 묶여 있어 함께 못 박는다.
+// 저장 형식("#120 (Ultra Light)")과 옛 한국어 표기의 해석을 함께 못 박는다.
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { parseRoastLevel, ROAST_LEVELS, roastLevelsForPrompt, roastLevelValue } from "./roast";
+import {
+  canonicalRoast,
+  parseRoastLevel,
+  ROAST_LEVELS,
+  roastLevelsForPrompt,
+  roastLevelValue,
+} from "./roast";
 
-test("저장 형식은 '#숫자 (한글)' 그대로다", () => {
-  assert.equal(ROAST_LEVELS.map(roastLevelValue).at(0), "#120 (울트라라이트)");
-  assert.equal(ROAST_LEVELS.map(roastLevelValue).at(-1), "#45 (다크)");
+test("저장 형식은 '#숫자 (영문)'이다", () => {
+  assert.equal(ROAST_LEVELS.map(roastLevelValue).at(0), "#120 (Ultra Light)");
+  assert.equal(ROAST_LEVELS.map(roastLevelValue).at(-1), "#45 (Dark)");
 });
 
 test("스와치는 밝은 쪽에서 어두운 쪽으로 선다", () => {
@@ -58,6 +64,31 @@ test("단서가 없으면 null", () => {
 test("AI 프롬프트 나열은 저장 형식과 같은 6단계를 말한다", () => {
   assert.equal(
     roastLevelsForPrompt(),
-    "#120(울트라라이트), #95(라이트), #75(미디움라이트), #65(미디움), #55(미디움다크), #45(다크)",
+    "#120(Ultra Light), #95(Light), #75(Medium Light), #65(Medium), #55(Medium Dark), #45(Dark)",
   );
+});
+
+// ── 표기 정규화 ────────────────────────────────────────────────
+// 괄호 안이 한국어에서 영문으로 바뀌었다. 옛 행은 편집으로 열 때 여기서 맞춰진다.
+
+test("옛 한국어 표기를 영문으로 되돌린다", () => {
+  assert.equal(canonicalRoast("#120 (울트라라이트)"), "#120 (Ultra Light)");
+  assert.equal(canonicalRoast("#55 (미디움다크)"), "#55 (Medium Dark)");
+  assert.equal(canonicalRoast("울트라라이트"), "#120 (Ultra Light)");
+  assert.equal(canonicalRoast("Medium Dark"), "#55 (Medium Dark)");
+});
+
+test("이미 영문이면 그대로다", () => {
+  for (const l of ROAST_LEVELS) {
+    assert.equal(canonicalRoast(roastLevelValue(l)), roastLevelValue(l));
+  }
+});
+
+// parseRoastLevel은 #88을 #95로 붙여 주지만 그건 스와치를 고르기 위한 근사다.
+// 저장값까지 옮기면 사용자가 적어 넣은 수치가 소리 없이 달라진다.
+test("6단계 밖의 숫자는 손대지 않는다", () => {
+  assert.equal(canonicalRoast("#88"), "#88");
+  assert.equal(canonicalRoast("70"), "70");
+  assert.equal(canonicalRoast(""), "");
+  assert.equal(canonicalRoast("맛있음"), "맛있음");
 });

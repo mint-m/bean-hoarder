@@ -65,7 +65,8 @@ export const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에�
 - NET_WEIGHT: 그램 숫자만 (예: "200").
 - HARVEST: 수확시기 (예: "25/26", "25.12-26.01").
 - AGTRON: 로스팅 포인트. 라이트~다크 표현(Light/Medium/City/Full City/Vienna/French roast 등)이나 숫자
-  (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 "#숫자 (한글표현)" 형식으로 변환한다:
+  (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 **아래 표기 그대로** 옮긴다
+  (원문이 한국어여도 영문 표기로):
   ${roastLevelsForPrompt()}.
   아무 단서도 없으면 생략한다.
 - TASTING_NOTE: 콤마로 구분한 짧은 노트. **반드시 영문 표기**로 쓴다 — 원문이 한국어여도

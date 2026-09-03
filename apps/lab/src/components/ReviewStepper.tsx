@@ -368,17 +368,17 @@ export default function ReviewStepper(p: Props) {
               <input
                 type="text"
                 autoComplete="off"
-                placeholder="#95 (라이트) — 숫자만 치면 #이 붙어요"
+                placeholder="#95 (Light) — 숫자 입력 or 선택"
                 {...bind("AGTRON")}
               />
             </Field>
             {/* 숫자 목록을 훑는 대신 실제 원두 색으로 고른다 (이슈 #25) */}
-            {/* 이 줄은 목록이 아니라 밝음에서 어두움으로 가는 한 벌의 척도라 통째로 보이는 편이
-                낫지만, 다른 줄과 어긋나게 두지 않는다 — 접어도 펼치기가 한 번이고, 줄이 들쭉날쭉한
-                쪽이 고르는 일을 더 방해한다. */}
+            {/* 이 줄만 접지도 재정렬하지도 않는다. 목록이 아니라 밝음에서 어두움으로 가는 한 벌의
+                척도라, 잘리거나 순서가 흔들리면 색을 눈으로 훑어 고르는 일 자체가 성립하지 않는다.
+                두 줄을 쓰더라도 여섯 칸이 늘 같은 자리에 같은 순서로 서 있어야 한다. */}
             <SuggestChips
               ariaLabel="로스팅 레벨 추천"
-              limit={CHIP_LIMIT}
+              ordered
               options={ROASTPOINT_OPTIONS}
               value={p.form.AGTRON}
               onPick={pick("AGTRON")}
