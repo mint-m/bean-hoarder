@@ -7,8 +7,13 @@ import { isoOffset } from "./format";
 const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 const PREV_YY = String(Number(YY) - 1).padStart(2, "0");
 
-/** 칩으로 먼저 보여줄 개수 — 나머지는 타이핑하면 datalist가 잡는다. */
-export const CHIP_LIMIT = 6;
+/**
+ * 칩으로 먼저 보여줄 개수 — 나머지는 펼치기 버튼이나 타이핑(datalist)이 맡는다.
+ *
+ * 6이던 것을 4로 내렸다. 375px에서 6칸이면 어느 줄이든 두세 줄로 흘러넘쳐, 스텝 하나가 칩 벽으로
+ * 보인다. 고르는 일을 돕자고 둔 것이 고르기 전에 피로를 주면 목적을 잃는다.
+ */
+export const CHIP_LIMIT = 4;
 
 /** 문자열이면 값=표시, 객체면 표시와 값을 따로 (칩·datalist가 같은 풀을 쓴다) */
 export type ChipOption = string | { label: string; value: string };
@@ -75,7 +80,7 @@ export const ORIGIN_OPTIONS: readonly ChipOption[] = [
   "YEMEN",
   "INDIA",
   "VIETNAM",
-  { label: "블렌드 (여러 원산지 혼합)", value: BLEND_VALUE },
+  BLEND_VALUE,
 ];
 
 export const PROCESS_OPTIONS: readonly ChipOption[] = [
@@ -86,7 +91,7 @@ export const PROCESS_OPTIONS: readonly ChipOption[] = [
   "Carbonic Maceration",
   "Wet-Hulled",
   "Semi-Washed",
-  { label: "블렌드 (여러 가공방식 혼합)", value: BLEND_VALUE },
+  BLEND_VALUE,
 ];
 
 export const VARIETY_OPTIONS: readonly ChipOption[] = [
@@ -100,7 +105,7 @@ export const VARIETY_OPTIONS: readonly ChipOption[] = [
   "SL28",
   "SL34",
   "Pacamara",
-  { label: "블렌드 (여러 품종 혼합)", value: BLEND_VALUE },
+  BLEND_VALUE,
 ];
 
 /**
@@ -115,7 +120,7 @@ export const ROASTPOINT_OPTIONS: readonly ChipOption[] = ROAST_LEVELS.map((l) =>
 export const HARVEST_OPTIONS = [`${PREV_YY}/${YY}`, YY, PREV_YY];
 
 /** 소분 보관이 목적이라 소용량이 앞에 온다 (단위 g은 폼이 붙인다). */
-export const WEIGHT_OPTIONS = ["20", "50", "100", "200", "250", "500", "1000"];
+export const WEIGHT_OPTIONS = ["20", "50", "100", "200", "250", "500"];
 
 /** 자주 쓰는 플레이버 — 누르면 콤마 목록에 덧붙는다(교체가 아니라 누적). */
 export const NOTE_OPTIONS = [
@@ -156,4 +161,57 @@ export function appendNote(current: string, note: string): string {
     .filter(Boolean);
   if (segs.some((s) => s.toLowerCase() === note.toLowerCase())) return current;
   return [...segs, note].join(", ");
+}
+
+// ── 칩 줄 접기·정렬 ───────────────────────────────────────────
+// 컴포넌트가 아니라 여기 두는 이유: 어느 칩이 보이는지는 순수 계산이고, 그래야 테스트가 잡는다.
+
+const nrm = (s: string): string =>
+  String(s ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+/** 검색어와의 일치도 — 완전 0, 접두 1, 부분 2, 무관 3. 라벨과 값 양쪽을 본다. */
+function chipScore(o: ChipOption, q: string): number {
+  const t = [nrm(optionLabel(o)), nrm(optionValue(o))];
+  if (t.some((x) => x === q)) return 0;
+  if (t.some((x) => x.startsWith(q))) return 1;
+  if (t.some((x) => x.includes(q))) return 2;
+  return 3;
+}
+
+/**
+ * 접힌 칩 줄에 무엇이 보이는가.
+ *
+ * 두 가지를 함께 한다.
+ *  1. **일치도 정렬** — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다. 칩과 datalist가 같은
+ *     풀을 쓰는데, 지금까지는 타이핑이 datalist만 좁히고 칩 줄은 그대로여서 둘이 따로 놀았다.
+ *     같은 점수끼리는 원래 순서를 지킨다(Array.sort가 안정 정렬이다).
+ *  2. **자리 배분** — limit는 접었을 때 보일 칩의 **총량**이다. 고정 노출(pin)과 현재 값은 그 안에서
+ *     자리를 먼저 가져가고, 남는 만큼만 앞에서 채운다. pin을 예산 밖의 덤으로 두면 줄 수가 늘어
+ *     limit를 내린 의미가 없어진다.
+ *
+ * 감춘 개수는 **언제나 접힌 상태 기준**이다 — 펼친 뒤 다시 세면 0이 되어 버튼이 사라지고,
+ * 그러면 되돌아갈 길이 없어진다.
+ */
+export function visibleChips(
+  options: readonly ChipOption[],
+  opts: { limit?: number; pin?: string; value?: string; expanded?: boolean } = {},
+): { shown: readonly ChipOption[]; hiddenCount: number } {
+  const q = nrm(opts.value ?? "");
+  const ranked = q ? [...options].sort((a, b) => chipScore(a, q) - chipScore(b, q)) : options;
+
+  if (!opts.limit) return { shown: ranked, hiddenCount: 0 };
+
+  const cur = (opts.value ?? "").trim();
+  const isForced = (o: ChipOption) => optionValue(o) === opts.pin || optionValue(o) === cur;
+  const forced = ranked.filter(isForced);
+  const room = Math.max(0, opts.limit - forced.length);
+  const keep = new Set([...forced, ...ranked.filter((o) => !isForced(o)).slice(0, room)]);
+  const collapsed = ranked.filter((o) => keep.has(o)); // 정렬된 순서를 그대로 지킨다
+
+  return {
+    shown: opts.expanded ? ranked : collapsed,
+    hiddenCount: options.length - collapsed.length,
+  };
 }

@@ -234,7 +234,13 @@ export default function ReviewStepper(p: Props) {
                 onPick={pick("ROASTERY")}
               />
             )}
-            <Field label="국가(산지)" required invalid={iv("ORIGIN")} fromAi={ai("ORIGIN")}>
+            <Field
+              label="국가(산지)"
+              required
+              aux="블렌드를 고르면 가공·품종도 함께 채워집니다"
+              invalid={iv("ORIGIN")}
+              fromAi={ai("ORIGIN")}
+            >
               <input
                 type="text"
                 list="dl-origin"
@@ -320,7 +326,7 @@ export default function ReviewStepper(p: Props) {
           <>
             {/* 문자열을 치는 대신 노트를 고른다 — 고른 것은 지울 수 있는 블록이 되고 콤마는
                 저장 형식으로만 남는다. 검색은 영문·한글 양쪽으로 되고 저장값은 영문이다. */}
-            <Field label="플레이버 노트" fromAi={ai("TASTING_NOTE")}>
+            <Field label="플레이버 노트" plain fromAi={ai("TASTING_NOTE")}>
               <FlavorPicker value={p.form.TASTING_NOTE} onChange={(v) => p.updateField("TASTING_NOTE", v)} />
             </Field>
             {/* 검색은 포커스해야 보인다 — 무엇을 고를 수 있는지 한눈에 알리는 자리는 여기다.
@@ -328,7 +334,7 @@ export default function ReviewStepper(p: Props) {
             <SuggestChips
               ariaLabel="자주 쓰는 플레이버 (누르면 추가)"
               options={NOTE_OPTIONS}
-              limit={6}
+              limit={CHIP_LIMIT}
               onPick={(v) => p.updateField("TASTING_NOTE", appendNote(p.form.TASTING_NOTE, v))}
             />
             <Field
@@ -352,6 +358,7 @@ export default function ReviewStepper(p: Props) {
             </Field>
             <SuggestChips
               ariaLabel="용량 추천"
+              limit={CHIP_LIMIT}
               options={WEIGHT_OPTIONS}
               value={p.form.NET_WEIGHT}
               onPick={pick("NET_WEIGHT")}
@@ -367,6 +374,9 @@ export default function ReviewStepper(p: Props) {
               />
             </Field>
             {/* 숫자 목록을 훑는 대신 실제 원두 색으로 고른다 (이슈 #25) */}
+            {/* 여기만 limit을 걸지 않는다. 6칸이면 두 줄인데 4칸으로 줄여도 펼치기 버튼이 붙어
+                여전히 두 줄이라 줄 수는 그대로면서 색 사다리만 잘린다 — 이 줄은 목록이 아니라
+                밝음에서 어두움으로 가는 **한 벌의 척도**라서, 잘리면 고르는 근거가 사라진다. */}
             <SuggestChips
               ariaLabel="로스팅 레벨 추천"
               options={ROASTPOINT_OPTIONS}

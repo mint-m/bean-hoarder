@@ -98,6 +98,7 @@ export default function FlavorPicker({
           ref={inputRef}
           type="text"
           role="combobox"
+          aria-label="향미 검색"
           aria-expanded={open}
           aria-controls={menuId}
           aria-autocomplete="list"

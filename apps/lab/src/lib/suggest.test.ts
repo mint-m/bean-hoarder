@@ -2,7 +2,7 @@
 // 이 함수의 요점은 "채운다"가 아니라 **사용자가 적은 값은 절대 건드리지 않는다**는 쪽이라,
 // 덮어쓰지 않는 경우들을 더 촘촘히 못 박는다.
 import { expect, test } from "vitest";
-import { appendNote, BLEND_VALUE, blendCascade, isBlend } from "./suggest";
+import { appendNote, BLEND_VALUE, blendCascade, isBlend, optionValue, visibleChips } from "./suggest";
 
 const form = (PROCESS = "", VARIETY = "") => ({ PROCESS, VARIETY });
 
@@ -53,4 +53,54 @@ test("노트 덧붙이기는 대소문자를 무시하고 중복을 막는다", 
   expect(appendNote("", "Peach")).toBe("Peach");
   expect(appendNote("Peach", "Bergamot")).toBe("Peach, Bergamot");
   expect(appendNote("Peach, Bergamot", "peach")).toBe("Peach, Bergamot");
+});
+
+// ── 칩 줄 접기·정렬 ───────────────────────────────────────────
+// 375px에서 칩이 두세 줄로 흘러넘쳐 스텝이 칩 벽으로 보이던 자리. 예산 배분과 일치도 정렬을 함께 본다.
+
+const OPTS = ["ETHIOPIA", "COLOMBIA", "KENYA", "BRAZIL", "GUATEMALA", "COSTA RICA", BLEND_VALUE];
+const shownOf = (r: ReturnType<typeof visibleChips>) => r.shown.map(optionValue);
+
+test("접으면 limit개까지만 보이고 나머지 수를 센다", () => {
+  const r = visibleChips(OPTS, { limit: 4 });
+  expect(shownOf(r)).toEqual(["ETHIOPIA", "COLOMBIA", "KENYA", "BRAZIL"]);
+  expect(r.hiddenCount).toBe(3);
+});
+
+// pin을 예산 밖의 덤으로 두면 줄 수가 늘어 limit를 내린 의미가 없어진다.
+test("고정 노출(pin)은 limit 안에서 자리를 먼저 가져간다", () => {
+  const r = visibleChips(OPTS, { limit: 4, pin: BLEND_VALUE });
+  expect(shownOf(r)).toEqual(["ETHIOPIA", "COLOMBIA", "KENYA", BLEND_VALUE]);
+  expect(r.shown.length).toBe(4);
+  expect(r.hiddenCount).toBe(3);
+});
+
+test("현재 값도 뒤쪽 칩이면 함께 끌어올린다", () => {
+  const r = visibleChips(OPTS, { limit: 4, value: "GUATEMALA" });
+  expect(shownOf(r).includes("GUATEMALA")).toBe(true);
+  expect(r.shown.length).toBe(4);
+});
+
+test("칸에 친 글자와 맞는 칩이 앞으로 올라온다", () => {
+  expect(shownOf(visibleChips(OPTS, { limit: 4, value: "co" })).slice(0, 2)).toEqual([
+    "COLOMBIA",
+    "COSTA RICA",
+  ]);
+  // 완전 일치가 접두보다 앞선다
+  expect(shownOf(visibleChips(OPTS, { limit: 4, value: "KENYA" }))[0]).toBe("KENYA");
+  // 같은 점수끼리는 원래 순서를 지킨다
+  expect(shownOf(visibleChips(OPTS, { limit: 3, value: "zzz" }))).toEqual(["ETHIOPIA", "COLOMBIA", "KENYA"]);
+});
+
+// 펼친 뒤 감춘 개수를 다시 세면 0이 되어 버튼이 사라지고, 되돌아갈 길이 없어진다.
+test("감춘 개수는 펼친 뒤에도 접힌 상태 기준으로 남는다", () => {
+  const r = visibleChips(OPTS, { limit: 4, expanded: true });
+  expect(r.shown.length).toBe(OPTS.length);
+  expect(r.hiddenCount).toBe(3);
+});
+
+test("limit이 없으면 전부 보인다", () => {
+  const r = visibleChips(OPTS, {});
+  expect(r.shown.length).toBe(OPTS.length);
+  expect(r.hiddenCount).toBe(0);
 });
