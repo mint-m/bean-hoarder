@@ -1,9 +1,9 @@
 // 폼 공용 부품 — 필드 래퍼와 추천 칩, 날짜 스테퍼.
 // 검증 스텝(ReviewStepper)이 필드마다 같은 결(라벨·필수·AI 채움 표시·추천 칩)을 반복하므로
 // 그 반복을 여기 한 곳에 두고, 스텝 쪽은 "무엇을 묻는가"만 적게 한다.
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isoOffset, shiftIso } from "../lib/format";
-import { type ChipOption, optionLabel, optionValue, visibleChips } from "../lib/suggest";
+import { type ChipOption, fitChipCount, optionLabel, optionValue, visibleChips } from "../lib/suggest";
 
 export function Field({
   label,
@@ -132,18 +132,96 @@ export function SuggestChips({
   renderChip?: (o: ChipOption) => ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  // 무엇이 보이고 몇 개가 감춰졌는지는 순수 계산이라 lib/suggest.ts가 맡는다(테스트가 잡는 자리다).
-  const { shown, hiddenCount } = visibleChips(options, { limit, pin, value, expanded });
+  const rowRef = useRef<HTMLFieldSetElement>(null);
+
+  /**
+   * 칩 폭 캐시 — 값 → px.
+   *
+   * 폭은 **검색어와 무관**하다. 타이핑이 바꾸는 것은 순서와 부분집합뿐이라, 한 번 재 두면 그다음은
+   * 계산만으로 끝난다. 이게 중요한 이유: 재려면 후보를 전부 그려야 하는데(display:none인 칩은 폭이
+   * 0이다) 산지 줄은 그 순간 29px에서 236px로 부푼다. 글자를 칠 때마다 그러면 문서 높이가 출렁여,
+   * 브라우저가 포커스된 칸을 따라다니며 스크롤을 다시 잡는다. 그래서 재는 것은 마운트 때 한 번이다.
+   */
+  const widths = useRef(new Map<string, number>());
+  const layout = useRef({ gap: 0, moreWidth: 0, rowWidth: 0 });
+  const [learned, setLearned] = useState(0); // 새로 안 폭이 생기면 올려서 다시 계산하게 한다
+
+  const known = !!layout.current.rowWidth && options.every((o) => widths.current.has(optionValue(o)));
+  // 아직 못 잰 폭이 있으면 후보를 전부 그린다 — 그림만 감추고 자리는 그대로 둔다.
+  const measuring = !!limit && !expanded && !known;
+  const fit = measuring
+    ? undefined
+    : fitChipCount(options, (o) => widths.current.get(optionValue(o)) ?? 0, layout.current, {
+        limit,
+        pin,
+        value,
+      });
+  const { shown, hiddenCount } = visibleChips(options, {
+    limit: measuring ? undefined : (fit ?? limit),
+    pin,
+    value,
+    expanded,
+  });
+
+  // 그려진 칩의 폭을 캐시에 담는다. 페인트 전에 끝내야 부푼 줄이 보이지 않으므로 useLayoutEffect다.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 렌더마다 DOM을 읽어야 해 의존성이 없다
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    let changed = false;
+    for (const el of row.querySelectorAll<HTMLElement>("[data-chip]")) {
+      const w = el.offsetWidth;
+      const key = el.dataset.chip as string;
+      if (w && widths.current.get(key) !== w) {
+        widths.current.set(key, w);
+        changed = true;
+      }
+    }
+    const l = layout.current;
+    const more = row.querySelector<HTMLElement>(".chip-more");
+    const next = {
+      gap: Number.parseFloat(getComputedStyle(row).columnGap) || 0,
+      moreWidth: more?.offsetWidth || l.moreWidth,
+      rowWidth: row.clientWidth,
+    };
+    if (next.gap !== l.gap || next.moreWidth !== l.moreWidth || next.rowWidth !== l.rowWidth) {
+      layout.current = next;
+      changed = true;
+    }
+    if (changed) setLearned((n) => n + 1);
+  });
+
+  // 회전·창 크기로 줄 폭이 바뀌면 들어가는 개수도 달라진다. **폭만 본다** — 높이에도 반응하면
+  // 다 재고 칩이 줄어든 것 자체가 다시 "재라"는 신호가 되어 재기와 접기를 번갈아 반복한다.
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (row.clientWidth === layout.current.rowWidth) return;
+      layout.current = { ...layout.current, rowWidth: row.clientWidth };
+      setLearned((n) => n + 1);
+    });
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, []);
+  void learned; // 다시 계산시키기 위한 상태 — 값 자체는 쓰지 않는다
 
   return (
     // 관련 컨트롤 묶음이라 fieldset — role="group"을 흉내내는 대신 시맨틱 요소를 쓴다
-    <fieldset className="chips-row" aria-label={ariaLabel}>
+    <fieldset
+      ref={rowRef}
+      className="chips-row"
+      aria-label={ariaLabel}
+      // 재는 동안 후보가 전부 보이면 한 줄이 잠깐 부풀어 보인다 — 자리는 지키고 그림만 감춘다
+      style={measuring ? { visibility: "hidden" } : undefined}
+    >
       {shown.map((o) => {
         const val = optionValue(o);
         return (
           <button
             key={optionLabel(o)}
             type="button"
+            data-chip={val}
             className={`chip${value?.trim() === val ? " on" : ""}`}
             onClick={() => onPick(val)}
           >
@@ -151,14 +229,17 @@ export function SuggestChips({
           </button>
         );
       })}
-      {hiddenCount > 0 && (
+      {(hiddenCount > 0 || measuring) && (
         <button
           type="button"
           className="chip chip-more"
           aria-expanded={expanded}
+          // 화면에는 "+16"만 — 이 줄에서 가장 아까운 것이 폭이고, 기호만으로도 뜻이 통한다.
+          // 뜻은 aria-label이 온전히 진다.
+          aria-label={expanded ? "선택지 접기" : `선택지 ${hiddenCount}개 더 보기`}
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? "접기" : `+ ${hiddenCount}개 더`}
+          {expanded ? "접기" : `+${hiddenCount}`}
         </button>
       )}
     </fieldset>

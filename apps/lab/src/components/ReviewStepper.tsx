@@ -374,11 +374,12 @@ export default function ReviewStepper(p: Props) {
               />
             </Field>
             {/* 숫자 목록을 훑는 대신 실제 원두 색으로 고른다 (이슈 #25) */}
-            {/* 여기만 limit을 걸지 않는다. 6칸이면 두 줄인데 4칸으로 줄여도 펼치기 버튼이 붙어
-                여전히 두 줄이라 줄 수는 그대로면서 색 사다리만 잘린다 — 이 줄은 목록이 아니라
-                밝음에서 어두움으로 가는 **한 벌의 척도**라서, 잘리면 고르는 근거가 사라진다. */}
+            {/* 이 줄은 목록이 아니라 밝음에서 어두움으로 가는 한 벌의 척도라 통째로 보이는 편이
+                낫지만, 다른 줄과 어긋나게 두지 않는다 — 접어도 펼치기가 한 번이고, 줄이 들쭉날쭉한
+                쪽이 고르는 일을 더 방해한다. */}
             <SuggestChips
               ariaLabel="로스팅 레벨 추천"
+              limit={CHIP_LIMIT}
               options={ROASTPOINT_OPTIONS}
               value={p.form.AGTRON}
               onPick={pick("AGTRON")}

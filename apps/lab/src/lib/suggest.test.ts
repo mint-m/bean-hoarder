@@ -2,7 +2,15 @@
 // 이 함수의 요점은 "채운다"가 아니라 **사용자가 적은 값은 절대 건드리지 않는다**는 쪽이라,
 // 덮어쓰지 않는 경우들을 더 촘촘히 못 박는다.
 import { expect, test } from "vitest";
-import { appendNote, BLEND_VALUE, blendCascade, isBlend, optionValue, visibleChips } from "./suggest";
+import {
+  appendNote,
+  BLEND_VALUE,
+  blendCascade,
+  fitChipCount,
+  isBlend,
+  optionValue,
+  visibleChips,
+} from "./suggest";
 
 const form = (PROCESS = "", VARIETY = "") => ({ PROCESS, VARIETY });
 
@@ -103,4 +111,63 @@ test("limit이 없으면 전부 보인다", () => {
   const r = visibleChips(OPTS, {});
   expect(r.shown.length).toBe(OPTS.length);
   expect(r.hiddenCount).toBe(0);
+});
+
+// ── 한 줄에 몇 개가 들어가는가 ─────────────────────────────────
+// 개수만으로는 한 줄을 보장할 수 없다 — 로스터리 줄의 SEY와 LEAVES COFFEE가 같은 한 칸을 쓴다.
+const W: Record<string, number> = {
+  ETHIOPIA: 100,
+  COLOMBIA: 100,
+  KENYA: 70,
+  BRAZIL: 80,
+  GUATEMALA: 110,
+  "COSTA RICA": 110,
+  [BLEND_VALUE]: 70,
+};
+const fit = (layout: { rowWidth: number; gap?: number; moreWidth?: number }, opts = {}) =>
+  fitChipCount(
+    OPTS,
+    (o) => W[optionValue(o)] ?? 0,
+    {
+      rowWidth: layout.rowWidth,
+      gap: layout.gap ?? 6,
+      moreWidth: layout.moreWidth ?? 34,
+    },
+    opts,
+  );
+
+test("잰 폭으로 한 줄에 들어가는 개수를 고른다", () => {
+  // 100 + 6+100 + 6+70 = 282, 더보기(6+34) 붙여 322 ≤ 330 → 3개
+  expect(fit({ rowWidth: 330 })).toBe(3);
+  // 폭이 좁아지면 개수도 준다
+  expect(fit({ rowWidth: 200 })).toBe(1);
+});
+
+test("더보기 버튼 자리를 미리 뗀다", () => {
+  // 감출 것이 없으면 그 폭을 뗄 이유가 없다 — 같은 줄 폭에서 하나 더 들어간다
+  const wide = fitChipCount(OPTS.slice(0, 2), (o) => W[optionValue(o)] ?? 0, {
+    rowWidth: 210,
+    gap: 6,
+    moreWidth: 34,
+  });
+  expect(wide).toBe(2);
+});
+
+// 앞에서 k개를 자르는 것과 다르다 — pin이 뒤에서 끌려 올라오면 조합이 통째로 바뀐다.
+test("그 k에서 실제로 보일 조합의 폭으로 잰다", () => {
+  // pin(블렌드 70)이 한 자리를 가져가므로 ETHIOPIA+COLOMBIA+블렌드 = 282, +더보기 = 322
+  expect(fit({ rowWidth: 330 }, { pin: BLEND_VALUE })).toBe(3);
+  expect(visibleChips(OPTS, { limit: 3, pin: BLEND_VALUE }).shown.map(optionValue)).toEqual([
+    "ETHIOPIA",
+    "COLOMBIA",
+    BLEND_VALUE,
+  ]);
+});
+
+test("한 개도 안 들어가도 최소 하나는 보인다", () => {
+  expect(fit({ rowWidth: 10 })).toBe(1);
+});
+
+test("limit이 상한으로 남는다", () => {
+  expect(fit({ rowWidth: 9999, moreWidth: 0 }, { limit: 2 })).toBe(2);
 });

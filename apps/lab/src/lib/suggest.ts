@@ -180,13 +180,20 @@ function chipScore(o: ChipOption, q: string): number {
   return 3;
 }
 
+/** 검색어 일치도로 재정렬 — 같은 점수끼리는 원래 순서를 지킨다(Array.sort가 안정 정렬이다). */
+export function rankChips(options: readonly ChipOption[], value?: string): readonly ChipOption[] {
+  const q = nrm(value ?? "");
+  if (!q) return options;
+  return [...options].sort((a, b) => chipScore(a, q) - chipScore(b, q));
+}
+
 /**
  * 접힌 칩 줄에 무엇이 보이는가.
  *
  * 두 가지를 함께 한다.
- *  1. **일치도 정렬** — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다. 칩과 datalist가 같은
- *     풀을 쓰는데, 지금까지는 타이핑이 datalist만 좁히고 칩 줄은 그대로여서 둘이 따로 놀았다.
- *     같은 점수끼리는 원래 순서를 지킨다(Array.sort가 안정 정렬이다).
+ *  1. **일치도 정렬**(rankChips) — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다. 칩과
+ *     datalist가 같은 풀을 쓰는데, 지금까지는 타이핑이 datalist만 좁히고 칩 줄은 그대로여서
+ *     둘이 따로 놀았다.
  *  2. **자리 배분** — limit는 접었을 때 보일 칩의 **총량**이다. 고정 노출(pin)과 현재 값은 그 안에서
  *     자리를 먼저 가져가고, 남는 만큼만 앞에서 채운다. pin을 예산 밖의 덤으로 두면 줄 수가 늘어
  *     limit를 내린 의미가 없어진다.
@@ -198,8 +205,7 @@ export function visibleChips(
   options: readonly ChipOption[],
   opts: { limit?: number; pin?: string; value?: string; expanded?: boolean } = {},
 ): { shown: readonly ChipOption[]; hiddenCount: number } {
-  const q = nrm(opts.value ?? "");
-  const ranked = q ? [...options].sort((a, b) => chipScore(a, q) - chipScore(b, q)) : options;
+  const ranked = rankChips(options, opts.value);
 
   if (!opts.limit) return { shown: ranked, hiddenCount: 0 };
 
@@ -214,4 +220,33 @@ export function visibleChips(
     shown: opts.expanded ? ranked : collapsed,
     hiddenCount: options.length - collapsed.length,
   };
+}
+
+/**
+ * 한 줄에 들어가는 칩 개수 — 실측한 폭으로 고른다.
+ *
+ * 개수만으로는 한 줄을 보장할 수 없다. 칩 폭이 내용마다 다르기 때문이다 — 로스터리 줄의
+ * `SEY`(48px)와 `LEAVES COFFEE`(140px)가 같은 한 칸을 쓴다. 그래서 개수(limit)는 상한으로만 두고,
+ * 실제로 몇 개가 남는지는 잰 폭으로 정한다.
+ *
+ * k를 1부터 올리며 **그 k에서 실제로 보일 조합**(visibleChips)의 폭을 더한다 — 앞에서 k개를 자르는
+ * 것과 다르다. pin이나 현재 값이 뒤쪽에서 끌려 올라오면 조합이 바뀌고 폭도 바뀌기 때문이다.
+ * 더보기 버튼도 같은 줄에 서야 하므로 감출 것이 남는 동안은 그 폭을 미리 뗀다.
+ */
+export function fitChipCount(
+  options: readonly ChipOption[],
+  widthOf: (o: ChipOption) => number,
+  layout: { rowWidth: number; gap: number; moreWidth: number },
+  opts: { limit?: number; pin?: string; value?: string } = {},
+): number {
+  const max = Math.min(opts.limit ?? options.length, options.length);
+  let best = 1;
+  for (let k = 1; k <= max; k++) {
+    const { shown, hiddenCount } = visibleChips(options, { ...opts, limit: k });
+    let total = shown.reduce((a, o, i) => a + (i ? layout.gap : 0) + widthOf(o), 0);
+    if (hiddenCount > 0) total += layout.gap + layout.moreWidth;
+    if (total > layout.rowWidth) break;
+    best = k;
+  }
+  return best;
 }
