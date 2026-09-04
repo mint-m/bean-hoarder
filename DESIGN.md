@@ -84,25 +84,32 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
 ### 향미 — 무드 그라데이션
 - 테이스팅 노트(`TASTING_NOTE`, 콤마/`·` 구분 자유입력)를 분해 → **향미 계열**로 판정 → 검출된 계열 색을
   조합한 `linear-gradient`.
-- **향미 계열 → 무드색 방향** (기준표):
+- **향미 계열 → 무드색 방향** (기준표, hue는 OKLCH):
 
-  | 계열 | 예시 키워드 | 무드색 |
-  |---|---|---|
-  | 베리·붉은과일 | berry, strawberry, cherry, grape | 레드·마젠타 |
-  | 시트러스 | citrus, lemon, orange, bergamot | 오렌지·옐로 |
-  | 열대과일 | tropical, mango, pineapple, passion | 앰버·골드 |
-  | 플로럴 | floral, jasmine, rose, lavender | 핑크·바이올렛 |
-  | 초콜릿·카카오 | chocolate, cocoa | 딥 브라운 |
-  | 넛티·캐러멜 | nutty, almond, caramel, brown sugar | 탠·앰버 |
-  | 스파이스·허브 | spice, cinnamon, herbal, black tea | 웜 브라운·올리브 |
-  | 스톤·그린 | green apple, peach, apricot, melon | 옐로그린 |
-  | 와이니·발효 | winey, boozy, fermented | 딥 퍼플레드 |
-  | (매칭 없음) | — | 중립 커피 그라데이션(웜 브라운) |
+  | 계열 | 예시 키워드 | 무드색 | hue |
+  |---|---|---|---|
+  | 베리·붉은과일 | berry, strawberry, cherry, grape | 레드 | 18 |
+  | 초콜릿·카카오 | chocolate, cocoa | 딥 브라운 (저채도·저명도) | 42 |
+  | 넛티·캐러멜 | nutty, almond, caramel, brown sugar | 탠 (저채도·고명도) | 65 |
+  | 열대과일 | tropical, mango, pineapple, passion | 앰버·골드 | 85 |
+  | 시트러스 | citrus, lemon, orange, bergamot | 옐로 | 105 |
+  | 스톤·그린 | green apple, peach, apricot, melon | 그린 | 148 |
+  | 스파이스·허브·차 | spice, cinnamon, herbal, black tea, cedar | 틸 | 190 |
+  | 플로럴 | floral, jasmine, rose, lavender | 라일락 | 305 |
+  | 와이니·발효 | winey, boozy, fermented | 딥 퍼플레드 | 345 |
+  | (매칭 없음) | — | 중립 커피 그라데이션(웜 브라운) | 60 |
+
+  **계열끼리 서로 밀어내는 것이 이 표의 요점이다.** 처음에는 시트러스와 넛티가 같은 hue(70)를 썼고
+  초콜릿·열대·스파이스·스톤그린까지 55~125의 좁은 노란 구간에 몰려 있어, 카드를 늘어놓으면 띠가 다
+  비슷한 누런 워시로 보였다 — 색이 원두를 구별해 주지 못하면 이 장치는 장식일 뿐이다. 비어 있던
+  초록~보라 구간으로 차·허브(틸)와 꽃(라일락)을 옮겨 간격을 벌렸고, hue가 가까울 수밖에 없는 따뜻한
+  과일·견과 구간은 **채도와 명도로 한 번 더 가른다**(초콜릿은 어둡고 탁하게, 넛티는 밝고 탁하게).
 
 - **조합 규칙**: 검출된 계열의 대표색을 등장 순서대로 2~3색까지 그라데이션으로. 단일 계열이면 그 색의
   명도 두 단계로. 매칭이 없으면 중립 커피 그라데이션.
 - **제약**: **저채도·저알파**로 얹어 본문 가시성(#32)을 해치지 않는다 — 텍스트 뒤 은은한 워시로,
-  콘텐츠 대비를 항상 우선한다.
+  콘텐츠 대비를 항상 우선한다. 다만 알파가 지나치게 낮으면 벌려 둔 hue가 회색빛 한 겹으로 뭉개져
+  구별이라는 목적 자체가 사라지므로, 계열이 읽히는 선(라이트 0.19 / 다크 0.26)까지는 올린다.
 - **적용**: 그라데이션은 **구조적 자리**에만 얹는다 — 상세 카드의 아이덴티티 밴드(§7)와 덱 카드의
   피크 밴드(§7). 본문·스텁 영역에는 얹지 않는다.
 
@@ -121,7 +128,8 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
 > (`originSignature` · `flavorGradient` · `matchFlavorFamilies`), 로스팅 레벨은
 > [packages/schema/src/roast.ts](packages/schema/src/roast.ts). 규칙의 단일 소스는 이 문서 —
 > 계열표를 바꾸면 코드도 함께 고친다. 반대로 **향미 어휘**(`@bnhd/schema/flavor`)에 노트를 더할 때는
-> 계열 정규식에 걸리는지 `apps/web/src/lib/flavor-coverage.test.ts`가 전수로 검사한다.
+> 계열 정규식에 걸리는지 `apps/web/src/lib/flavor-coverage.test.ts`가 전수로 검사한다 — 같은 파일이
+> 계열끼리 hue가 겹치지 않는지도 함께 지킨다(위 표의 "서로 밀어낸다"가 코드에서 유지되는 근거).
 
 ## 4. 타이포그래피
 

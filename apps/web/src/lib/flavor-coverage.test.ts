@@ -20,3 +20,31 @@ test("어휘에 중복된 저장값이 없다", () => {
   const seen = FLAVOR_NOTES.map((n) => n.en.toLowerCase());
   expect(seen.length).toBe(new Set(seen).size);
 });
+
+// 위 전수 검사는 "계열이 하나라도 걸리는가"만 본다. 그래서 Nutmeg이 `nut`에 걸려 견과류 색을
+// 쓰는 동안에도 통과했다. 다른 계열의 키워드를 부분 문자열로 품은 노트만 여기서 못박는다 —
+// 어휘 전체의 정답표를 손으로 유지하는 대신, 실제로 걸려 넘어진 자리만 남긴다.
+test("다른 계열의 키워드를 품은 노트가 제 계열로 간다", () => {
+  const first = (note: string) => matchFlavorFamilies(note)[0]?.name;
+  expect(first("Nutmeg")).toBe("spice"); // `nut`(견과류)을 앞에 품는다
+  expect(first("육두구")).toBe("spice");
+  expect(first("Grapefruit")).toBe("citrus"); // `grape`(베리)를 앞에 품는다
+  expect(first("Hazelnut")).toBe("nutty"); // 반대로 여기서는 `nut`이 제 계열이어야 한다
+  expect(first("Peanut")).toBe("nutty");
+});
+
+test("계열마다 색이 다르다 — 같은 hue를 쓰는 계열이 없다", () => {
+  // citrus와 nutty가 같은 hue 70을 쓰던 시절이 있었다. 그러면 카드 띠만 봐선 두 결이 구분되지 않는다.
+  const hues = FLAVOR_NOTES.map((n) => matchFlavorFamilies(n.en)[0])
+    .filter((f) => f !== undefined)
+    .map((f) => `${f.name}:${f.hue}`);
+  const byHue = new Map<number, Set<string>>();
+  for (const entry of new Set(hues)) {
+    const [name, hue] = entry.split(":") as [string, string];
+    const set = byHue.get(Number(hue)) ?? new Set<string>();
+    set.add(name);
+    byHue.set(Number(hue), set);
+  }
+  const collisions = [...byHue.entries()].filter(([, names]) => names.size > 1);
+  expect(collisions).toEqual([]);
+});
