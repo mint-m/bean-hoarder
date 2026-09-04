@@ -16,10 +16,12 @@ concurrency:
   group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
-# PR 코멘트는 issues API를 쓰지만 PR 대상이면 pull-requests:write로 충분하다 (issues:write 불필요).
+# pull-requests:write — 리뷰와 인라인 코멘트 등록.
+# issues:write      — 호출 코멘트에 👀 반응을 남기는 데 필요하다(반응 API는 issues 쪽이다).
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   review:
@@ -53,4 +55,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          # 코멘트로 부른 경우에만 채워진다 — 그 코멘트에 👀를 달아 접수를 알린다.
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
         run: node .github/scripts/ai-review.mjs

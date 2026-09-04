@@ -5,11 +5,70 @@
 // 1. GitHub API를 통해 PR 메타데이터와 diff를 가져온다.
 // 2. CLAUDE.md 원문을 규칙으로 주입한 프롬프트로 Gemini API를 호출한다(모델 동적 선택 · flash 우선).
 //    출력은 responseSchema로 강제한 구조화 JSON(판정·요약·강점·findings)을 받는다.
-// 3. 구조화 결과를 마크다운으로 렌더해 PR 코멘트로 등록하거나 기존 코멘트를 갱신한다(파싱 실패 시 원문 폴백).
+// 3. findings를 **파일·줄에 붙는 인라인 코멘트**로, 요약을 리뷰 본문으로 올린다(PR 리뷰 API).
+//    이미 올린 지적은 지문(fingerprint)으로 걸러 다시 올리지 않는다 — 매번 같은 말을 반복하면
+//    조치한 지적과 새 지적이 뒤섞여 읽을 수 없게 된다.
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const BOT_SIGNATURE = "<!-- ai-pr-review-bot -->";
+/** 지적 하나의 지문 — 이미 올린 것을 다시 올리지 않으려고 코멘트 본문에 숨겨 둔다 */
+const FINDING_TAG = (sig) => `<!-- ai-finding:${sig} -->`;
+const FINDING_TAG_RE = /<!-- ai-finding:([0-9a-f]{12}) -->/g;
+
+/**
+ * 지적의 동일성 판단 기준 — 파일·줄·분류.
+ *
+ * 설명 문구는 넣지 않는다. 같은 문제라도 실행할 때마다 표현이 조금씩 달라지는데, 문구까지 지문에
+ * 넣으면 같은 지적이 매번 새것으로 잡혀 걸러지지 않는다. 줄이 바뀌면 다시 올라오는데, 그건 코드가
+ * 실제로 움직였다는 뜻이라 다시 보는 편이 맞다.
+ */
+function fingerprint(f) {
+  return createHash("sha1")
+    .update(`${f.file || ""}|${f.line ?? ""}|${f.category || ""}`)
+    .digest("hex")
+    .slice(0, 12);
+}
+
+/**
+ * diff에서 **오른쪽(변경 후) 파일의 몇 번째 줄이 코멘트를 받을 수 있는지** 뽑는다.
+ *
+ * 인라인 코멘트는 그 커밋의 diff에 실제로 등장하는 줄에만 달 수 있다. 모델이 짐작한 줄 번호를
+ * 그대로 보내면 422가 나는데, 리뷰 API는 **코멘트 하나가 틀리면 리뷰 전체를 거절한다.** 그래서
+ * 보내기 전에 여기서 거른다. 추가된 줄(+)만 담는다 — 문맥 줄에도 달 수는 있지만, 이 PR이 바꾸지
+ * 않은 자리에 지적을 붙이면 무엇을 고치라는 말인지 흐려진다.
+ */
+function diffLineMap(diff) {
+  const map = new Map();
+  let path = null;
+  let newLine = 0;
+  for (const raw of diff.split("\n")) {
+    if (raw.startsWith("diff --git ")) {
+      path = (raw.match(/ b\/(.+)$/) || [])[1] || null;
+      continue;
+    }
+    const plus = raw.match(/^\+\+\+ b\/(.+)$/);
+    if (plus) {
+      path = plus[1];
+      continue;
+    }
+    const hunk = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      newLine = Number(hunk[1]);
+      continue;
+    }
+    if (!path) continue;
+    if (raw.startsWith("+")) {
+      if (!map.has(path)) map.set(path, new Set());
+      map.get(path).add(newLine);
+      newLine += 1;
+    } else if (raw.startsWith(" ")) {
+      newLine += 1;
+    }
+  }
+  return map;
+}
 
 /**
  * 프로젝트 규칙 — CLAUDE.md를 그대로 싣는다.
@@ -79,12 +138,26 @@ const REVIEW_SCHEMA = {
   propertyOrdering: ["summary", "findings", "strengths", "verdict"],
 };
 
-/** 구조화 리뷰 객체 → PR 코멘트 마크다운. 심각도순 정렬 + 집계 한 줄. */
-function renderReview(review) {
+/** 인라인 코멘트 본문 — 심각도 배지 + 설명 + 제안. 끝에 지문을 숨겨 다음 실행이 알아본다. */
+function renderFinding(f) {
+  const out = [`**${SEV_LABEL[f.severity] || f.severity || ""}** · _${f.category || "review"}_`];
+  out.push(f.description || "");
+  if (f.suggestion) out.push(`\n> 제안: ${f.suggestion}`);
+  out.push(`\n${FINDING_TAG(fingerprint(f))}`);
+  return out.join("\n");
+}
+
+/**
+ * 리뷰 본문 — 요약·판정·집계, 그리고 줄에 붙이지 못한 지적.
+ *
+ * 지적 대부분은 인라인으로 가므로 본문은 짧다. 여기 남는 것은 (1) 파일 전체에 걸린 이야기나
+ * 모델이 이 PR의 diff에 없는 줄을 짚어 인라인으로 달 수 없던 것, (2) 이번에 새로 나온 게 없다는 사실.
+ */
+function renderBody(review, { inlineCount, unanchored, dupCount, skippedFiles }) {
   const findings = Array.isArray(review.findings) ? review.findings : [];
-  const tally = SEV_ORDER.map((s) => {
-    const n = findings.filter((f) => f.severity === s).length;
-    return n ? `${SEV_LABEL[s]} ${n}` : null;
+  const tally = SEV_ORDER.map((sev) => {
+    const n = findings.filter((f) => f.severity === sev).length;
+    return n ? `${SEV_LABEL[sev]} ${n}` : null;
   }).filter(Boolean);
 
   const out = [`**판정: ${VERDICT_LABEL[review.verdict] || review.verdict || "—"}**`];
@@ -93,22 +166,29 @@ function renderReview(review) {
 
   if (Array.isArray(review.strengths) && review.strengths.length) {
     out.push("\n#### 잘된 점");
-    out.push(review.strengths.map((s) => `- ${s}`).join("\n"));
+    out.push(review.strengths.map((x) => `- ${x}`).join("\n"));
   }
 
   out.push("\n#### 개선 제안 및 주의사항");
-  if (!findings.length) {
-    out.push("특이사항 없음.");
-  } else {
-    const sorted = [...findings].sort(
-      (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity),
-    );
-    for (const f of sorted) {
+  const bits = [];
+  if (inlineCount) bits.push(`새 지적 **${inlineCount}건**을 해당 줄에 코멘트로 달았습니다`);
+  // 이미 올린 것을 다시 올리지 않는다는 사실은 밝혀 둔다 — 안 그러면 "왜 아까 그 지적이 없지?"가 된다
+  if (dupCount) bits.push(`이미 올린 ${dupCount}건은 생략했습니다`);
+  if (bits.length) out.push(`${bits.join(" · ")}.`);
+  else if (!unanchored.length) out.push("이번 실행에서 새로 발견한 것은 없습니다.");
+
+  if (unanchored.length) {
+    out.push("\n줄에 붙이지 못한 지적 (이 PR의 diff 밖이거나 파일 전체에 걸린 것):");
+    for (const f of unanchored) {
       const loc = f.line != null ? `\`${f.file}:${f.line}\`` : `\`${f.file || "?"}\``;
-      const cat = f.category ? ` · _${f.category}_` : "";
-      out.push(`\n**${SEV_LABEL[f.severity] || f.severity || ""}** ${loc}${cat}\n${f.description || ""}`);
+      out.push(`\n**${SEV_LABEL[f.severity] || f.severity || ""}** ${loc} · _${f.category || "review"}_\n${f.description || ""}`);
       if (f.suggestion) out.push(`> 제안: ${f.suggestion}`);
+      out.push(FINDING_TAG(fingerprint(f)));
     }
+  }
+
+  if (skippedFiles.length) {
+    out.push(`\n> ⚠️ 토큰 한도로 **검토하지 못한 파일**: ${skippedFiles.join(", ")}`);
   }
   return out.join("\n");
 }
@@ -135,25 +215,41 @@ async function main() {
 
   console.log(`🔍 PR #${prNumber} (${repo}) 리뷰 준비 중...`);
 
+  /** GitHub API 호출 — 헤더가 매번 같아 한 곳에 모은다. */
+  const gh = (url, init = {}) =>
+    fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "bean-hoarder-ai-reviewer",
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(init.headers || {}),
+      },
+    });
+
+  // 부른 코멘트에 👀를 달아 "접수됨"을 먼저 알린다. 리뷰 자체는 몇 분 걸리는데 그동안 아무 신호가
+  // 없으면 명령이 먹었는지 알 수 없다. 실패해도 리뷰는 계속한다 — 어디까지나 신호일 뿐이다.
+  const triggerCommentId = process.env.TRIGGER_COMMENT_ID;
+  if (triggerCommentId) {
+    const r = await gh(`https://api.github.com/repos/${repo}/issues/comments/${triggerCommentId}/reactions`, {
+      method: "POST",
+      body: JSON.stringify({ content: "eyes" }),
+    });
+    console.log(r.ok ? "👀 호출 코멘트에 반응을 남겼습니다." : `⚠️ 반응 남기기 실패(${r.status}) — 리뷰는 계속합니다.`);
+  }
+
   // 1. PR 메타데이터 및 diff 수집
-  const prRes = await fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
-    headers: {
-      Authorization: `Bearer ${githubToken}`,
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "bean-hoarder-ai-reviewer",
-    },
-  });
+  const prRes = await gh(`https://api.github.com/repos/${repo}/pulls/${prNumber}`);
   if (!prRes.ok) {
     throw new Error(`PR 메타데이터 조회 실패: ${prRes.status} ${await prRes.text()}`);
   }
   const prData = await prRes.json();
+  // 인라인 코멘트는 특정 커밋의 diff에 붙는다 — 리뷰를 올리는 시점의 head를 기준으로 삼는다.
+  const headSha = prData.head?.sha || "";
 
-  const diffRes = await fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
-    headers: {
-      Authorization: `Bearer ${githubToken}`,
-      Accept: "application/vnd.github.v3.diff",
-      "User-Agent": "bean-hoarder-ai-reviewer",
-    },
+  const diffRes = await gh(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, {
+    headers: { Accept: "application/vnd.github.v3.diff" },
   });
   if (!diffRes.ok) {
     throw new Error(`PR diff 조회 실패: ${diffRes.status} ${await diffRes.text()}`);
@@ -284,7 +380,11 @@ ${cleanDiff}
   **찾지 못한 것과 없는 것은 다르다** — summary에 무엇을 확인했는지 한 문장으로 남긴다.
 - 특히 위 규칙 문서의 "절대 바꾸지 말 것"·"걸려 넘어지기 쉬운 것"에 걸리는 변경이 있는지 본다.
 
-설명은 친절하고 전문적인 한국어로 작성한다.`;
+## 출력 언어
+분석과 추론은 영어로 해도 좋다 — 코드를 따지는 일은 그쪽이 편하면 그렇게 한다. 다만 **출력 JSON에
+담기는 모든 문자열(summary·strengths·description·suggestion)은 한국어로 쓴다.** 그 값이 그대로 PR
+코멘트가 되어 사람이 읽는다. 코드 식별자·파일 경로·API 이름·원문 에러 메시지는 번역하지 않고 그대로 둔다.
+문체는 친절하고 전문적으로.`;
 
   // targetModel 먼저, 이후 flash > pro 순 폴백 — 하나가 5xx/429여도 다음으로 넘어간다.
   const candidateModels = [
@@ -351,74 +451,84 @@ ${cleanDiff}
     throw new Error("Gemini로부터 응답 텍스트를 받지 못했습니다.");
   }
 
-  // responseSchema로 강제한 JSON을 파싱해 렌더한다. 스키마가 깨진 응답(구형 모델 등)은 원문 그대로 싣는다.
-  let reviewMarkdown = reviewText;
+  // responseSchema로 강제한 JSON을 파싱한다. 스키마가 깨진 응답(구형 모델 등)은 원문 그대로 싣는다.
+  let review = null;
   try {
-    reviewMarkdown = renderReview(JSON.parse(reviewText));
+    review = JSON.parse(reviewText);
   } catch (_e) {
     console.warn("⚠️ 구조화 응답 파싱 실패 — 원문을 그대로 싣습니다.");
   }
 
-  const commentBody = `${BOT_SIGNATURE}
+  // ── 3. 이미 올린 지적을 걷어낸다 ───────────────────────────────
+  // 예전에는 봇 코멘트 하나를 계속 덮어썼다. 그러면 (1) 이미 조치한 지적 위에 새 내용이 덮여
+  // 무엇이 처리됐는지 알 수 없고, (2) 수정된 코멘트는 스레드 아래로 오지 않아 부른 사람 눈에
+  // 아무 일도 안 일어난 것처럼 보인다. 이제는 매번 새 리뷰를 올리되 **중복만 걸러낸다.**
+  const seen = new Set();
+  for (const url of [
+    `https://api.github.com/repos/${repo}/pulls/${prNumber}/comments?per_page=100`,
+    `https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`,
+  ]) {
+    const res = await gh(url);
+    if (!res.ok) continue;
+    for (const item of await res.json()) {
+      for (const m of String(item.body || "").matchAll(FINDING_TAG_RE)) seen.add(m[1]);
+    }
+  }
+
+  const allFindings = Array.isArray(review?.findings) ? review.findings : [];
+  const fresh = allFindings.filter((f) => !seen.has(fingerprint(f)));
+  const dupCount = allFindings.length - fresh.length;
+
+  // 인라인으로 달 수 있는 것만 고른다 — 코멘트 하나가 틀리면 리뷰 전체가 422로 거절된다.
+  const lineMap = diffLineMap(diff);
+  const inline = [];
+  const unanchored = [];
+  for (const f of fresh) {
+    if (f.line != null && lineMap.get(f.file)?.has(Number(f.line))) {
+      inline.push({ path: f.file, line: Number(f.line), side: "RIGHT", body: renderFinding(f) });
+    } else {
+      unanchored.push(f);
+    }
+  }
+  console.log(`🧾 지적 ${allFindings.length}건 — 새것 ${fresh.length} (인라인 ${inline.length} · 본문 ${unanchored.length}) · 중복 ${dupCount}`);
+
+  const body = `${BOT_SIGNATURE}
 ### 🤖 Gemini AI Automated PR Review
 
-${reviewMarkdown}
+${review ? renderBody(review, { inlineCount: inline.length, unanchored, dupCount, skippedFiles: skipped }) : reviewText}
 
 ---
-*이 리뷰는 GitHub Actions 워크플로를 통해 \`${targetModel}\` 모델로 자동 생성되었습니다.*`;
+*\`${targetModel}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC · 대상 커밋 \`${headSha.slice(0, 7)}\`*`;
 
-  // 3. 기존 코멘트 검색 후 갱신(Update) 또는 신규 등록(Create)
-  console.log("💬 PR 코멘트 등록/갱신 중...");
-  // per_page=100: 봇의 기존 코멘트가 첫 페이지(기본 30개) 밖으로 밀려 중복 생성되는 것을 줄인다.
-  const commentsRes = await fetch(
-    `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=100`,
-    {
-      headers: {
-        Authorization: `Bearer ${githubToken}`,
-        Accept: "application/vnd.github.v3+json",
-        "User-Agent": "bean-hoarder-ai-reviewer",
-      },
-    },
-  );
+  // ── 4. 리뷰 등록 ───────────────────────────────────────────────
+  // event는 언제나 COMMENT다. 봇이 APPROVE를 남기면 사람 리뷰를 대신해 버리고,
+  // REQUEST_CHANGES는 병합을 막는다 — 판정은 코멘트로 말하고 결정은 사람이 한다.
+  console.log("💬 PR 리뷰 등록 중...");
+  let postRes = await gh(`https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews`, {
+    method: "POST",
+    body: JSON.stringify({ commit_id: headSha, event: "COMMENT", body, comments: inline }),
+  });
 
-  let existingCommentId = null;
-  if (commentsRes.ok) {
-    const comments = await commentsRes.json();
-    const botComment = comments.find((c) => c.body?.includes(BOT_SIGNATURE));
-    if (botComment) existingCommentId = botComment.id;
-  }
-
-  if (existingCommentId) {
-    const updateRes = await fetch(`https://api.github.com/repos/${repo}/issues/comments/${existingCommentId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${githubToken}`,
-        Accept: "application/vnd.github.v3+json",
-        "User-Agent": "bean-hoarder-ai-reviewer",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ body: commentBody }),
+  // 줄 위치가 틀려 거절되면 인라인을 포기하고 본문만이라도 남긴다 — 리뷰를 통째로 잃지 않는다.
+  if (!postRes.ok && inline.length) {
+    console.warn(`⚠️ 인라인 코멘트가 거절돼(${postRes.status}) 본문만 등록합니다: ${await postRes.text()}`);
+    const merged = renderBody(review, {
+      inlineCount: 0,
+      unanchored: fresh,
+      dupCount,
+      skippedFiles: skipped,
     });
-    if (!updateRes.ok) {
-      throw new Error(`코멘트 수정 실패: ${updateRes.status} ${await updateRes.text()}`);
-    }
-    console.log(`✅ 기존 리뷰 코멘트(#${existingCommentId})가 성공적으로 갱신되었습니다.`);
-  } else {
-    const createRes = await fetch(`https://api.github.com/repos/${repo}/issues/${prNumber}/comments`, {
+    postRes = await gh(`https://api.github.com/repos/${repo}/pulls/${prNumber}/reviews`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${githubToken}`,
-        Accept: "application/vnd.github.v3+json",
-        "User-Agent": "bean-hoarder-ai-reviewer",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ body: commentBody }),
+      body: JSON.stringify({
+        commit_id: headSha,
+        event: "COMMENT",
+        body: body.replace(/(?<=Review\n\n)[\s\S]*(?=\n\n---)/, merged),
+      }),
     });
-    if (!createRes.ok) {
-      throw new Error(`코멘트 생성 실패: ${createRes.status} ${await createRes.text()}`);
-    }
-    console.log("✅ 새로운 리뷰 코멘트가 성공적으로 등록되었습니다.");
   }
+  if (!postRes.ok) throw new Error(`리뷰 등록 실패: ${postRes.status} ${await postRes.text()}`);
+  console.log("✅ 리뷰를 등록했습니다.");
 }
 
 main().catch((err) => {
