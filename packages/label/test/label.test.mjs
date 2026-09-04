@@ -74,7 +74,7 @@ for (const size of Object.keys(SIZE_SPECS)) {
   });
 }
 
-test("50x60(세로형): QR이 우측·하단에 배치, 로스팅일·패키징일은 좌측에 배치", () => {
+test("50x60(세로형): QR이 우측·하단에 배치, 로스팅일·소분일은 좌측에 배치", () => {
   const { svg } = buildLabelSVG(ROW, designFor("50x60"));
   const S = SIZE_SPECS["50x60"];
   const module = S.qrDots * 0.125;
@@ -97,7 +97,7 @@ test("빈 옵션 필드는 라벨에서 생략, 긴 텍스트는 말줄임", () 
   assert.ok(!svg.includes("NET")); // 스펙 값 없음 → 셀 생략 (옵션 스펙만 해당)
   assert.ok(
     svg.includes("RSTD") && svg.includes("PKGD"),
-    "로스팅일·패키징일은 필수 정보라 값이 비어도 고정 푸터 라벨은 항상 인쇄된다",
+    "로스팅일·소분일은 필수 정보라 값이 비어도 고정 푸터 라벨은 항상 인쇄된다",
   );
   const long = buildLabelSVG(
     Object.assign({}, ROW, {
@@ -122,6 +122,42 @@ test("스펙 값이 칸 절반 폭을 넘으면 말줄임 대신 전체 폭 단�
     "가공방식이 잘리지 않고 줄바꿈되어 전부 인쇄됨",
   );
   assert.ok(!svg.includes("…"), "말줄임 없음");
+});
+
+// specVal이 stripParen에서 displayValue로 바뀌면서 가공·품종의 괄호가 살아남게 됐다. 값이
+// 길어진 만큼 폭 계산(layoutSpecRows·specValueMax)을 실제로 통과하는지가 이 변화의 진짜 관심사다 —
+// displayValue 자체의 단위 테스트(headline.test.ts)는 그 경로를 밟지 않는다.
+test("스펙: 가공·품종의 괄호는 정보라 인쇄에 남고, 길어져도 말줄임 대신 줄바꿈으로 실린다", () => {
+  const d = designFor("50x30");
+  d.subFields = [];
+  d.specFields = ["PROCESS", "VARIETY"];
+  const { svg } = buildLabelSVG(
+    Object.assign({}, ROW, {
+      REGION: "",
+      PROCESS: "Anaerobic (72h)",
+      VARIETY: "Sewda (Micro)",
+    }),
+    d,
+  );
+  assert.ok(svg.includes("Anaerobic (72h)"), "가공방식의 괄호가 인쇄에 남는다");
+  assert.ok(svg.includes("Sewda (Micro)"), "품종의 괄호가 인쇄에 남는다");
+  assert.ok(!svg.includes("…"), "괄호가 붙어도 말줄임되지 않는다");
+});
+
+test("스펙: 블렌드만 괄호 설명을 떼고 인쇄한다 (같은 카드에 '혼합' 문구가 겹쳐 뜨지 않게)", () => {
+  const d = designFor("50x30");
+  d.subFields = [];
+  d.specFields = ["PROCESS", "VARIETY"];
+  const { svg } = buildLabelSVG(
+    Object.assign({}, ROW, {
+      REGION: "",
+      PROCESS: "블렌드 (여러 가공방식 혼합)",
+      VARIETY: "블렌드 (여러 품종 혼합)",
+    }),
+    d,
+  );
+  assert.ok(!svg.includes("혼합"), "괄호 속 설명은 라벨에 인쇄되지 않는다");
+  assert.ok(svg.includes("블렌드"), "값 자체는 남는다");
 });
 
 test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮은(나중 선택) 항목부터 자동으로 줄인다", () => {
@@ -215,7 +251,7 @@ test("DEFAULT_DESIGN 기본값은 흑백(mono) — 2도 인쇄를 지원하지 �
   assert.equal(DEFAULT_DESIGN.colorMode, "mono");
 });
 
-test("50x60(세로형): 로스팅일·패키징일이 QR 옆(좌측)에 한 줄로 촘촘하게 배치되고 QR·라벨 영역을 벗어나지 않음", () => {
+test("50x60(세로형): 로스팅일·소분일이 QR 옆(좌측)에 한 줄로 촘촘하게 배치되고 QR·라벨 영역을 벗어나지 않음", () => {
   const { svg } = buildLabelSVG(ROW, designFor("50x60"));
   const S = SIZE_SPECS["50x60"];
   const rstd = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>RSTD</.exec(svg);
