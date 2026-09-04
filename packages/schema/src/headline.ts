@@ -14,6 +14,22 @@ export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"] as
 /** 헤드라인 입력: CSV 키(UPPER_SNAKE) 기준의 느슨한 원두 레코드. 부분 행·미지 키를 허용한다. */
 export type HeadlineRow = Record<string, string | boolean | undefined>;
 
+/**
+ * 블렌드의 **저장값** — 화면에 보이는 "(여러 원산지 혼합)" 설명은 칩 라벨에만 남는다.
+ *
+ * 등록 폼(칩·연쇄 채움)과 표시(displayValue)가 같은 말을 봐야 하는데, 폼은 상위 패키지라
+ * 스키마가 거꾸로 가져올 수 없다. 그래서 값이 여기 살고 폼이 가져다 쓴다 — 리터럴이 두 벌이면
+ * 한쪽만 바뀌는 날 표시가 조용히 원래 버그로 돌아간다.
+ */
+export const BLEND_VALUE = "블렌드";
+
+/** 이미 등록된 행은 괄호까지 저장돼 있어 접두로 본다. */
+export function isBlend(v: string): boolean {
+  return String(v ?? "")
+    .trim()
+    .startsWith(BLEND_VALUE);
+}
+
 /** 괄호 속 상세 설명 축약 — "블렌드 (여러 원산지 혼합)" → "블렌드" */
 export function stripParen(s: string): string {
   return String(s || "")
@@ -33,7 +49,7 @@ export function stripParen(s: string): string {
  */
 export function displayValue(v: string): string {
   const s = String(v ?? "").trim();
-  return s.startsWith("블렌드") ? stripParen(s) : s;
+  return isBlend(s) ? stripParen(s) : s;
 }
 
 const g = (row: HeadlineRow, k: string): string => stripParen(String(row[k] ?? "").trim());

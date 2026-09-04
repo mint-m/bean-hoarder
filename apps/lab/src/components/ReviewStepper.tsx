@@ -6,7 +6,7 @@
 
 import { parseRoastLevel } from "@bnhd/schema/roast";
 import { useEffect, useRef, useState } from "react";
-import { isoToDot } from "../lib/format";
+import { isoToDot, parseIso } from "../lib/format";
 import {
   appendNote,
   BLEND_VALUE,
@@ -89,8 +89,7 @@ interface Props {
  * 이 한 줄이 혼자 말해야 한다** — 그래서 D+N 대신 사람이 쓰는 말과 실제 날짜를 함께 보여준다.
  */
 function roastAgeLabel(iso: string): string | undefined {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-  if (!m) return undefined;
+  if (!parseIso(iso)) return undefined;
   const then = new Date(`${iso}T00:00:00`);
   const now = new Date();
   const days = Math.floor((now.setHours(0, 0, 0, 0) - then.getTime()) / 86_400_000);

@@ -3,8 +3,13 @@
 // 무엇이 보이는지를 정하는 계산(rankChips·visibleChips·fitChipCount)이 여기 함께 있어야
 // 테스트가 잡기 때문이다.
 import { canonicalNote, FLAVOR_NOTES, parseNotes } from "@bnhd/schema/flavor";
+// 블렌드 값은 표시(displayValue)와 같은 말을 봐야 해서 스키마가 단일 소스다 — 여기서는 가져다 쓰고
+// 그대로 다시 내보낸다(폼 쪽 import 경로를 바꾸지 않기 위해).
+import { BLEND_VALUE, isBlend } from "@bnhd/schema/headline";
 import { ROAST_LEVELS, roastLevelValue } from "@bnhd/schema/roast";
 import { isoOffset } from "./format";
+
+export { BLEND_VALUE, isBlend };
 
 const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 const PREV_YY = String(Number(YY) - 1).padStart(2, "0");
@@ -21,20 +26,6 @@ export const CHIP_LIMIT = 4;
 export type ChipOption = string | { label: string; value: string };
 export const optionValue = (o: ChipOption): string => (typeof o === "string" ? o : o.value);
 export const optionLabel = (o: ChipOption): string => (typeof o === "string" ? o : o.label);
-
-/**
- * 블렌드의 **저장값** — 화면에 보이는 "(여러 원산지 혼합)" 설명은 칩 라벨에만 남는다.
- *
- * 예전에는 괄호까지 통째로 저장해서, 조회 카드 한 장에 "블렌드 (여러 원산지 혼합)"·"(여러 가공방식
- * 혼합)"·"(여러 품종 혼합)"이 셋 떴다. 헤드라인만 stripParen을 타고 서브라인·스펙 줄은 날값을 쓰기
- * 때문이다. 저장을 짧게 하면 그 누수가 애초에 생기지 않는다.
- */
-export const BLEND_VALUE = "블렌드";
-
-/** 이미 등록된 행은 괄호까지 저장돼 있어 접두로 본다. */
-export function isBlend(v: string): boolean {
-  return v.trim().startsWith(BLEND_VALUE);
-}
 
 /**
  * 국가를 블렌드로 바꾸면 가공·품종도 함께 블렌드가 되고, 되돌리면 함께 풀린다.

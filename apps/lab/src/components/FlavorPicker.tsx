@@ -6,7 +6,7 @@
 //
 // **저장값은 영문**이다(@bnhd/schema/flavor). 한글은 검색을 돕는 보조어일 뿐 — 이 값이 인쇄 라벨에
 // 그대로 찍히고 조회 카드의 색을 정한다. 목록에 없는 향미는 친 그대로 들어간다(막지 않는다).
-import { parseNotes, searchNotes, serializeNotes } from "@bnhd/schema/flavor";
+import { norm, parseNotes, searchNotes, serializeNotes } from "@bnhd/schema/flavor";
 import { useId, useRef, useState } from "react";
 import { capitalizeNoteSegments } from "../lib/format";
 
@@ -20,8 +20,6 @@ interface Candidate {
   hint: string;
   mine?: boolean;
 }
-
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 export default function FlavorPicker({
   value,

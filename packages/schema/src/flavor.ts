@@ -135,8 +135,13 @@ export const FLAVOR_NOTES: readonly FlavorNote[] = [
   { en: "Brandy", ko: "브랜디" },
 ];
 
-/** 검색용 정규화 — 대소문자와 공백만 지운다(한글은 그대로) */
-const norm = (s: string): string =>
+/**
+ * 검색용 정규화 — 대소문자와 공백만 지운다(한글은 그대로).
+ *
+ * 폼의 향미 고르개도 같은 규칙으로 걸러야 한다(내 노트 검색). 규칙이 갈라지면 어휘는 걸리는데
+ * 내 노트는 안 걸리는 식으로 한 목록 안에서 기준이 둘이 되므로 여기서 내보낸다.
+ */
+export const norm = (s: string): string =>
   String(s ?? "")
     .toLowerCase()
     .replace(/\s+/g, "");
