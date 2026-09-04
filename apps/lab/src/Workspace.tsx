@@ -664,6 +664,9 @@ export default function Workspace({
    * 어느 단계에서 멈추든 사용자는 "채워졌다/못 채웠다"만 보면 되므로 실패는 다음 단계로 흘린다.
    */
   async function recognizeText(raw: string): Promise<boolean> {
+    // 지난 실패 표시는 **사다리에 들어서는 이 한 곳에서** 지운다. 아래 서비스 키 분기에서만
+    // 지우면 자체 키를 등록해 ①로 갈아탄 뒤에는 성공해도 배너가 영영 남는다 — 실제로 그랬다.
+    setAiServiceDown(false);
     if ((localStorage.getItem("bh_gemini_key") || "").trim()) return runAiRecognition(raw);
 
     setAutofillStatus({ msg: "AI 인식 중…", cls: "" });
@@ -676,7 +679,6 @@ export default function Workspace({
       },
     );
     if (body?.ok && body.fields) {
-      setAiServiceDown(false);
       const ok = fillParsed(body.fields, "AI ", true);
       // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게
       if (ok && typeof body.remaining === "number" && body.remaining <= 3) {
