@@ -3,7 +3,7 @@
 // 두 페이지는 데이터 출처만 다르다(로그인 세션의 D1 목록 / 저장소에 고정된 데모 데이터).
 // 보이는 카드는 같아야 하므로 마크업은 여기 한 곳에서만 만든다 — 짝이 되는 스타일은
 // public/deck.css에 있고, 클래스 이름이 그 파일과의 계약이다.
-import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { buildHeadline, displayValue, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { flavorGradient, originSignature } from "./coffee-color";
 import { daysSince, escapeHtml } from "./dom";
 
@@ -17,12 +17,17 @@ export interface WalletCardOptions {
 export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: WalletCardOptions): string {
   const g = (k: string) => String(b[k] ?? "").trim();
   const n = daysSince(g("ROAST_DATE"));
+  // 경과일은 아래 줄 오른쪽 끝에 둔다. 윗줄을 통째로 헤드라인에 내주기 위해서고(배지가 그 폭의
+  // 5분의 1을 가져가 이름이 먼저 잘렸다), 아래 줄에서도 왼쪽의 로스터리·KEY와 성격이 다르기
+  // 때문이다 — 그 둘은 "어느 봉지인가"(식별)이고 경과일은 "지금 어떤 상태인가"다.
+  // 오른쪽 끝에 고정하면 스택의 모든 카드에서 같은 x좌표에 줄 서서, 덱을 훑으며 신선도를 세로로
+  // 비교할 수 있다 — 덱 정렬은 등록 순(KEY 내림차순)이라 순서로는 신선도가 드러나지 않는다.
   const dday = n != null ? `<span class="dday">D+${n}</span>` : "";
   // 헤드라인이 이미 쓴 필드(세부지역 등)는 메타에서 제외 — 라벨과 동일하게 중복 방지
   const usedInHead = headlineUsedFields(b);
   const meta = ["REGION", "VARIETY", "PROCESS"]
     .filter((k) => !usedInHead.includes(k))
-    .map(g)
+    .map((k) => displayValue(g(k)))
     .filter(Boolean)
     .join(" · ");
   const foot = [
@@ -46,8 +51,8 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: Wa
       aria-label="${escapeHtml(headline)} 상세보기" data-key="${escapeHtml(g("KEY"))}">
     ${menu ? '<button type="button" class="wcard-menu" aria-label="메뉴 열기">⋯</button>' : ""}
     <div class="w-band"${bandStyle}>
-      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span>${dday}</div>
-      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${escapeHtml(g("KEY"))}</span></div>
+      <div class="w-band-top"><span class="w-origin-label">${dot}<span class="w-origin-text">${escapeHtml(headline)}</span></span></div>
+      <div class="w-band-sub"><span class="w-roastery">${escapeHtml(g("ROASTERY"))}</span><span class="w-key">${escapeHtml(g("KEY"))}</span>${dday}</div>
     </div>
     <div class="w-body">
       ${meta ? `<div class="w-meta">${escapeHtml(meta)}</div>` : ""}

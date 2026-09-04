@@ -41,7 +41,9 @@ export const BEAN_FIELDS = [
   { column: "altitude", csv: "ALTITUDE" },
   { column: "harvest", csv: "HARVEST" },
   { column: "roast_date", csv: "ROAST_DATE", label: "로스팅일", required: "always" },
-  { column: "package_date", csv: "PACKAGE_DATE", label: "패키징일", required: "always" },
+  // 라벨은 "소분일" — 내가 원두를 받아 나눠 담은 날이지 로스터가 포장한 날이 아니다.
+  // 키(PACKAGE_DATE)는 CSV 헤더·D1 컬럼·인쇄된 라벨의 PKGD와 묶여 있어 바꾸지 않는다.
+  { column: "package_date", csv: "PACKAGE_DATE", label: "소분일", required: "always" },
   { column: "net_weight", csv: "NET_WEIGHT" },
   { column: "agtron", csv: "AGTRON" },
   { column: "tasting_note", csv: "TASTING_NOTE" },

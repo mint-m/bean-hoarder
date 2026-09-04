@@ -74,7 +74,7 @@ for (const size of Object.keys(SIZE_SPECS)) {
   });
 }
 
-test("50x60(세로형): QR이 우측·하단에 배치, 로스팅일·패키징일은 좌측에 배치", () => {
+test("50x60(세로형): QR이 우측·하단에 배치, 로스팅일·소분일은 좌측에 배치", () => {
   const { svg } = buildLabelSVG(ROW, designFor("50x60"));
   const S = SIZE_SPECS["50x60"];
   const module = S.qrDots * 0.125;
@@ -97,7 +97,7 @@ test("빈 옵션 필드는 라벨에서 생략, 긴 텍스트는 말줄임", () 
   assert.ok(!svg.includes("NET")); // 스펙 값 없음 → 셀 생략 (옵션 스펙만 해당)
   assert.ok(
     svg.includes("RSTD") && svg.includes("PKGD"),
-    "로스팅일·패키징일은 필수 정보라 값이 비어도 고정 푸터 라벨은 항상 인쇄된다",
+    "로스팅일·소분일은 필수 정보라 값이 비어도 고정 푸터 라벨은 항상 인쇄된다",
   );
   const long = buildLabelSVG(
     Object.assign({}, ROW, {
@@ -124,6 +124,42 @@ test("스펙 값이 칸 절반 폭을 넘으면 말줄임 대신 전체 폭 단�
   assert.ok(!svg.includes("…"), "말줄임 없음");
 });
 
+// specVal이 stripParen에서 displayValue로 바뀌면서 가공·품종의 괄호가 살아남게 됐다. 값이
+// 길어진 만큼 폭 계산(layoutSpecRows·specValueMax)을 실제로 통과하는지가 이 변화의 진짜 관심사다 —
+// displayValue 자체의 단위 테스트(headline.test.ts)는 그 경로를 밟지 않는다.
+test("스펙: 가공·품종의 괄호는 정보라 인쇄에 남고, 길어져도 말줄임 대신 줄바꿈으로 실린다", () => {
+  const d = designFor("50x30");
+  d.subFields = [];
+  d.specFields = ["PROCESS", "VARIETY"];
+  const { svg } = buildLabelSVG(
+    Object.assign({}, ROW, {
+      REGION: "",
+      PROCESS: "Anaerobic (72h)",
+      VARIETY: "Sewda (Micro)",
+    }),
+    d,
+  );
+  assert.ok(svg.includes("Anaerobic (72h)"), "가공방식의 괄호가 인쇄에 남는다");
+  assert.ok(svg.includes("Sewda (Micro)"), "품종의 괄호가 인쇄에 남는다");
+  assert.ok(!svg.includes("…"), "괄호가 붙어도 말줄임되지 않는다");
+});
+
+test("스펙: 블렌드만 괄호 설명을 떼고 인쇄한다 (같은 카드에 '혼합' 문구가 겹쳐 뜨지 않게)", () => {
+  const d = designFor("50x30");
+  d.subFields = [];
+  d.specFields = ["PROCESS", "VARIETY"];
+  const { svg } = buildLabelSVG(
+    Object.assign({}, ROW, {
+      REGION: "",
+      PROCESS: "블렌드 (여러 가공방식 혼합)",
+      VARIETY: "블렌드 (여러 품종 혼합)",
+    }),
+    d,
+  );
+  assert.ok(!svg.includes("혼합"), "괄호 속 설명은 라벨에 인쇄되지 않는다");
+  assert.ok(svg.includes("블렌드"), "값 자체는 남는다");
+});
+
 test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮은(나중 선택) 항목부터 자동으로 줄인다", () => {
   const d = designFor("50x30");
   d.specFields = ["NET_WEIGHT", "AGTRON", "PROCESS", "VARIETY", "ALTITUDE", "HARVEST"];
@@ -142,16 +178,26 @@ test("스펙 항목이 너무 많아 세로 공간을 넘치면 우선순위 낮
   }
 });
 
-// 헤드라인 조합 규칙 단위 테스트는 @bnhd/schema/headline로 이동(단일 소스). 여기서는 그 규칙이
-// 라벨 SVG에 대문자로 렌더되는지(라벨 측 .toUpperCase())를 buildLabelSVG 테스트가 지킨다.
-
-test("헤드라인은 라벨 SVG에 대문자로 렌더된다 (라벨 측 toUpperCase 적용점)", () => {
+// 헤드라인 조합 규칙 단위 테스트는 @bnhd/schema/headline로 이동(단일 소스).
+// 여기서는 라벨이 그 결과를 **저장된 대소문자 그대로** 찍는지를 지킨다.
+//
+// 예전에는 라벨이 .toUpperCase()로 대문자를 강제했다. 그런데 대문자는 같은 이름을 7% 넓게 만들어
+// 잘림을 앞당기고(383px vs 355px), Yirgacheffe·La Cabaña 같은 고유명사의 결을 뭉갠다. 화면(덱·조회)의
+// 대문자 강제를 걷어내면서 라벨도 함께 풀어 인쇄물과 화면의 표기를 하나로 뒀다.
+// 대가: 사용자가 "colombia"라고 적으면 라벨에도 그대로 나간다 — 정규화 그물이 하나 사라진 셈이다.
+// 로스터리·KEY는 마이크로 캡스라 여전히 대문자로 찍는다(그 자리는 아래 다른 테스트가 지킨다).
+test("헤드라인은 저장된 대소문자 그대로 라벨에 렌더된다 (대문자 강제 없음)", () => {
   const d = designFor("40x20");
   const { svg } = buildLabelSVG(Object.assign({}, ROW, { COFFEE_NAME: "푸루티 봉봉" }), d);
   assert.ok(svg.includes("푸루티 봉봉"), "COFFEE_NAME 오버라이드가 헤드라인으로 렌더");
-  const { svg: svg2 } = buildLabelSVG({ ...ROW, COFFEE_NAME: "", ORIGIN: "colombia", REGION: "" }, d);
-  assert.ok(svg2.includes("COLOMBIA"), "국가 헤드라인은 대문자로 렌더");
-  assert.ok(!svg2.includes(">colombia<"), "원본 소문자는 라벨에 남지 않음");
+  const { svg: svg2 } = buildLabelSVG(
+    { ...ROW, COFFEE_NAME: "", ORIGIN: "COLOMBIA", REGION: "Pitalito, Huila" },
+    d,
+  );
+  // 40x20에서는 라벨 폭에 맞춰 "COLOMBIA Pitalit…"로 잘린다 — 대소문자만 본다.
+  // (대문자를 걷어낸 덕에 같은 폭에 7% 더 들어가므로 잘림 자체도 조금 늦춰진다)
+  assert.ok(svg2.includes("COLOMBIA Pitalit"), "지역의 원래 대소문자가 유지된다");
+  assert.ok(!svg2.includes("PITALIT"), "대문자로 바꾸지 않는다");
 });
 
 test("노트 렌더링 보장: 스펙이 많아도 테이스팅 노트는 드롭되지 않는다", () => {
@@ -205,7 +251,7 @@ test("DEFAULT_DESIGN 기본값은 흑백(mono) — 2도 인쇄를 지원하지 �
   assert.equal(DEFAULT_DESIGN.colorMode, "mono");
 });
 
-test("50x60(세로형): 로스팅일·패키징일이 QR 옆(좌측)에 한 줄로 촘촘하게 배치되고 QR·라벨 영역을 벗어나지 않음", () => {
+test("50x60(세로형): 로스팅일·소분일이 QR 옆(좌측)에 한 줄로 촘촘하게 배치되고 QR·라벨 영역을 벗어나지 않음", () => {
   const { svg } = buildLabelSVG(ROW, designFor("50x60"));
   const S = SIZE_SPECS["50x60"];
   const rstd = /<text x="([\d.]+)" y="([\d.]+)"[^>]*>RSTD</.exec(svg);

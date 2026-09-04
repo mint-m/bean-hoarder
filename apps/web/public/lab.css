@@ -154,6 +154,15 @@ body {
   content: "";
   flex: 3;
 }
+/* 인증 화면만 더 위로. 이 화면에는 스페이서 위에 히어로(마크·제목·설명 두 줄)가 한 덩어리 더
+   얹혀 있어, 같은 2:3을 쓰면 히어로 높이만큼 정작 손이 가는 폼 카드가 아래로 밀린다.
+   히어로가 밀어낸 몫을 되돌리는 배분이다 — 카드 위치가 기준이지 스페이서가 기준이 아니다. */
+.auth-view::before {
+  flex: 1;
+}
+.auth-view::after {
+  flex: 4;
+}
 /* 화면 머리의 되돌아가기 — 브라우저 뒤로가기와 같은 곳으로 간다 */
 .stage-head {
   margin-bottom: var(--sp-3);
@@ -261,6 +270,101 @@ h2 {
   min-height: 90px;
 }
 
+/* ── 향미 노트 피커 ───────────────────────────────────────────────
+   고른 노트는 지울 수 있는 블록(.note-token), 검색은 그 아래 한 칸(.notepick-field).
+   추천 칩(.chip)과 한 화면에 서므로 **채운 칩 vs 테두리 칩**으로 성격을 가른다 —
+   위는 "지금 담긴 것", 아래는 "담을 수 있는 것"이다. */
+.notepick {
+  display: block;
+}
+.note-tokens {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 var(--sp-2);
+  padding: 0;
+}
+.note-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.note-token button {
+  all: unset;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-pill);
+  color: var(--sub);
+}
+.note-token button:hover,
+.note-token button:focus-visible {
+  color: var(--ink);
+  background: var(--line);
+}
+/* 후보 목록은 입력 칸에 붙어 뜬다 — 스텝이 접혔다 펴지는 화면이라 문서 흐름을 밀지 않게 절대 배치 */
+.notepick-field {
+  position: relative;
+}
+.notepick-menu {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
+}
+.notepick-opt {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  cursor: pointer;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink);
+}
+.notepick-opt.on {
+  background: var(--surface-2);
+}
+/* 한글은 찾는 것을 돕는 보조어일 뿐 저장되지 않는다 — 위계를 낮춰 그 사실을 화면이 말하게 한다 */
+.notepick-ko {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--sub);
+}
+/* 내가 전에 쓴 노트 — 서비스가 고른 말이 아니라는 것을 점선 테두리로 갈라 둔다(.chip-more와 같은 결) */
+.notepick-ko.mine {
+  padding: 1px 6px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-pill);
+}
+/* 목록에 없는 값을 그대로 담는 줄 — 값이 아니라 동작이라 .chip-more와 같은 결로 점선 */
+.notepick-new {
+  border-top: 1px dashed var(--line);
+  border-radius: 0;
+}
+
 .unit-wrap {
   position: relative;
   display: block;
@@ -327,6 +431,17 @@ details.acc > summary {
 .chip-more {
   border-style: dashed;
 }
+/* 로스팅 레벨 칩의 색 견본 — 숫자 목록을 훑는 대신 실제 원두 색으로 고르게 한다.
+   밝은 쪽 스와치가 흰 배경에 묻히지 않도록 얇은 테두리를 둔다. */
+.chip-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px solid rgb(128 128 128 / 0.4);
+  vertical-align: -1px;
+}
 
 /* 복사 버튼 — 결과를 버튼 자신이 말한다. 라벨이 바뀌어도 폭이 흔들리지 않게 최소 폭을 준다 */
 .copy-btn {
@@ -362,9 +477,7 @@ details.acc > summary {
    빈 칸이 크게 벌어져 있으면 그 자체로 "많이 써야 하나" 하는 인상을 준다. */
 .intake-input {
   min-height: 0;
-  height: 46px;
   font-size: 14px;
-  line-height: 1.5;
 }
 .intake-act {
   display: flex;
@@ -532,6 +645,65 @@ details.acc > summary {
 }
 .step-missing {
   color: var(--bad);
+}
+/* 값은 찼는데 아직 확인하지 않은 스텝 — 완료와 한눈에 갈려야 이 화면이 하는 일(사람이 승인했는가)이
+   화면에 남는다. 마크는 점선으로, 요약 끝에는 작은 배지로. */
+.step.pending .step-mark {
+  border-style: dashed;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.step-pending {
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.step.skipped .step-mark {
+  opacity: 0.5;
+}
+/* 확인이 막힌 이유 — 버튼 바로 위에서 말한다. 한 번 흔들어 눈이 가게 하고 그 뒤엔 조용히 남는다 */
+.step-blocked {
+  margin: var(--sp-3) 0 0;
+  color: var(--bad);
+  font-size: 12.5px;
+  animation: shake 0.32s ease;
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+/* 채워야 할 칸 — 입력 테두리로 가리킨다. 값이 들어오는 순간 저절로 풀린다(파생 상태). */
+.field.invalid input,
+.field.invalid textarea {
+  border-color: var(--bad);
+}
+.field.invalid .field-name {
+  color: var(--bad);
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-blocked {
+    animation: none;
+  }
 }
 .step-body {
   padding-bottom: var(--sp-4);
@@ -801,20 +973,21 @@ input.upper {
   grid-template-columns: 1fr;
   gap: var(--sp-3);
 }
+/* 히어로는 "여기가 어디인지"만 알려주면 되는 자리라 세로를 아낀다 — 이 화면의 주인공은 폼 카드다 */
 .auth-hero {
   text-align: center;
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
 }
 .auth-hero .beanmark {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   color: var(--accent);
 }
 .auth-hero h1 {
-  margin: 4px 0 6px;
+  margin: 2px 0 4px;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 26px;
+  font-size: 24px;
 }
 .auth-hero p {
   margin: 0;

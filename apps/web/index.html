@@ -54,7 +54,7 @@
   h1.origin {
     margin: 0; font-family: var(--display); font-weight: 700;
     font-size: clamp(28px, 7.6vw, 36px); line-height: 1.06;
-    letter-spacing: -.01em; text-transform: uppercase; text-wrap: balance;
+    letter-spacing: -.01em; text-wrap: balance;
   }
   .subline { margin: 8px 0 0; font-size: 14px; color: var(--sub); font-weight: 500; }
   .subline .sep { padding: 0 5px; }
@@ -80,6 +80,8 @@
   dl.ticket-row > div { display: flex; flex-direction: column; min-width: 0; }
   dt { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--sub); }
   dl.ticket-row dd { margin: 3px 0 0; font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  /* 로스팅 레벨 견본 — 실제 원두 색(화면 전용, DESIGN.md §3). 밝은 쪽이 흰 배경에 묻히지 않게 테두리를 둔다 */
+  .roast-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; border: 1px solid rgb(128 128 128 / .4); vertical-align: 1px; }
   /* 부가 스펙(가공·품종·고도…)은 행이 아니라 한 줄 텍스트로 — 티켓 행과 위계를 가른다 */
   .specline { margin: 12px 0 0; font-size: 12.5px; color: var(--sub); line-height: 1.7; }
   .specline b { color: var(--ink); font-weight: 600; }
@@ -107,6 +109,9 @@
   .memo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .memo-label { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--sub); margin-bottom: 3px; }
   .memo-body { font-size: 13.5px; }
+  /* 문단 사이는 빈 줄이 아니라 여백으로 — 문단 안의 줄바꿈(블렌드 구성 등)은 pre-line이 살린다 */
+  .memo-body p { margin: 0 0 8px; white-space: pre-line; }
+  .memo-body p:last-child { margin-bottom: 0; }
 
   /* ---- 상태 / 랜딩 ---- */
   .status { text-align: center; padding: 52px 22px; color: var(--sub); font-size: 14px; }
@@ -215,7 +220,7 @@
         <div id="f-roasted-box" class="hidden"><dt>RSTD</dt><dd id="f-roasted"></dd></div>
         <div id="f-packed-box" class="hidden"><dt>PKGD</dt><dd id="f-packed"></dd></div>
         <div id="f-net-box" class="hidden"><dt>NET</dt><dd id="f-net"></dd></div>
-        <div id="f-roastpt-box" class="hidden"><dt>ROAST PT</dt><dd id="f-roastpt"></dd></div>
+        <div id="f-roastpt-box" class="hidden"><dt>ROAST</dt><dd id="f-roastpt"></dd></div>
       </dl>
       <p class="specline hidden" id="f-specline"></p>
     </div>

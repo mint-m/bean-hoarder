@@ -30,6 +30,8 @@ interface Props {
   aiNudge: boolean;
   /** 서비스 키로 남은 AI 인식 횟수 (얼마 안 남았을 때만 값이 온다. 0 = 소진) */
   aiQuotaLeft: number | null;
+  /** AI 대행이 응답하지 못했다 — 한도 소진과는 다른 이유이므로 다른 문구를 쓴다 */
+  aiServiceDown: boolean;
   onOpenSettings: () => void;
 }
 
@@ -105,17 +107,23 @@ export default function IntakeCard(p: Props) {
       : p.aiQuotaLeft === 0
         ? "오늘 무료 AI 인식을 다 썼습니다 — 지금은 간단한 규칙으로 채웁니다."
         : `무료 AI 인식이 오늘 ${p.aiQuotaLeft}번 남았습니다.`;
-  const nudge =
-    quotaMsg || p.aiNudge ? (
-      <p className="ai-nudge">
-        <span className="ai-nudge-msg">
-          {quotaMsg ?? "본인 Google AI 키(무료 발급)를 넣으면 훨씬 많이 채워집니다."}
-        </span>
-        <button type="button" onClick={p.onOpenSettings}>
-          내 키 넣기 →
-        </button>
-      </p>
-    ) : null;
+  // 우선순위: 한도(내 몫을 다 씀) > 대행 장애(우리 쪽 사정) > 키 권유(규칙 기반이 부실했음).
+  // 앞의 둘은 "왜 AI가 안 붙었는지"에 대한 답이라, 뒤의 일반 권유보다 먼저 말해야 한다.
+  const msg =
+    quotaMsg ??
+    (p.aiServiceDown
+      ? "AI 인식이 지금 응답하지 않아 간단한 규칙으로 채웠습니다."
+      : p.aiNudge
+        ? "본인 Google AI 키(무료 발급)를 넣으면 훨씬 많이 채워집니다."
+        : null);
+  const nudge = msg ? (
+    <p className="ai-nudge">
+      <span className="ai-nudge-msg">{msg}</span>
+      <button type="button" onClick={p.onOpenSettings}>
+        내 키 넣기 →
+      </button>
+    </p>
+  ) : null;
 
   // ── 검증 단계로 넘어간 뒤: 접힌 한 줄로 물러난다 ──
   if (p.started) {
@@ -143,7 +151,7 @@ export default function IntakeCard(p: Props) {
 
       <textarea
         className="intake-input"
-        placeholder={"https://roastery.com/products/…  또는 원두 정보 전체"}
+        placeholder={"원두 [링크] 또는 [정보/노트] 붙여넣기"}
         value={p.autofillText}
         onChange={(e) => p.setAutofillText(e.target.value)}
         onKeyDown={(e) => {

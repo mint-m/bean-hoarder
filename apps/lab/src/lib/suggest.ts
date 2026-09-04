@@ -1,15 +1,59 @@
-// 입력 추천값 — 타이핑을 줄이기 위한 칩·datalist 공용 옵션 풀.
-// 폼 컴포넌트가 아니라 여기 모아두는 이유: 같은 풀을 칩(한 번 눌러 채우기)과 datalist(자유 입력
-// 자동완성)가 함께 쓰고, 스텝 구성이 바뀌어도 값 자체는 그대로 유지되기 때문이다.
+// 입력 추천값 — 타이핑을 줄이기 위한 칩 옵션 풀.
+// 폼 컴포넌트가 아니라 여기 모아두는 이유: 스텝 구성이 바뀌어도 값 자체는 그대로 유지돼야 하고,
+// 무엇이 보이는지를 정하는 계산(rankChips·visibleChips·fitChipCount)이 여기 함께 있어야
+// 테스트가 잡기 때문이다.
+import { canonicalNote, FLAVOR_NOTES, parseNotes } from "@bnhd/schema/flavor";
+// 블렌드 값은 표시(displayValue)와 같은 말을 봐야 해서 스키마가 단일 소스다 — 여기서는 가져다 쓰고
+// 그대로 다시 내보낸다(폼 쪽 import 경로를 바꾸지 않기 위해).
+import { BLEND_VALUE, isBlend } from "@bnhd/schema/headline";
+import { ROAST_LEVELS, roastLevelValue } from "@bnhd/schema/roast";
 import { isoOffset } from "./format";
+
+export { BLEND_VALUE, isBlend };
 
 const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 const PREV_YY = String(Number(YY) - 1).padStart(2, "0");
 
-/** 칩으로 먼저 보여줄 개수 — 나머지는 타이핑하면 datalist가 잡는다. */
-export const CHIP_LIMIT = 6;
+/**
+ * 칩으로 먼저 보여줄 **상한** — 실제 개수는 잰 폭이 정한다(fitChipCount). 나머지는 펼치기 버튼이 맡는다.
+ *
+ * 6이던 것을 4로 내렸다. 375px에서 6칸이면 어느 줄이든 두세 줄로 흘러넘쳐, 스텝 하나가 칩 벽으로
+ * 보인다. 고르는 일을 돕자고 둔 것이 고르기 전에 피로를 주면 목적을 잃는다.
+ */
+export const CHIP_LIMIT = 4;
 
-export const ORIGIN_OPTIONS = [
+/** 문자열이면 값=표시, 객체면 표시와 값을 따로 (날짜의 "오늘 → 2026-08-17", 로스팅 레벨 등) */
+export type ChipOption = string | { label: string; value: string };
+export const optionValue = (o: ChipOption): string => (typeof o === "string" ? o : o.value);
+export const optionLabel = (o: ChipOption): string => (typeof o === "string" ? o : o.label);
+
+/**
+ * 국가를 블렌드로 바꾸면 가공·품종도 함께 블렌드가 되고, 되돌리면 함께 풀린다.
+ *
+ * 블렌드에는 단일 가공방식도 품종도 없는데 둘 다 등록 필수라, 산지만 고르면 다음 스텝에서 반드시
+ * 막힌다. 다만 **사용자가 직접 적은 값은 절대 덮지 않는다** — 채우는 건 빈 칸에만, 지우는 건 아직
+ * 블렌드 값 그대로일 때만. 그래서 이 함수는 바뀔 칸만 담은 조각을 돌려주고, 호출부가 그대로 넘긴다.
+ */
+export function blendCascade(
+  prevOrigin: string,
+  nextOrigin: string,
+  form: { PROCESS: string; VARIETY: string },
+): { PROCESS?: string; VARIETY?: string } {
+  const now = isBlend(nextOrigin);
+  if (isBlend(prevOrigin) === now) return {};
+  const out: { PROCESS?: string; VARIETY?: string } = {};
+  for (const k of ["PROCESS", "VARIETY"] as const) {
+    const cur = form[k].trim();
+    if (now) {
+      if (!cur) out[k] = BLEND_VALUE;
+    } else if (isBlend(cur)) {
+      out[k] = "";
+    }
+  }
+  return out;
+}
+
+export const ORIGIN_OPTIONS: readonly ChipOption[] = [
   "ETHIOPIA",
   "COLOMBIA",
   "KENYA",
@@ -29,10 +73,10 @@ export const ORIGIN_OPTIONS = [
   "YEMEN",
   "INDIA",
   "VIETNAM",
-  "블렌드 (여러 원산지 혼합)",
+  BLEND_VALUE,
 ];
 
-export const PROCESS_OPTIONS = [
+export const PROCESS_OPTIONS: readonly ChipOption[] = [
   "Washed",
   "Natural",
   "Honey",
@@ -40,10 +84,10 @@ export const PROCESS_OPTIONS = [
   "Carbonic Maceration",
   "Wet-Hulled",
   "Semi-Washed",
-  "블렌드 (여러 가공방식 혼합)",
+  BLEND_VALUE,
 ];
 
-export const VARIETY_OPTIONS = [
+export const VARIETY_OPTIONS: readonly ChipOption[] = [
   "Heirloom",
   "Bourbon",
   "Caturra",
@@ -54,22 +98,22 @@ export const VARIETY_OPTIONS = [
   "SL28",
   "SL34",
   "Pacamara",
-  "블렌드 (여러 품종 혼합)",
+  BLEND_VALUE,
 ];
 
-export const ROASTPOINT_OPTIONS = [
-  "#120 (울트라라이트)",
-  "#95 (라이트)",
-  "#75 (미디움라이트)",
-  "#65 (미디움)",
-  "#55 (미디움다크)",
-  "#45 (다크)",
-];
+/**
+ * 로스팅 레벨 추천 — 칩에는 레벨 이름만 보이고, 들어가는 값은 예전 그대로 "#120 (울트라라이트)"다.
+ * 6단계의 단일 소스는 @bnhd/schema/roast (프롬프트·라벨·조회 카드가 함께 쓴다).
+ */
+export const ROASTPOINT_OPTIONS: readonly ChipOption[] = ROAST_LEVELS.map((l) => ({
+  label: l.en,
+  value: roastLevelValue(l),
+}));
 
 export const HARVEST_OPTIONS = [`${PREV_YY}/${YY}`, YY, PREV_YY];
 
 /** 소분 보관이 목적이라 소용량이 앞에 온다 (단위 g은 폼이 붙인다). */
-export const WEIGHT_OPTIONS = ["20", "50", "100", "200", "250", "500", "1000"];
+export const WEIGHT_OPTIONS = ["20", "50", "100", "200", "250", "500"];
 
 /** 자주 쓰는 플레이버 — 누르면 콤마 목록에 덧붙는다(교체가 아니라 누적). */
 export const NOTE_OPTIONS = [
@@ -87,14 +131,18 @@ export const NOTE_OPTIONS = [
   "Winey",
 ];
 
-/** 날짜 추천 — 달력을 열지 않고 흔한 값(오늘·며칠 전)을 한 번에 넣는다. */
-export function dateChips(): { label: string; value: string }[] {
+/**
+ * 소분일 추천 — 달력을 열지 않고 흔한 값을 한 번에 넣는다.
+ *
+ * 소분일은 "내가 원두를 받아 나눠 담은 날"이라 거의 오늘이거나 며칠 안쪽이다. 그래서 절대 날짜
+ * 칩이 스테퍼보다 빠르고, 셋이면 충분하다. 로스팅일은 성격이 달라(몇 주~몇 달 전) 누적 스테퍼가
+ * 맡는다 — 이 목록을 거기에 쓰지 않는다.
+ */
+export function packageDateChips(): { label: string; value: string }[] {
   return [
     { label: "오늘", value: isoOffset(0) },
     { label: "어제", value: isoOffset(-1) },
     { label: "3일 전", value: isoOffset(-3) },
-    { label: "1주 전", value: isoOffset(-7) },
-    { label: "2주 전", value: isoOffset(-14) },
   ];
 }
 
@@ -106,4 +154,122 @@ export function appendNote(current: string, note: string): string {
     .filter(Boolean);
   if (segs.some((s) => s.toLowerCase() === note.toLowerCase())) return current;
   return [...segs, note].join(", ");
+}
+
+// ── 칩 줄 접기·정렬 ───────────────────────────────────────────
+// 컴포넌트가 아니라 여기 두는 이유: 어느 칩이 보이는지는 순수 계산이고, 그래야 테스트가 잡는다.
+
+const nrm = (s: string): string =>
+  String(s ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+/** 검색어와의 일치도 — 완전 0, 접두 1, 부분 2, 무관 3. 라벨과 값 양쪽을 본다. */
+function chipScore(o: ChipOption, q: string): number {
+  const t = [nrm(optionLabel(o)), nrm(optionValue(o))];
+  if (t.some((x) => x === q)) return 0;
+  if (t.some((x) => x.startsWith(q))) return 1;
+  if (t.some((x) => x.includes(q))) return 2;
+  return 3;
+}
+
+/** 검색어 일치도로 재정렬 — 같은 점수끼리는 원래 순서를 지킨다(Array.sort가 안정 정렬이다). */
+export function rankChips(options: readonly ChipOption[], value?: string): readonly ChipOption[] {
+  const q = nrm(value ?? "");
+  if (!q) return options;
+  return [...options].sort((a, b) => chipScore(a, q) - chipScore(b, q));
+}
+
+/**
+ * 접힌 칩 줄에 무엇이 보이는가.
+ *
+ * 두 가지를 함께 한다.
+ *  1. **일치도 정렬**(rankChips) — 칸에 뭔가 쳐 넣었으면 그와 맞는 칩을 앞으로 올린다.
+ *     이 정렬이 걷어낸 datalist의 자리를 대신한다 — 전체 목록을 훑는 일은 펼치기가 맡는다.
+ *  2. **자리 배분** — limit는 접었을 때 보일 칩의 **총량**이다. 고정 노출(pin)과 현재 값은 그 안에서
+ *     자리를 먼저 가져가고, 남는 만큼만 앞에서 채운다. pin을 예산 밖의 덤으로 두면 줄 수가 늘어
+ *     limit를 내린 의미가 없어진다.
+ *
+ * 감춘 개수는 **언제나 접힌 상태 기준**이다 — 펼친 뒤 다시 세면 0이 되어 버튼이 사라지고,
+ * 그러면 되돌아갈 길이 없어진다.
+ */
+export function visibleChips(
+  options: readonly ChipOption[],
+  opts: { limit?: number; pin?: string; value?: string; expanded?: boolean; ordered?: boolean } = {},
+): { shown: readonly ChipOption[]; hiddenCount: number } {
+  const ranked = opts.ordered ? options : rankChips(options, opts.value);
+
+  if (!opts.limit) return { shown: ranked, hiddenCount: 0 };
+
+  const cur = (opts.value ?? "").trim();
+  const isForced = (o: ChipOption) => optionValue(o) === opts.pin || optionValue(o) === cur;
+  const forced = ranked.filter(isForced);
+  const room = Math.max(0, opts.limit - forced.length);
+  const keep = new Set([...forced, ...ranked.filter((o) => !isForced(o)).slice(0, room)]);
+  const collapsed = ranked.filter((o) => keep.has(o)); // 정렬된 순서를 그대로 지킨다
+
+  return {
+    shown: opts.expanded ? ranked : collapsed,
+    hiddenCount: options.length - collapsed.length,
+  };
+}
+
+/**
+ * 한 줄에 들어가는 칩 개수 — 실측한 폭으로 고른다.
+ *
+ * 개수만으로는 한 줄을 보장할 수 없다. 칩 폭이 내용마다 다르기 때문이다 — 로스터리 줄의
+ * `SEY`(48px)와 `LEAVES COFFEE`(140px)가 같은 한 칸을 쓴다. 그래서 개수(limit)는 상한으로만 두고,
+ * 실제로 몇 개가 남는지는 잰 폭으로 정한다.
+ *
+ * k를 1부터 올리며 **그 k에서 실제로 보일 조합**(visibleChips)의 폭을 더한다 — 앞에서 k개를 자르는
+ * 것과 다르다. pin이나 현재 값이 뒤쪽에서 끌려 올라오면 조합이 바뀌고 폭도 바뀌기 때문이다.
+ * 더보기 버튼도 같은 줄에 서야 하므로 감출 것이 남는 동안은 그 폭을 미리 뗀다.
+ */
+export function fitChipCount(
+  options: readonly ChipOption[],
+  widthOf: (o: ChipOption) => number,
+  layout: { rowWidth: number; gap: number; moreWidth: number },
+  opts: { limit?: number; pin?: string; value?: string } = {},
+): number {
+  const max = Math.min(opts.limit ?? options.length, options.length);
+  let best = 1;
+  for (let k = 1; k <= max; k++) {
+    const { shown, hiddenCount } = visibleChips(options, { ...opts, limit: k });
+    let total = shown.reduce((a, o, i) => a + (i ? layout.gap : 0) + widthOf(o), 0);
+    if (hiddenCount > 0) total += layout.gap + layout.moreWidth;
+    if (total > layout.rowWidth) break;
+    best = k;
+  }
+  return best;
+}
+
+// ── 내가 쓴 향미 노트 ──────────────────────────────────────────
+
+const CURATED = new Set(FLAVOR_NOTES.map((n) => n.en.toLowerCase()));
+
+/**
+ * 등록된 원두에서 **내장 어휘에 없는** 노트를 모은다 — 자주 쓴 순.
+ *
+ * 새 저장소를 두지 않고 등록된 원두에서 파생하는 이유는 로스터리 추천과 같다: 오타가 남에게 번지지
+ * 않고, 원두를 지우면 노트도 함께 사라지고, "어느 쪽이 원본이냐"가 생기지 않는다. 공용 어휘를
+ * 런타임에 늘리지 않으므로 색 보증 테스트(flavor-coverage)도 계속 의미를 갖는다.
+ *
+ * 어휘에 있는 것은 뺀다 — 피커가 이미 정식 후보로 보여주므로 중복이다. 옛 한글 표기는
+ * canonicalNote로 접어서 세므로 "파인애플"이 따로 세어지지 않는다.
+ */
+export function collectMyNotes(beans: readonly Record<string, unknown>[] | null): string[] {
+  const seen = new Map<string, { display: string; count: number }>();
+  for (const b of beans ?? []) {
+    for (const raw of parseNotes(String(b.TASTING_NOTE ?? ""))) {
+      const note = canonicalNote(raw);
+      const key = note.toLowerCase();
+      if (!note || CURATED.has(key)) continue;
+      const cur = seen.get(key);
+      if (cur) cur.count += 1;
+      else seen.set(key, { display: note, count: 1 });
+    }
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.count - a.count || a.display.localeCompare(b.display))
+    .map((v) => v.display);
 }

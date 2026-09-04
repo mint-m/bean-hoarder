@@ -139,7 +139,7 @@ function monthDot(name, year) {
   const m = MONTHS[name.toLowerCase().replace(/\.$/, "")];
   return m ? `${String(year).slice(2)}.${String(m).padStart(2, "0")}` : null;
 }
-// "Month YYYY – Month YYYY" 또는 "Month YYYY" 형태를 로스팅/패키징일과 같은 점(dot) 표기(yy.mm)로 정규화.
+// "Month YYYY – Month YYYY" 또는 "Month YYYY" 형태를 로스팅일·소분일과 같은 점(dot) 표기(yy.mm)로 정규화.
 // 매칭 실패 시 원문 그대로 반환.
 function normalizeHarvestMonths(s) {
   let m = /([A-Za-z]{3,9})\.?\s+(20\d{2})\s*(?:[-–~]|to|and)\s*([A-Za-z]{3,9})\.?\s+(20\d{2})/i.exec(s);
@@ -244,7 +244,7 @@ export function parseBeanText(text) {
   }
 
   // 라벨 인식으로 채운 수확시기를 정규화: "2024/2025"→"24/25", 단일 "2024"→"24",
-  // "December 2025 – January 2026"→"25.12-26.01"(로스팅/패키징일과 같은 점 표기).
+  // "December 2025 – January 2026"→"25.12-26.01"(로스팅일·소분일과 같은 점 표기).
   if (out.HARVEST) {
     let m = /(20\d{2})\s*[/-]\s*(?:20)?(\d{2})/.exec(out.HARVEST);
     if (m) out.HARVEST = `${m[1].slice(2)}/${m[2]}`;

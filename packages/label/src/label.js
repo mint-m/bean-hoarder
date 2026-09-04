@@ -2,7 +2,7 @@
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
 // 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다 —
 // 라벨은 SVG라 대소문자 CSS가 없으므로 렌더 시점에 직접 .toUpperCase()를 건다.
-import { buildHeadline, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
+import { buildHeadline, displayValue, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
 //
@@ -26,7 +26,7 @@ const DOT = 0.125;
 const RED = "#e8341c";
 
 // [필드키, 라벨 인쇄 약어, 관리자 화면 표시명]
-// 로스팅일·패키징일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
+// 로스팅일·소분일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
 // 배열 순서 = 기본 표시 우선순위(공간이 부족할 때 뒤쪽부터 자동으로 숨겨짐) — lab.js에서 사용자가 직접 재정렬 가능.
 // 우선순위 체계(#27): 가공·품종은 2순위(향미·정체성), 고도·수확시기는 3순위(전문 디테일)이므로
 // 2순위를 앞에 둔다. 용량(NET)은 유통 필수라 1위 유지, 로스팅 포인트는 품종 다음.
@@ -34,7 +34,7 @@ export const SPEC_POOL = [
   ["NET_WEIGHT", "NET", "용량"],
   ["PROCESS", "PROC", "가공"],
   ["VARIETY", "VAR", "품종"],
-  ["AGTRON", "RSTP", "로스팅 포인트"],
+  ["AGTRON", "RSTP", "로스팅 레벨"],
   ["ALTITUDE", "ALT", "고도"],
   ["HARVEST", "CROP", "수확시기"],
 ];
@@ -332,7 +332,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const module = S.qrDots * DOT;
   const QR_SIZE = module * n;
   const portrait = S.orient === "portrait";
-  // 세로형(카드형)은 QR을 우측에 붙이고, 로스팅일·패키징일을 좌측에 두 줄로 쌓아 배치한다
+  // 세로형(카드형)은 QR을 우측에 붙이고, 로스팅일·소분일을 좌측에 두 줄로 쌓아 배치한다
   // (보딩패스 스텁의 바코드 옆 항공편 정보 컨셉 — buildLabelSVG 하단 참고).
   const QR_X = portrait
     ? Math.round((W - S.margin - QR_SIZE) / DOT) * DOT
@@ -376,7 +376,9 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   // 헤드라인: 가로형은 1줄 고정, 세로형(50×60)은 최대 2줄 랩
   // 국가 단독이 아니라 국가+세부장소[+랏] 조합(또는 시그니쳐/블렌드명)으로 변별력을 높인다.
   let yCur;
-  const origin = buildHeadline(row).toUpperCase();
+  // 헤드라인은 대문자로 강제하지 않는다 — 대문자는 같은 이름을 7% 넓게 만들어 잘림을 앞당기고,
+  // Yirgacheffe·La Cabaña 같은 고유명사의 결을 뭉갠다. 로스터리·KEY는 마이크로 캡스라 그대로 둔다.
+  const origin = buildHeadline(row);
   if (portrait) {
     const headLines = wrapN(origin, headlineSize, 0.68, headMax, S.headMaxLines || 2);
     let hy = S.headY;
@@ -405,7 +407,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   );
   const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
 
-  // 로스팅일·패키징일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
+  // 로스팅일·소분일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
   // 가로형은 라벨 최하단에 한 줄(2열)로, 세로형(카드형)은 QR 좌측에 두 줄로 타이트하게 고정한다 —
   // 가로형만 그 한 줄만큼 아래 flow 레이아웃의 바닥 예산을 당긴다(세로형은 QR 옆 여백을 쓰므로 본문 예산을 그대로 쓴다).
   const CONTENT_BOTTOM = portrait ? BOTTOM : BOTTOM - S.specLH;
@@ -414,7 +416,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const labelOf = (k) => (SPEC_POOL.find(([key]) => key === k) || [k, k])[1];
   const specVal = (f) => {
     if (f === "AGTRON") return g(f).split(/\s+/)[0];
-    if (f === "PROCESS" || f === "VARIETY") return stripParen(g(f));
+    if (f === "PROCESS" || f === "VARIETY") return displayValue(g(f));
     return g(f);
   };
   const allSpecs = design.specFields
@@ -512,7 +514,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     );
   }
 
-  // 고정 푸터: 로스팅일·패키징일 — 필수 정보이므로 토글 여부와 무관하게 항상 인쇄
+  // 고정 푸터: 로스팅일·소분일 — 필수 정보이므로 토글 여부와 무관하게 항상 인쇄
   if (portrait) {
     // 카드형: QR 왼쪽 옆에 "RSTD26.06.29 PKGD26.07.09" 한 줄로 촘촘하게 배치, QR 하단에 맞춰 정렬.
     // 라벨·값 사이 간격을 specGapX보다 훨씬 좁게 둬 좁은 QR 옆 공간에 한 줄로 들어가게 한다.

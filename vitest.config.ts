@@ -20,6 +20,7 @@ export default defineConfig({
             "packages/session/src/**/*.test.ts",
             "packages/api/src/**/*.test.ts",
             "apps/web/src/**/*.test.ts",
+            "apps/lab/src/**/*.test.ts",
           ],
         },
       },

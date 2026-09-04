@@ -2,9 +2,11 @@
 //
 // 이 페이지는 파일이 아닌 경로(/{KEY})로도 열린다 — Pages가 매치 없는 경로에 index.html을 주고,
 // 여기서 location.pathname을 읽어 KEY를 뽑는다. 그 계약은 e2e/routing.spec.ts가 지킨다.
-import { buildHeadline, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { buildHeadline, displayValue, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
+import { parseRoastLevel } from "@bnhd/schema/roast";
 import { flavorGradient, originSignature } from "./lib/coffee-color";
 import { daysSince, el, escapeHtml, safeHttpUrl } from "./lib/dom";
+import { normalizeMemo } from "./lib/memo";
 
 // jsQR 디코더(~130KB)는 타입만 정적으로 참조하고 런타임 코드는 스캔을 처음 열 때 지연 로드한다
 // (setupScanner의 open 참조). type-only import라 번들에는 들어가지 않는다 — 조회 진입(QR로
@@ -201,9 +203,9 @@ function render(row: HeadlineRow, isPreview: boolean): void {
 
   // 시그니쳐명일 땐 국가를 서브라인에 보존, 헤드라인이 이미 쓴 지역·생산자는 제외(중복 방지)
   const subParts: string[] = [];
-  if (g("COFFEE_NAME") && g("ORIGIN")) subParts.push(g("ORIGIN"));
+  if (g("COFFEE_NAME") && g("ORIGIN")) subParts.push(displayValue(g("ORIGIN")));
   for (const k of ["REGION", "PRODUCER"]) {
-    if (!usedInHead.includes(k) && g(k)) subParts.push(g(k));
+    if (!usedInHead.includes(k) && g(k)) subParts.push(displayValue(g(k)));
   }
   const sub = el("f-subline");
   sub.classList.toggle("hidden", !subParts.length);
@@ -238,14 +240,29 @@ function render(row: HeadlineRow, isPreview: boolean): void {
   setTicket("f-roasted-box", "f-roasted", shortDate(rd));
   setTicket("f-packed-box", "f-packed", shortDate(g("PACKAGE_DATE")));
   setTicket("f-net-box", "f-net", g("NET_WEIGHT"));
-  // 로스팅포인트는 "#75 (미디움라이트)"처럼 길 수 있어 티켓 행에는 수치만 (전체는 라벨·폼에)
-  setTicket("f-roastpt-box", "f-roastpt", g("AGTRON").replace(/\s*\(.*\)\s*$/, ""));
+  // 로스팅은 레벨이 앞선다 — 애그트론 숫자는 로스터의 계측값이고, 카드를 읽는 사람이 알고 싶은
+  // 것은 "얼마나 볶았나"다. 색 견본이 그 축을 한눈에 말하고, 못 알아본 값은 원문 그대로 둔다.
+  const roast = parseRoastLevel(g("AGTRON"));
+  const roastText = roast ? roast.en : g("AGTRON").replace(/\s*\(.*\)\s*$/, "");
+  el("f-roastpt-box").classList.toggle("hidden", !roastText);
+  if (roastText) {
+    const dd = el("f-roastpt");
+    dd.replaceChildren();
+    if (roast) {
+      const sw = document.createElement("span");
+      sw.className = "roast-swatch";
+      sw.style.background = roast.swatch;
+      sw.title = g("AGTRON");
+      dd.append(sw);
+    }
+    dd.append(roastText);
+  }
 
   // 부가 스펙 한 줄 — 헤드라인이 이미 쓴 필드(워싱스테이션·랏)는 제외
   const specParts: string[] = [];
   for (const [col, label] of SPEC_FIELDS) {
     if (usedInHead.includes(col)) continue;
-    const v = g(col);
+    const v = displayValue(g(col));
     // 라벨과 값은 한 덩어리다 — 묶지 않으면 "ALTITUDE"와 "2100m"이 서로 다른 줄로 갈린다
     if (v) specParts.push(`<span class="spec-pair"><b>${label}</b> ${escapeHtml(v)}</span>`);
   }
@@ -260,9 +277,18 @@ function render(row: HeadlineRow, isPreview: boolean): void {
   dday.classList.toggle("hidden", !showDday);
   if (showDday) dday.textContent = `D+${n}`;
 
-  const memo = el("f-memo");
-  memo.classList.toggle("hidden", !g("MEMO"));
-  if (g("MEMO")) el("f-memo-body").textContent = g("MEMO");
+  // 메모는 대개 어딘가에서 옮겨 온 덩어리다 — 문장마다 빈 줄이 끼거나 줄바꿈이 아예 없다.
+  // 저장값은 건드리지 않고 표시할 때만 문단으로 정돈하므로 이미 등록된 원두도 함께 고쳐진다.
+  const paras = normalizeMemo(g("MEMO"));
+  el("f-memo").classList.toggle("hidden", !paras.length);
+  // 문단마다 <p> — 간격을 빈 줄이 아니라 CSS가 주고, textContent라 이스케이프할 것이 없다
+  el("f-memo-body").replaceChildren(
+    ...paras.map((t) => {
+      const node = document.createElement("p");
+      node.textContent = t;
+      return node;
+    }),
+  );
 
   const src = el<HTMLAnchorElement>("f-source");
   // 스킴이 http(s)가 아니면 링크 자체를 걸지 않는다 — 아래 safeHttpUrl 주석 참고

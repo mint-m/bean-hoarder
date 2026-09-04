@@ -55,7 +55,17 @@ footer {
    새지 않고 이 컨테이너 안에서만 "맨 뒤"로 가라앉도록 자체 stacking context를 만든다. */
 .deck {
   --w-peek: 66px; /* 스택시 보이는 밴드 높이 */
-  --w-card-h: 158px; /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치 */
+  /* 카드 전체 높이 (고정 — 스택 정렬의 전제). 노트 표시 시 본문 3행이 잘리지 않는 최소치다:
+     펼쳤을 때 밴드가 두 줄로 85px까지 자라므로 85 + 본문 79 = 164가 하한이고, 2px 여유를 얹었다.
+     한 화면에 보이는 카드 수는 이 값이 아니라 --w-peek이 정하므로(4.8 → 4.7장) 밀도 비용은 없다. */
+  --w-card-h: 166px;
+  /* 펼침 모션. 뒤 카드가 92px(=카드 높이 − 피크)을 옮겨 가므로 곡선이 결을 좌우한다 — 길이보다
+     곡선이 체감 속도를 정한다. 실기기에서 양쪽 끝을 다 밟아 보고 가운데로 정착한 값이다:
+       · easeOutQuint 0.28s (0.22, 1, 0.36, 1) → 거리의 40%를 시간의 10%에 지나가 "휙" 튀었다
+       · easeOutCubic 0.36s (0.33, 1, 0.68, 1) → 급함은 사라졌지만 둔했다
+     easeOutQuart 0.3s는 앞의 날카로움만 덜어낸 자리다. 다시 조절할 일이 있으면 이 두 줄만 만진다. */
+  --w-motion: 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  --w-stagger: 16ms; /* 아래 카드들이 차례로 비켜서게 하는 시차 (한 덩어리로 움직이면 판때기가 된다) */
   display: flex;
   flex-direction: column;
   padding-top: 4px;
@@ -63,6 +73,9 @@ footer {
 }
 .wcard {
   display: block;
+  /* 덱은 flex 컬럼이다. 높이가 제한되는 순간(터치에서 덱이 스크롤 영역이 될 때) 기본 flex-shrink가
+     카드를 눌러 버려 158px 카드가 20px대로 찌그러진다 — 스택 정렬의 전제가 무너진다. */
+  flex-shrink: 0;
   color: var(--ink);
   cursor: pointer;
   background: var(--surface);
@@ -74,23 +87,60 @@ footer {
   margin-top: calc(var(--w-peek) - var(--w-card-h));
   position: relative;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
+    transform var(--w-motion),
+    box-shadow var(--w-motion);
 }
 .wcard:first-child {
   margin-top: 0;
 }
-/* 애플 월렛처럼: 호버·포커스한 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로
-   밀려 내려가 시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가
-   기본적으로 앞 카드 위에 그려지므로, 뒤 카드들을 비켜주기만 해도 호버한 카드가 온전히 드러난다. */
-.wcard:hover,
+/* 애플 월렛처럼: 펼쳐진 카드만 살짝 위로 뽑혀 나오고, 그 아래 쌓인 카드들은 통째로 밀려 내려가
+   시야를 가리지 않는다. z-index는 전혀 건드리지 않는다 — DOM 순서상 뒤 카드가 기본적으로 앞 카드
+   위에 그려지므로, 뒤 카드들을 비켜주기만 해도 펼친 카드가 온전히 드러난다.
+
+   트리거는 기기마다 다르다: 마우스는 호버, 터치는 "기준선에 온 카드"(.active — lib/deck-focus.ts).
+   보이는 결과는 하나여야 하므로 선언은 여기 한 벌만 두고 셀렉터만 나눈다. */
+.wcard.active,
 .wcard:focus-within {
   transform: translateY(-8px);
   box-shadow: var(--shadow-hover);
+  /* 펼쳐진 카드만 헤드라인을 두 줄까지 편다. 스택의 밀도는 --w-peek 하나가 정하므로, 두 줄을
+     펼침에만 허용하면 한 화면에 보이는 카드 수를 전혀 내주지 않고 이름만 온전해진다. */
+  --band-h: auto;
+  --head-wrap: normal;
+  --head-display: -webkit-box;
+  --label-align: flex-start;
+  --dot-shift: 5px;
 }
-.wcard:hover ~ .wcard,
+.wcard.active ~ .wcard,
 .wcard:focus-within ~ .wcard {
   transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+  /* 가까운 카드부터 차례로 비켜선다. 한 덩어리로 동시에 움직이면 카드가 아니라 판때기 하나가
+     미끄러지는 것처럼 보인다. 시차는 세 장 분량에서 멈춘다 — 더 끌면 굼떠 보인다.
+     --i(카드 순번)·--active-i(펼쳐진 카드)는 deck-focus.ts가 넣는다. 호버 경로에는 없으므로
+     기본값 0으로 떨어져 시차 없이 동시에 움직인다(마우스에서는 그 편이 또렷하다). */
+  transition-delay: min(calc((var(--i, 0) - var(--active-i, 0)) * var(--w-stagger)), 48ms);
+}
+/* 모션을 줄여 달라고 한 사용자에게는 펼침만 남기고 움직임을 없앤다 */
+@media (prefers-reduced-motion: reduce) {
+  .wcard {
+    transition: none;
+  }
+}
+/* 호버는 마우스가 있는 기기에서만 — 터치에서는 탭한 카드에 호버가 눌어붙어(sticky hover)
+   중앙 펼침과 두 카드가 동시에 열린 것처럼 보인다. */
+@media (hover: hover) {
+  .wcard:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-hover);
+    --band-h: auto;
+    --head-wrap: normal;
+    --head-display: -webkit-box;
+    --label-align: flex-start;
+    --dot-shift: 5px;
+  }
+  .wcard:hover ~ .wcard {
+    transform: translateY(calc(var(--w-card-h) - var(--w-peek)));
+  }
 }
 /* 숨긴 카드는 덱의 가장 뒤(음수 z-index)로 가라앉혀 다른 카드 뒤에 깔리게 하고, 불투명하게
    채도만 낮춘다(투명하게 하면 겹친 뒤 카드가 비쳐 지저분해 보여서 opacity는 쓰지 않는다). */
@@ -134,10 +184,60 @@ footer {
   .wcard-menu {
     opacity: 1;
   }
+  /* ── 화면은 고정, 스크롤은 덱 안에서만 ─────────────────────────────
+     호버가 없는 기기에서는 기준선에 온 카드가 펼쳐진다(lib/deck-focus.ts). 그러려면 그 선이
+     화면 안에 고정돼 있어야 한다. 페이지가 통째로 흘러가면 기준선이 함께 움직여, 카드를 훑는
+     동안 화면 밖으로 나가 버린다.
+     그래서 스크롤 단위를 덱으로 좁힌다 — 톱바·안내문·푸터는 제자리에 있고 카드만 움직인다.
+     375×812 기준 덱 몫이 482px라 카드(--w-card-h 158px)가 충분히 들어간다. */
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  main {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .deck {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* 덱 끝에서 페이지가 딸려 움직이지 않게 (당겨서 새로고침도 함께 막힌다) */
+    overscroll-behavior: contain;
+    /* 스크롤 앵커링을 끈다 — 펼쳐진 카드가 뒤 카드들을 transform으로 밀어내므로, 브라우저가
+       그 변화를 "내용이 움직였다"고 보고 스크롤 위치를 보정하면 실기기에서 화면이 튄다. */
+    overflow-anchor: none;
+    /* 카드의 offsetTop이 이 요소 기준이 되게 (deck-focus.ts가 그 전제로 잰다) */
+    position: relative;
+    /* 첫 카드 위 숨 쉴 틈. 기준선은 "이만큼 내려온 첫 카드의 중심"이라(deck-focus.ts가 이 값을
+       읽는다) 이 한 줄이 곧 펼침 위치를 정한다 — 0에 가까우면 카드가 안내문에 붙어 답답하고,
+       화면 절반까지 내리면 맨 위에서 첫 카드 앞이 통째로 비어 보인다. */
+    padding-top: var(--sp-7);
+    /* 스크롤바를 숨긴다 — 덱은 목록이 아니라 카드 뭉치라 막대가 월렛 은유를 깬다.
+       대신 아래를 옅게 흐려 "더 있다"를 말한다. 페이지가 안 움직이는 화면에서 막대까지 없애면
+       스크롤할 수 있다는 신호가 통째로 사라지기 때문이다. */
+    scrollbar-width: none;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  }
+  .deck::-webkit-scrollbar {
+    display: none;
+  }
+  /* 스크롤 활주로 — 마지막 카드도 기준선까지 올라오게 한다.
+     ⚠️ padding-bottom으로 두면 안 된다. WebKit(모바일 사파리)은 스크롤 컨테이너가 flex일 때
+     하단 패딩을 스크롤 영역에 넣지 않아 **실기기에서 스크롤이 통째로 막힌다** — 에뮬레이터
+     (Chrome)는 포함해서 계산하므로 데스크톱 검증만으로는 잡히지 않는다. 실제로 그렇게 놓쳤다.
+     플렉스 아이템으로 두면 어느 엔진에서나 높이로 잡힌다. */
+  .deck::after {
+    content: "";
+    flex-shrink: 0;
+    height: var(--deck-runway, 0px);
+  }
 }
 /* 피크 밴드 — 스택시 보이는 유일한 영역. 향미 그라데이션(JS)·산지 닷·헤드라인·경과일·로스터리 */
 .w-band {
-  height: var(--w-peek);
+  /* 스택에서는 피크 높이로 고정, 펼쳐진 카드에서만 늘어난다(--band-h) */
+  height: var(--band-h, var(--w-peek));
   padding: 11px 18px 9px;
   box-sizing: border-box;
   background-color: var(--surface-2);
@@ -169,25 +269,34 @@ footer {
   gap: 10px;
   justify-content: space-between;
 }
+/* 헤드라인은 대문자로 강제하지 않는다 — 같은 이름이 7% 넓어져 잘림이 앞당겨지고(383px vs 355px),
+   Yirgacheffe·La Cabaña 같은 고유명사의 결이 뭉개진다. 아래 .w-roastery처럼 마이크로 캡스로
+   쓰는 자리는 그대로 둔다(DESIGN.md §4의 마이크로 규칙). */
 .w-origin-label {
   display: inline-flex;
-  align-items: center;
+  align-items: var(--label-align, center);
   gap: 9px;
   min-width: 0;
   font-family: var(--display);
   font-weight: 700;
   font-size: 21px;
   line-height: 1.05;
-  text-transform: uppercase;
 }
-/* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다 */
+/* 말줄임은 flex 컨테이너가 아니라 내부 텍스트 span에 걸어야 동작한다.
+   스택에서는 한 줄 말줄임, 펼쳐졌을 때만 두 줄(--head-wrap/--head-display).
+   -webkit-line-clamp는 display:-webkit-box일 때만 효력이 있어 항상 적어 둬도 무해하다. */
 .w-origin-text {
   min-width: 0;
-  white-space: nowrap;
+  white-space: var(--head-wrap, nowrap);
+  display: var(--head-display, block);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .w-origin-dot {
+  /* 두 줄로 펼쳐지면 닷이 가운데로 내려가 첫 줄과 어긋난다 — 그때만 첫 줄 높이에 맞춘다 */
+  margin-top: var(--dot-shift, 0);
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -198,6 +307,10 @@ footer {
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  /* 왼쪽 그룹(로스터리·KEY)과 떼어 오른쪽 끝에 세운다 — 카드마다 같은 x좌표에 정렬된다 */
+  margin-left: auto;
+  /* 아래 줄은 baseline 정렬이라, 테두리가 있는 알약은 가운데로 맞춰야 줄이 흔들려 보이지 않는다 */
+  align-self: center;
   color: var(--sub);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
@@ -209,11 +322,15 @@ footer {
 }
 .w-band-sub {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 10px;
+  /* 로스터리와 KEY 사이의 간격 — 붙여 두되 한 낱말로 뭉치지 않을 만큼만 */
+  gap: 8px;
 }
 .w-roastery {
+  /* 내용 너비만 쓰되 좁으면 줄어들며 말줄임 — KEY를 밀어내지 않게 한다.
+     남는 폭은 D+N의 margin-left:auto가 가져가 배지를 오른쪽 끝에 붙인다. */
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -223,10 +340,19 @@ footer {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 로스터리 바로 옆 — 둘 다 "어느 봉지인가"를 말하는 식별자라 한 덩어리로 읽히게 붙인다.
+   서체가 갈려(로스터리는 캡스+자간, KEY는 mono) 붙여도 두 값으로 읽힌다.
+   다만 둘의 무게가 같으면 안 된다. 로스터리는 사람이 읽는 이름이고 KEY는 봉지와 대조하는 번호라,
+   훑을 때 먼저 걸려야 하는 쪽은 로스터리다. 그런데 KEY가 오히려 반 픽셀 크고 같은 700이라 더 세게
+   읽혔다 — 크기를 로스터리에 맞추고 웨이트를 내려 뒤로 물린다.
+   ⚠️ 색으로는 낮추지 않는다. 이 밴드(--surface-2) 위에서 --sub의 대비가 라이트 4.88 : 다크 4.82로
+   AA(4.5) 여유가 0.3~0.4뿐이라, 한 단계만 흐리면(85%) 3.6~3.9로 떨어져 기준을 깬다 —
+   테마의 --sub 주석에 남아 있는 그 실수(구 #74747c, 4.2:1)를 되풀이하는 셈이다. */
 .w-key {
+  flex-shrink: 0;
   font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.05em;
   color: var(--sub);
 }

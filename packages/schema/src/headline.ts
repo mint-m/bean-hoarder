@@ -14,11 +14,42 @@ export const HEADLINE_PLACE_ORDER = ["WASHING_STATION", "PRODUCER", "REGION"] as
 /** 헤드라인 입력: CSV 키(UPPER_SNAKE) 기준의 느슨한 원두 레코드. 부분 행·미지 키를 허용한다. */
 export type HeadlineRow = Record<string, string | boolean | undefined>;
 
+/**
+ * 블렌드의 **저장값** — 화면에 보이는 "(여러 원산지 혼합)" 설명은 칩 라벨에만 남는다.
+ *
+ * 등록 폼(칩·연쇄 채움)과 표시(displayValue)가 같은 말을 봐야 하는데, 폼은 상위 패키지라
+ * 스키마가 거꾸로 가져올 수 없다. 그래서 값이 여기 살고 폼이 가져다 쓴다 — 리터럴이 두 벌이면
+ * 한쪽만 바뀌는 날 표시가 조용히 원래 버그로 돌아간다.
+ */
+export const BLEND_VALUE = "블렌드";
+
+/** 이미 등록된 행은 괄호까지 저장돼 있어 접두로 본다. */
+export function isBlend(v: string): boolean {
+  return String(v ?? "")
+    .trim()
+    .startsWith(BLEND_VALUE);
+}
+
 /** 괄호 속 상세 설명 축약 — "블렌드 (여러 원산지 혼합)" → "블렌드" */
 export function stripParen(s: string): string {
   return String(s || "")
     .replace(/\s*[(（][^)）]*[)）]?/g, "")
     .trim();
+}
+
+/**
+ * 값을 화면·라벨에 그대로 쓸 수 있게 다듬는다 — 지금은 블렌드의 괄호 설명만 떼어낸다.
+ *
+ * 등록 폼은 "블렌드 (여러 원산지 혼합)"을 통째로 저장하던 시절이 있어, 조회 카드 한 장에
+ * "블렌드 (여러 원산지 혼합)"·"(여러 가공방식 혼합)"·"(여러 품종 혼합)"이 셋 뜬다. 헤드라인만
+ * stripParen을 타고 서브라인·스펙 줄·라벨은 날값을 쓰기 때문이다.
+ *
+ * stripParen을 아무 값에나 거는 대신 **블렌드로 시작하는 값에만** 거는 이유: 괄호가 정보인
+ * 필드가 있다. LOT "Sewda (Micro)", AGTRON "#75 (미디움라이트)"에서 괄호를 떼면 값이 상한다.
+ */
+export function displayValue(v: string): string {
+  const s = String(v ?? "").trim();
+  return isBlend(s) ? stripParen(s) : s;
 }
 
 const g = (row: HeadlineRow, k: string): string => stripParen(String(row[k] ?? "").trim());
