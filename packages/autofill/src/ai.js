@@ -30,7 +30,7 @@ export const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/mod
 /** 한 번에 보낼 최대 글자 수. /api/fetch가 이미 20,000자로 자르므로 사실상의 상한이다. */
 export const AI_MAX_CHARS = 30000;
 
-/** AI가 채울 수 있는 필드 — 로스팅일·패키징일은 페이지에 없는 정보라 제외한다. */
+/** AI가 채울 수 있는 필드 — 로스팅일·소분일은 페이지에 없는 정보라 제외한다. */
 export const AI_FIELD_KEYS = [
   "ROASTERY",
   "ORIGIN",

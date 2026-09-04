@@ -26,7 +26,7 @@ const DOT = 0.125;
 const RED = "#e8341c";
 
 // [필드키, 라벨 인쇄 약어, 관리자 화면 표시명]
-// 로스팅일·패키징일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
+// 로스팅일·소분일은 필수 입력 정보라 이 풀에 넣지 않고 항상 고정 위치(최하단/QR 옆)에 인쇄한다 — buildLabelSVG 참고.
 // 배열 순서 = 기본 표시 우선순위(공간이 부족할 때 뒤쪽부터 자동으로 숨겨짐) — lab.js에서 사용자가 직접 재정렬 가능.
 // 우선순위 체계(#27): 가공·품종은 2순위(향미·정체성), 고도·수확시기는 3순위(전문 디테일)이므로
 // 2순위를 앞에 둔다. 용량(NET)은 유통 필수라 1위 유지, 로스팅 포인트는 품종 다음.
@@ -332,7 +332,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   const module = S.qrDots * DOT;
   const QR_SIZE = module * n;
   const portrait = S.orient === "portrait";
-  // 세로형(카드형)은 QR을 우측에 붙이고, 로스팅일·패키징일을 좌측에 두 줄로 쌓아 배치한다
+  // 세로형(카드형)은 QR을 우측에 붙이고, 로스팅일·소분일을 좌측에 두 줄로 쌓아 배치한다
   // (보딩패스 스텁의 바코드 옆 항공편 정보 컨셉 — buildLabelSVG 하단 참고).
   const QR_X = portrait
     ? Math.round((W - S.margin - QR_SIZE) / DOT) * DOT
@@ -407,7 +407,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   );
   const infoText = subOrder.map(labelVal).filter(Boolean).join(" · ");
 
-  // 로스팅일·패키징일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
+  // 로스팅일·소분일은 필수 정보라 사용자가 끄거나 순서를 바꿀 수 없는 고정 푸터로 인쇄한다.
   // 가로형은 라벨 최하단에 한 줄(2열)로, 세로형(카드형)은 QR 좌측에 두 줄로 타이트하게 고정한다 —
   // 가로형만 그 한 줄만큼 아래 flow 레이아웃의 바닥 예산을 당긴다(세로형은 QR 옆 여백을 쓰므로 본문 예산을 그대로 쓴다).
   const CONTENT_BOTTOM = portrait ? BOTTOM : BOTTOM - S.specLH;
@@ -514,7 +514,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
     );
   }
 
-  // 고정 푸터: 로스팅일·패키징일 — 필수 정보이므로 토글 여부와 무관하게 항상 인쇄
+  // 고정 푸터: 로스팅일·소분일 — 필수 정보이므로 토글 여부와 무관하게 항상 인쇄
   if (portrait) {
     // 카드형: QR 왼쪽 옆에 "RSTD26.06.29 PKGD26.07.09" 한 줄로 촘촘하게 배치, QR 하단에 맞춰 정렬.
     // 라벨·값 사이 간격을 specGapX보다 훨씬 좁게 둬 좁은 QR 옆 공간에 한 줄로 들어가게 한다.
