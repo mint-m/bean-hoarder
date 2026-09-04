@@ -25,7 +25,10 @@ jobs:
           node-version-file: .nvmrc
       - name: Run AI Review
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # CI 전용 키가 있으면 그것을 쓴다 — 서비스(랩 자동 채우기)와 같은 키를 쓰면 Google 쪽
+          # 쿼터를 함께 갉아먹어, 리뷰 한 번(수만 토큰)이 같은 시각의 사용자 자동 채우기를 429로
+          # 밀어낼 수 있다. 없으면 기존 키로 떨어지므로 시크릿을 안 만들어도 그대로 동작한다.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_CI || secrets.GEMINI_API_KEY }}
           # 비워 두면 스크립트가 ListModels로 사용 가능한 모델을 동적 탐색한다 (vars.GEMINI_MODEL로 고정 가능).
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

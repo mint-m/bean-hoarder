@@ -3,11 +3,35 @@
 //
 // 동작 원리:
 // 1. GitHub API를 통해 PR 메타데이터와 diff를 가져온다.
-// 2. 프로젝트 특화 규칙(SSOT, Cloudflare Pages 폴백, XSS/SQLi 보안)을 주입한 프롬프트로 Gemini API를 호출한다(모델 동적 선택).
+// 2. CLAUDE.md 원문을 규칙으로 주입한 프롬프트로 Gemini API를 호출한다(모델 동적 선택 · flash 우선).
 //    출력은 responseSchema로 강제한 구조화 JSON(판정·요약·강점·findings)을 받는다.
 // 3. 구조화 결과를 마크다운으로 렌더해 PR 코멘트로 등록하거나 기존 코멘트를 갱신한다(파싱 실패 시 원문 폴백).
 
+import { readFileSync } from "node:fs";
+
 const BOT_SIGNATURE = "<!-- ai-pr-review-bot -->";
+
+/**
+ * 프로젝트 규칙 — CLAUDE.md를 그대로 싣는다.
+ *
+ * 예전에는 규칙 네 줄을 프롬프트에 손으로 적어 뒀는데, 그 사이 CLAUDE.md가 자라면서 어긋났다
+ * (마이그레이션 파일이 경보라는 것, app.test.ts가 계약 문서라는 것, wallet-card.ts와 deck.css가
+ * 한 벌이라는 것이 전부 빠져 있었다). 원본을 실으면 규칙이 바뀔 때 자동으로 따라온다.
+ * 읽지 못하면 리뷰를 멈추지 않고 최소 규칙으로 계속한다 — 리뷰는 보조 기능이다.
+ */
+function projectRules() {
+  try {
+    return readFileSync("CLAUDE.md", "utf8");
+  } catch (_e) {
+    console.warn("⚠️ CLAUDE.md를 읽지 못해 최소 규칙으로 진행합니다.");
+    return [
+      "- Cloudflare Pages의 암묵적 SPA 폴백을 유지해야 함 (404.html 생성 금지 — 인쇄된 QR이 죽음).",
+      "- 도메인 규칙은 packages/의 단일 소스(SSOT)를 사용해야 함.",
+      "- innerHTML 사용 시 escapeHtml 철저 검증.",
+      "- 웹 번들에 불필요한 서드파티 유입 금지, 무거운 모듈은 지연 로딩.",
+    ].join("\n");
+  }
+}
 
 // 심각도는 코드랩(Antigravity)의 구조화 findings에서 따온 축 — 렌더 정렬·집계에 쓴다.
 const SEV_ORDER = ["critical", "high", "medium", "low", "nit"];
@@ -49,7 +73,10 @@ const REVIEW_SCHEMA = {
     },
   },
   required: ["summary", "verdict", "findings"],
-  propertyOrdering: ["summary", "verdict", "strengths", "findings"],
+  // ⚠️ 순서가 곧 생성 순서다. verdict를 findings보다 먼저 두면 모델이 **문제를 열거하기 전에**
+  // 판정을 확정하고, 그다음 findings가 이미 써 버린 APPROVE에 맞춰 눌린다. findings를 앞에 둬야
+  // "무엇을 찾았는가 → 그래서 어떤 판정인가" 순으로 쓴다.
+  propertyOrdering: ["summary", "findings", "strengths", "verdict"],
 };
 
 /** 구조화 리뷰 객체 → PR 코멘트 마크다운. 심각도순 정렬 + 집계 한 줄. */
@@ -133,8 +160,8 @@ async function main() {
   }
   let diff = await diffRes.text();
 
-  // lockfile, 거대 삭제 청크 등 불필요한 diff 제외 및 크기 축소 (무료 티어 토큰 한도 보호)
-  let cleanDiff = diff
+  // lockfile, 거대 삭제 청크 등 불필요한 diff 제외 (무료 티어 토큰 한도 보호)
+  const chunks = diff
     .split(/^diff --git /m)
     .filter((chunk) => {
       if (!chunk) return false;
@@ -147,12 +174,26 @@ async function main() {
       );
     })
     // split이 떼어낸 "diff --git " 접두를 각 청크에 도로 붙인다 — 첫 파일도 접두를 잃지 않도록.
-    .map((chunk) => `diff --git ${chunk}`)
-    .join("");
+    .map((chunk) => `diff --git ${chunk}`);
 
-  if (cleanDiff.length > 25000) {
-    cleanDiff = cleanDiff.slice(0, 25000) + "\n\n...(diff가 길어 주요 파일 내용만 요약 전달되었습니다)...";
+  // 파일 단위로 담는다. 예전에는 이어 붙인 문자열을 25,000자에서 통째로 잘랐는데, 그 값이 이
+  // 저장소의 큰 PR(45파일·diff 210KB)에서 **전체의 11%**만 남겼다. 모델은 앞쪽 파일 다섯 개만 보고도
+  // PR 설명을 근거로 나머지를 아는 듯이 평했다 — 얕은 리뷰의 원인은 프롬프트가 아니라 입력이었다.
+  // 250,000자면 이 저장소의 역대 최대 PR도 통째로 들어간다(≈7만 토큰).
+  const MAX_DIFF_CHARS = 250_000;
+  const fileOf = (chunk) => (chunk.match(/^diff --git a\/(\S+)/) || [])[1] || "?";
+  let cleanDiff = "";
+  const skipped = [];
+  for (const chunk of chunks) {
+    // 중간에서 끊지 않는다 — 반쪽짜리 파일은 오히려 잘못된 판단을 부른다
+    if (cleanDiff.length + chunk.length > MAX_DIFF_CHARS) skipped.push(fileOf(chunk));
+    else cleanDiff += chunk;
   }
+  // 빠진 것이 있으면 모델에게 알린다. 안 알리면 "안 본 파일"을 본 것처럼 평하게 된다.
+  if (skipped.length) {
+    cleanDiff += `\n\n...(토큰 한도로 diff에서 제외된 파일 — 아래 파일은 검토하지 못했다고 밝힐 것: ${skipped.join(", ")})...`;
+  }
+  console.log(`📏 diff ${cleanDiff.length}자 전달${skipped.length ? ` (제외 ${skipped.length}개 파일)` : " (전량)"}`);
 
   // 2. 사용할 Gemini 모델 결정 (ListModels API로 지원 모델 동적 탐색)
   console.log("🤖 사용할 Gemini 모델 확인 중...");
@@ -171,24 +212,27 @@ async function main() {
           .map((m) => m.name.replace(/^models\//, ""));
 
         console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // 모델 탐색 우선순위 — 코드 리뷰 품질을 위해 고성능(pro)을 먼저, 가용성 폴백으로 flash를 뒤에 둔다.
+        // 모델 탐색 우선순위 — **flash가 먼저다.**
+        // 예전에는 품질을 노리고 pro를 앞에 뒀는데, 이 키로는 pro 계열이 매번 429(쿼터)라 실제로는
+        // 한 번도 쓰이지 못하면서 왕복만 두 번 버렸다(2026-09-03 실측: 3.1-pro-preview 429 →
+        // pro-latest 429 → 2.5-pro 404 → …). pro는 티어가 바뀌면 쓸 수 있으므로 맨 뒤에 남겨 둔다.
         const preferredModels = [
-          "gemini-3.1-pro-preview",
-          "gemini-pro-latest",
-          "gemini-2.5-pro",
+          "gemini-3.8-flash",
           "gemini-3.7-flash",
           "gemini-3.6-flash",
-          "gemini-3.5-flash",
           "gemini-flash-latest",
+          "gemini-3.5-flash",
+          "gemini-3.1-pro-preview",
+          "gemini-pro-latest",
           "gemini-flash-lite-latest",
         ];
         targetModel = preferredModels.find((m) => available.includes(m));
         if (!targetModel) {
-          // 목록에 없으면 pro > flash 순으로, 이미지·비전 전용 모델은 제외하고 고른다.
-          const usable = (m) => !m.includes("image") && !m.includes("vision");
+          // 목록에 없으면 flash > pro 순으로, 이미지·비전 전용 모델은 제외하고 고른다.
+          const usable = (m) => !m.includes("image") && !m.includes("vision") && !m.includes("lite");
           targetModel =
-            available.find((m) => m.includes("pro") && usable(m)) ||
-            available.find((m) => m.includes("flash") && usable(m));
+            available.find((m) => m.includes("flash") && usable(m)) ||
+            available.find((m) => m.includes("pro") && usable(m));
         }
         targetModel = targetModel || available[0];
       }
@@ -197,21 +241,15 @@ async function main() {
     }
   }
 
-  targetModel = targetModel || "gemini-3.1-pro-preview";
+  targetModel = targetModel || "gemini-3.7-flash";
   console.log(`🎯 선택된 모델: ${targetModel}`);
 
   console.log("🤖 Gemini API에 코드 리뷰 요청 중...");
   const prompt = `당신은 Bean-Hoarder 프로젝트의 시니어 풀스택 코드 리뷰어입니다.
 제출된 Pull Request의 제목, 설명, git diff를 분석하고 건설적이고 명확한 한국어 코드 리뷰를 작성해 주세요.
 
-## 프로젝트 맥락
-- 프로젝트명: Bean-Hoarder (원두 소분 라벨 아카이브)
-- 기술 스택: TypeScript, Cloudflare Pages + D1 (SQLite) + R2, Hono (API), Vite MPA (apps/web - viewer, deck), React SPA (apps/lab), SVG 라벨 엔진 (@bnhd/label), Playwright E2E & Vitest
-- **절대 규칙**:
-  1. Cloudflare Pages의 암묵적 SPA 폴백(매치 없는 경로 -> index.html)을 유지해야 함 (404.html 생성 금지 — 인쇄된 라벨의 QR 코드가 죽음).
-  2. 도메인 규칙(헤드라인 생성, 세션 저장 등)은 반드시 packages/의 단일 소스(SSOT)를 사용해야 함.
-  3. XSS 방어: innerHTML 사용 시 escapeHtml 철저 검증.
-  4. 웹 번들 크기 최적화: 불필요한 서드파티 라이브러리 유입 방지 및 무거운 모듈(jsQR 등) 지연 로딩 준수.
+## 프로젝트 규칙 (CLAUDE.md 원문 — 이 저장소의 금지 사항과 함정이 전부 여기 있다)
+${projectRules()}
 
 ## PR 정보
 - PR 번호: #${prNumber}
@@ -237,18 +275,27 @@ ${cleanDiff}
     - description: 무엇이 왜 문제인지 한국어로
     - suggestion: 구체적 수정 제안 (없으면 null)
 
+## 리뷰 태도
+- **diff에 실제로 있는 코드만 근거로 삼는다.** PR 설명은 작성자의 주장일 뿐이므로, 설명이 그렇다고
+  해서 그렇게 되었다고 적지 않는다. 위에 "제외된 파일" 목록이 있으면 그 파일은 검토하지 못했다고 밝힌다.
+- **strengths는 diff에서 확인한 것만 적는다.** 확인할 수 없으면 비운다 — 근거 없는 칭찬은 리뷰를
+  못 믿게 만든다.
+- findings를 먼저 채우고, 그 결과를 보고 verdict를 정한다. 문제가 없으면 빈 배열이어도 좋지만,
+  **찾지 못한 것과 없는 것은 다르다** — summary에 무엇을 확인했는지 한 문장으로 남긴다.
+- 특히 위 규칙 문서의 "절대 바꾸지 말 것"·"걸려 넘어지기 쉬운 것"에 걸리는 변경이 있는지 본다.
+
 설명은 친절하고 전문적인 한국어로 작성한다.`;
 
-  // targetModel(고성능 우선 선택) 먼저, 이후 pro > flash 순 폴백 — 하나가 5xx/429여도 다음으로 넘어간다.
+  // targetModel 먼저, 이후 flash > pro 순 폴백 — 하나가 5xx/429여도 다음으로 넘어간다.
   const candidateModels = [
     targetModel,
-    "gemini-3.1-pro-preview",
-    "gemini-pro-latest",
-    "gemini-2.5-pro",
+    "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
-    "gemini-3.5-flash",
     "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-3.1-pro-preview",
+    "gemini-pro-latest",
     "gemini-flash-lite-latest",
   ];
   const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
@@ -258,31 +305,38 @@ ${cleanDiff}
   let lastError = null;
 
   for (const model of modelsToTry) {
-    console.log(`🤖 Gemini API (${model}) 호출 시도 중...`);
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const res = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json",
-          responseSchema: REVIEW_SCHEMA,
-        },
-      }),
-    });
+    // 5xx는 일시적 과부하라 한 번은 다시 묻는다 — 2026-09-03에 gemini-3.7-flash가 503 하나로 밀려
+    // 한 단계 아래 모델이 리뷰를 썼다. 429(쿼터)·404(없는 모델)는 곧바로 다시 물어도 같은 답이라
+    // 재시도하지 않고 다음 후보로 넘어간다.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      console.log(`🤖 Gemini API (${model}) 호출 시도 중...${attempt > 1 ? ` (재시도 ${attempt})` : ""}`);
+      const res = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json",
+            responseSchema: REVIEW_SCHEMA,
+          },
+        }),
+      });
 
-    if (res.ok) {
-      aiRes = res;
-      usedModel = model;
-      console.log(`✅ ${model} 모델로 성공적인 응답을 받았습니다.`);
-      break;
-    } else {
+      if (res.ok) {
+        aiRes = res;
+        usedModel = model;
+        console.log(`✅ ${model} 모델로 성공적인 응답을 받았습니다.`);
+        break;
+      }
       const errText = await res.text();
       console.warn(`⚠️ 모델 ${model} 실패 (${res.status}): ${errText}`);
       lastError = `${res.status} ${errText}`;
+      if (res.status < 500 || attempt === 2) break;
+      await new Promise((r) => setTimeout(r, 3000));
     }
+    if (aiRes) break;
   }
 
   if (!aiRes || !usedModel) {
