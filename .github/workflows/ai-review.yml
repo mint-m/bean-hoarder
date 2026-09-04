@@ -1,12 +1,19 @@
 name: AI PR Review
 
 on:
+  # 열릴 때 한 번만. synchronize(=브랜치 push)를 뺀 이유: push마다 리뷰가 돌면 한 PR에서 열 번도
+  # 도는데, diff 전량을 싣는 지금은 회당 수만 토큰이라 그 대부분이 낭비다(같은 코드를 조금씩 늘려
+  # 가며 다시 읽는 셈이다). 코드가 바뀐 뒤 다시 보고 싶으면 아래 코멘트 명령으로 부른다.
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
+  # 수동 트리거 — PR에 "/gemini review"라고 코멘트하면 그 PR을 다시 검토한다.
+  issue_comment:
+    types: [created]
 
-# 같은 PR에 연속 push가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+# 같은 PR에 연속 트리거가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+# issue_comment 이벤트에는 pull_request.number가 없어 issue.number로 떨어진다(같은 번호다).
 concurrency:
-  group: ai-review-${{ github.event.pull_request.number }}
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 # PR 코멘트는 issues API를 쓰지만 PR 대상이면 pull-requests:write로 충분하다 (issues:write 불필요).
@@ -17,8 +24,20 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    # 코멘트 트리거는 세 가지를 모두 만족해야 돈다:
+    #   1) 이슈가 아니라 PR에 달린 코멘트일 것 (issue.pull_request가 있어야 한다)
+    #   2) 본문이 "/gemini review"로 시작할 것 — 봇 자신의 코멘트로 되돌아 도는 일도 이걸로 막힌다
+    #   3) 쓰기 권한이 있는 사람일 것 — 아니면 누구나 코멘트 한 줄로 API 쿼터를 태울 수 있다
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request != null &&
+       startsWith(github.event.comment.body, '/gemini review') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     # Dependabot 등의 자동 PR은 필요에 따라 건너뛰거나 실행할 수 있음
     steps:
+      # 코멘트 트리거일 때는 PR이 아니라 기본 브랜치가 체크아웃된다. 스크립트는 diff를 API로
+      # 가져오므로 상관없고, 규칙(CLAUDE.md)은 오히려 main 것을 쓰는 편이 맞다 — 심사받는 PR이
+      # 자신을 심사할 규칙까지 바꿔 오면 안 된다.
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
@@ -33,5 +52,5 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
         run: node .github/scripts/ai-review.mjs
