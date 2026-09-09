@@ -171,7 +171,9 @@ export default function IntakeCard(p: Props) {
           직접 입력으로 시작하기 →
         </button>
       </div>
-      <div className={`status-line intake-status ${p.status.cls}`}>{p.status.msg}</div>
+      <div role="status" className={`status-line intake-status ${p.status.cls}`}>
+        {p.status.msg}
+      </div>
       {nudge}
     </div>
   );

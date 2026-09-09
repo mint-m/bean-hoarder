@@ -798,7 +798,9 @@ export default function Workspace({
                     처음부터
                   </button>
                 </div>
-                <div className={`status-line register-status ${status.cls}`}>{status.msg}</div>
+                <div role="status" className={`status-line register-status ${status.cls}`}>
+                  {status.msg}
+                </div>
               </div>
             </>
           )}

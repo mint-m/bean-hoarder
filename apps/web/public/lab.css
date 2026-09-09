@@ -261,6 +261,8 @@ h2 {
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }
+/* 저장·검증 결과가 여기 뜬다. 마크업 쪽에 role="status"가 붙어 있어 스크린리더도 읽는다 —
+   시각 변화만으로 끝내면 "저장 완료"·"검증 실패"가 화면 밖 사용자에게는 아무 일도 아니게 된다. */
 .status-line {
   font-size: 12px;
   margin-top: var(--sp-2);
