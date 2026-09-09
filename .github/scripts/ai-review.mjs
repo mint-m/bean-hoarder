@@ -121,8 +121,8 @@ const DECL_PATTERNS = [
   /^[+-]\s*export\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/,
   /^[+-]\s*export\s+(?:abstract\s+)?(?:const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/,
 ];
-/** `export { a, b as c }` 재수출 목록도 심볼로 본다 */
-const EXPORT_LIST_RE = /^[+-]\s*export\s*\{([^}]*)\}/;
+/** `export {` 가 열리는 줄 — 닫는 `}`가 같은 줄에 없으면 다음 줄로 이어진다 */
+const EXPORT_OPEN_RE = /^[+-]\s*export\s*\{(.*)$/;
 
 /**
  * 이 PR이 건드린 심볼이 **diff 밖 어디서 쓰이는지** 모은다.
@@ -139,20 +139,41 @@ function callSiteContext(tree, diff, changedFiles) {
   if (!tree) return "";
 
   const symbols = new Set();
+  /** `a, b as c }` 같은 조각에서 이름을 거둔다 — `}` 뒤는 목록이 아니다 */
+  const addNames = (segment) => {
+    for (const part of segment.split("}")[0].split(",")) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) symbols.add(name);
+    }
+  };
+
+  // 재수출 목록은 여러 줄로 쓸 수 있어(`export {\n  foo,\n  bar\n}`) 줄 하나만 봐서는 못 잡는다.
+  // 열림 상태를 들고 다음 줄로 이어 읽되, **헌크가 바뀌면 상태를 버린다** — 헌크 사이는 이어진
+  // 코드가 아니라서, 들고 넘어가면 엉뚱한 줄을 목록의 일부로 읽는다.
+  let openList = false;
   for (const line of diff.split("\n")) {
+    if (line.startsWith("@@")) {
+      openList = false;
+      continue;
+    }
     if (!/^[+-]/.test(line) || /^(\+\+\+|---)/.test(line)) continue;
+
+    if (openList) {
+      addNames(line.slice(1));
+      if (line.includes("}")) openList = false;
+      continue;
+    }
+    const open = line.match(EXPORT_OPEN_RE);
+    if (open) {
+      addNames(open[1]);
+      openList = !open[1].includes("}");
+      continue;
+    }
     for (const re of DECL_PATTERNS) {
       const m = line.match(re);
       if (m) {
         symbols.add(m[1]);
         break;
-      }
-    }
-    const list = line.match(EXPORT_LIST_RE);
-    if (list) {
-      for (const part of list[1].split(",")) {
-        const name = part.trim().split(/\s+as\s+/).pop()?.trim();
-        if (name && /^[A-Za-z_$][\w$]*$/.test(name)) symbols.add(name);
       }
     }
   }
@@ -683,8 +704,10 @@ ${CHECKLIST.map((c, i) => `    ${i + 1}. ${c}`).join("\n")}
   // 없는데, 모르는 필드를 보내면 400으로 거절당한다. 그래서 **떠보고 거절당하면 한 단계 내린다.**
   // 한 번 정해지면 그 실행 내내 그 형태를 쓴다 — 호출마다 왕복을 버리지 않도록.
   const THINKING_VARIANTS = [
-    { thinkingLevel: "high" }, // Gemini 3.x
-    { thinkingConfig: { thinkingBudget: 8192 } }, // Gemini 2.5 계열
+    // 2026-09-09 실측: 이 키의 gemini-3.8-flash는 thinkingLevel을 400으로 거절하고 thinkingConfig를
+    // 받았다. 먹는 쪽을 앞에 둔다 — 안 그러면 매 실행이 거절 왕복 하나를 그냥 버린다.
+    { thinkingConfig: { thinkingBudget: 8192 } },
+    { thinkingLevel: "high" },
     {}, // 사고 예산을 받지 않는 모델
   ];
   let thinkingIdx = 0;
