@@ -25,6 +25,22 @@ import { type BeanPublicRow, emptyForm, type FormKey, type FormState, type Statu
 const SITE = "https://bnhd.pages.dev";
 
 /**
+ * 폼에 들어오는 값의 표기를 저장될 모습으로 미리 맞춘다.
+ *
+ * 폼이 원문을 들고 화면만 다르게 보이면, 접힌 요약·라벨 미리보기·저장값이 서로 다른 말을 한다
+ * (로스터리 칸은 BIGSUR COFFEE인데 그 위 요약은 "BigSur Coffee · ETHIOPIA"로 뜬다). 값을 넣는
+ * 길이 셋이라(직접 입력·칩·자동 채우기) 화면 쪽에서 막을 수 없어, 들어오는 길목 하나로 모은다.
+ *
+ * ROASTERY는 서버가 대문자로 정규화해 저장한다(@bnhd/schema normalizeRoastery) — 여기가 그 규칙의
+ * 사본이라는 뜻이므로, 서버 쪽이 바뀌면 함께 바뀌어야 한다. AGTRON의 # 자동 부착도 같은 성격이다.
+ */
+function normalizeFieldValue(key: FormKey, value: string): string {
+  if (key === "ROASTERY") return value.toUpperCase();
+  if (key === "AGTRON" && /^\d/.test(value)) return `#${value}`; // 숫자로 시작하면 # 자동 부착
+  return value;
+}
+
+/**
  * "같은 원두"를 가르는 필드 — 이 전부가 같을 때만 중복으로 본다.
  *
  * 헤드라인(@bnhd/schema/headline)이 쓰는 식별 필드에 품종·가공방식을 더한 것이다. 둘은 등록
@@ -210,7 +226,7 @@ export default function Workspace({
   // ── 표시 토글 자동 체크: 값이 방금 채워지면 켜고, 비워지면 끈다 ──
   const updateField = useCallback(
     (key: FormKey, value: string) => {
-      if (key === "AGTRON" && /^\d/.test(value)) value = `#${value}`; // 숫자로 시작하면 # 자동 부착
+      value = normalizeFieldValue(key, value);
       // 사용자가 직접 손댄 순간 그 칸은 더 이상 "AI가 채운 미확인 값"이 아니다
       setAiFilled((prev) => {
         if (!prev.has(key)) return prev;
@@ -455,7 +471,9 @@ export default function Workspace({
     // 공백·중복만 다듬은 형태와 견줘, 표기가 실제로 바뀐 경우에만 알린다
     const retyped = notes !== serializeNotes(parseNotes(g("TASTING_NOTE")));
     const next: FormState = {
-      ROASTERY: g("ROASTERY"),
+      // 소급 마이그레이션을 두지 않았으므로 옛 원두는 원문으로 저장돼 있다 — 폼에 들이면서
+      // 저장될 표기로 맞춘다. 안 그러면 칸은 대문자로 보이는데(input.upper) 접힌 요약만 원문이다.
+      ROASTERY: normalizeFieldValue("ROASTERY", g("ROASTERY")),
       ORIGIN: g("ORIGIN"),
       COFFEE_NAME: g("COFFEE_NAME"),
       REGION: g("REGION"),
@@ -584,12 +602,14 @@ export default function Workspace({
       // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
       // 노트는 영문 표기로 되돌린 뒤 담는다 — AI가 "파인애플"을 주는 일이 있었고, 그대로 저장되면
       // 라벨에 한글이 찍히고 같은 향미가 카드마다 달라진다. 어휘 밖의 말은 그대로 둔다.
-      next[key] =
+      next[key] = normalizeFieldValue(
+        key,
         field === "TASTING_NOTE"
           ? capitalizeNoteSegments(canonicalizeNotes(v))
           : field === "AGTRON"
             ? canonicalRoast(v)
-            : v;
+            : v,
+      );
       filled.push(FIELD_LABELS_KO[field] || field);
       filledKeys.add(key);
     }
