@@ -1,7 +1,9 @@
 // Bean-Hoarder — 라벨 렌더러 단일 모듈 (@bnhd/label)
 // 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).
-// 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다 —
-// 라벨은 SVG라 대소문자 CSS가 없으므로 렌더 시점에 직접 .toUpperCase()를 건다.
+// 헤드라인 조합 규칙은 조회·덱과 공유하는 단일 소스(@bnhd/schema/headline)에서 가져온다.
+// 값의 대소문자는 **여기서 바꾸지 않는다** — 로스터리는 저장될 때 이미 대문자로 올라오고
+// (@bnhd/schema normalizeRoastery), 나머지는 원문이 기준이다. 라벨이 혼자 올리면 화면과 갈린다.
+// KEY만 예외로 .toUpperCase()를 거는데, 그건 표기가 아니라 형식(KEY_RE) 방어다.
 import { buildHeadline, displayValue, headlineUsedFields, stripParen } from "@bnhd/schema/headline";
 import jsQR from "jsqr";
 import qrcode from "qrcode-generator";
@@ -359,7 +361,7 @@ export function buildLabelSVG(row, design = DEFAULT_DESIGN, logoDataUrl = null) 
   // 상단 스트립 / 도트 + 로스터리 / 오리진 헤드라인(블랙) /
   // 정보 블록 / 점선 절취선 / 스펙 그리드(라벨+값) / 노트 / QR
   els.push(`<rect x="0" y="0" width="${W}" height="${S.strip}" fill="${INK}"/>`);
-  const rst = g("ROASTERY").toUpperCase();
+  const rst = g("ROASTERY");
   if (rst) {
     els.push(`<circle cx="${(S.margin + S.dotR).toFixed(2)}" cy="${S.dotCy}" r="${S.dotR}" fill="${INK}"/>`);
     els.push(

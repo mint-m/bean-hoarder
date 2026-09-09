@@ -152,10 +152,17 @@ export default function Workspace({
   const currentKey =
     confirmedKey ?? `${account.usercode || "????"}${YY}-${String(previewSeq).padStart(3, "0")}`;
 
+  /**
+   * 로스터리는 **저장될 때 대문자로 올라간다**(@bnhd/schema normalizeRoastery, 서버가 진짜 기준).
+   * 라벨 미리보기와 로고 R2 키가 그 값을 그대로 써야 미리 본 것과 저장된 것이 같다 —
+   * 라벨 렌더러는 더 이상 스스로 대문자로 바꾸지 않으므로 여기서 안 올리면 미리보기만 원문이 된다.
+   */
+  const roasteryUpper = form.ROASTERY.trim().toUpperCase();
+
   const row = useMemo(
     () => ({
       KEY: currentKey,
-      ROASTERY: form.ROASTERY.trim(),
+      ROASTERY: roasteryUpper,
       ORIGIN: form.ORIGIN.trim(),
       COFFEE_NAME: form.COFFEE_NAME.trim(),
       REGION: form.REGION.trim(),
@@ -174,7 +181,7 @@ export default function Workspace({
       MEMO: form.MEMO.trim(),
       SOURCE_URL: form.SOURCE_URL.trim(),
     }),
-    [form, currentKey],
+    [form, roasteryUpper, currentKey],
   );
 
   const label = useMemo(() => buildLabelSVG(row, design, logo.dataUrl), [row, design, logo.dataUrl]);
@@ -251,7 +258,6 @@ export default function Workspace({
   );
 
   // ── 로고: 로스터리 입력값에 저장된 로고 자동 적용 ───────────
-  const roasteryUpper = form.ROASTERY.trim().toUpperCase();
   useEffect(() => {
     setLogo((cur) => {
       if (cur.source === "manual") return cur;

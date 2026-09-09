@@ -92,6 +92,15 @@ test("50x60(세로형): QR이 우측·하단에 배치, 로스팅일·소분일�
   assert.ok(rstdX < minX, "RSTD 라벨은 QR보다 왼쪽에 위치");
 });
 
+test("라벨은 값의 대소문자를 바꾸지 않는다 — 로스터리도 저장된 표기 그대로", () => {
+  // 예전에는 여기서 로스터리에 .toUpperCase()를 걸었다. 지금은 저장될 때 이미 대문자로 올라오므로
+  // (@bnhd/schema normalizeRoastery) 라벨이 또 올릴 이유가 없고, 올리면 소급되지 않은 옛 원두만
+  // "화면은 원문 · 라벨은 대문자"로 갈린다. 헤드라인이 원문인 것과 같은 결이다.
+  const { svg } = buildLabelSVG(Object.assign({}, ROW, { ROASTERY: "BigSur Coffee" }), designFor("40x20"));
+  assert.ok(svg.includes("BigSur Coffee"), "로스터리는 넘어온 표기 그대로 찍힌다");
+  assert.ok(!svg.includes("BIGSUR COFFEE"), "라벨이 스스로 대문자로 바꾸지 않는다");
+});
+
 test("빈 옵션 필드는 라벨에서 생략, 긴 텍스트는 말줄임", () => {
   const { svg } = buildLabelSVG({ KEY: "TEST26-002", ROASTERY: "R", ORIGIN: "BRAZIL" }, designFor("40x20"));
   assert.ok(!svg.includes("NET")); // 스펙 값 없음 → 셀 생략 (옵션 스펙만 해당)

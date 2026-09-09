@@ -46,9 +46,11 @@
   .pass-band { padding: 20px 22px 16px; background-color: var(--surface-2); }
   .band-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .origin-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  /* 대문자는 CSS가 아니라 저장값이 진다(@bnhd/schema normalizeRoastery) — 보이는 글자를
+     복사하면 그대로 나와야 한다. 여기 남은 자간·웨이트가 캡스의 결을 만든다. */
   .band-roastery {
     font-size: 11.5px; font-weight: 700; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--ink); opacity: .78;
+    color: var(--ink); opacity: .78;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   h1.origin {

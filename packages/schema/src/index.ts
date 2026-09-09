@@ -118,6 +118,25 @@ export function beanToPublic(row: BeanRow): BeanPublic {
   return out as BeanPublic;
 }
 
+/**
+ * 로스터리명 정규화 — **저장값을 대문자로 올린다.**
+ *
+ * 화면이 CSS로 대문자로 보여 주고 저장은 원문이던 시절, 보이는 글자를 복사하면 다른 표기가 나왔다
+ * ("BIGSUR COFFEE"로 보고 복사하면 "BigSur Coffee"). 표시를 원문으로 내리는 대신 저장을 올린 것은
+ * 로스터리명이 이 서비스에서 **KEY와 함께 대문자 체계**이기 때문이다 — 라벨의 마이크로 캡스,
+ * 로고 R2 키(roasteryName)가 이미 대문자로 산다. (헤드라인 등 나머지 값은 반대로 원문이 기준이라
+ * 표시 쪽 text-transform을 걷어냈다 — label.js의 "헤드라인은 대문자로 강제하지 않는다" 참고.)
+ *
+ * 등록·수정(routes/beans.ts)과 CSV 복원(routes/backup.ts)이 함께 쓴다 — 한쪽만 정규화하면
+ * 복원한 원두만 표기가 갈린다.
+ */
+export function normalizeRoastery(v: unknown): string {
+  return String(v || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, ROASTERY_MAX_LEN);
+}
+
 /** 임의 페이로드에서 필드 값을 추출 — 문자열화·trim·길이 상한. (기존 _lib.js pickFields와 동일 동작) */
 export function pickFields(body: Record<string, unknown>): Record<BeanColumn, string> {
   const vals = {} as Record<BeanColumn, string>;
