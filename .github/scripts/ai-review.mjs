@@ -239,6 +239,55 @@ function callSiteContext(tree, diff, changedFiles) {
 }
 
 /**
+ * ListModels가 준 이름들을 **좋은 순서로** 세운다.
+ *
+ * 예전에는 선호 모델을 배열에 손으로 적어 뒀는데, 손으로 적은 목록은 곧 상한이 된다 —
+ * gemini-3.9-flash가 나와도 목록이 모르니 3.8을 계속 고르고, 고르는 쪽도 부르는 쪽도 아무 문제가
+ * 없어 보여서 아무도 눈치채지 못한다. 이름에서 세대 번호를 뽑아 정렬하면 새 모델이 나오는 대로
+ * 저절로 따라간다.
+ *
+ * 계열 순서는 flash → pro → flash-lite다. pro가 더 좋지만 이 키로는 매번 429라 앞에 두면 왕복만
+ * 버리고(2026-09-03 실측: 3.1-pro-preview 429 → pro-latest 429 → …), flash-lite는 리뷰 품질이
+ * 눈에 띄게 떨어져 맨 뒤에 둔다. 티어가 바뀌면 이 순서만 손대면 된다.
+ */
+function rankModels(available) {
+  // 코드 리뷰에 쓸 수 없는 계열 — 이미지·음성·리서치·로봇·컴퓨터 사용 등.
+  // gemini- 접두가 아닌 것(gemma, lyria, nano-banana, antigravity, deep-research)은 아래에서 함께 걸린다.
+  const NOT_FOR_REVIEW =
+    /image|vision|tts|transcribe|omni|robotics|computer-use|embedding|customtools|native-audio|live/;
+  const TIERS = [
+    (n) => n.includes("flash") && !n.includes("flash-lite"),
+    (n) => n.includes("pro"),
+    (n) => n.includes("flash-lite"),
+  ];
+
+  return available
+    .filter((n) => n.startsWith("gemini-") && !NOT_FOR_REVIEW.test(n))
+    .map((n) => {
+      const tier = TIERS.findIndex((t) => t(n));
+      const gen = n.match(/^gemini-(\d+(?:\.\d+)?)-/);
+      return {
+        name: n,
+        tier: tier < 0 ? TIERS.length : tier,
+        // 번호가 없는 것은 별칭(gemini-flash-latest)이다. 계열 안에서 맨 뒤에 둔다 — 이름 규칙이
+        // 바뀌어 번호를 못 읽는 날에도 리뷰가 돌게 하는 안전망이지, 평소에 고를 것은 아니다.
+        gen: gen ? Number(gen[1]) : -1,
+        preview: n.includes("preview") ? 1 : 0,
+      };
+    })
+    .sort((a, b) => a.tier - b.tier || b.gen - a.gen || a.preview - b.preview)
+    .map((m) => m.name);
+}
+
+/**
+ * ListModels를 부르지 못했을 때만 쓰는 목록.
+ *
+ * 여기 이름들은 **낡는다** — 그래서 정상 경로에서는 쓰이지 않는다. 목록 조회가 실패한 날에도
+ * 리뷰가 돌게 하려는 것뿐이다.
+ */
+const FALLBACK_MODELS = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"];
+
+/**
  * 프로젝트 규칙 — CLAUDE.md를 그대로 싣는다.
  *
  * 예전에는 규칙 네 줄을 프롬프트에 손으로 적어 뒀는데, 그 사이 CLAUDE.md가 자라면서 어긋났다
@@ -570,52 +619,35 @@ async function main() {
 
   // 2. 사용할 Gemini 모델 결정 (ListModels API로 지원 모델 동적 탐색)
   console.log("🤖 사용할 Gemini 모델 확인 중...");
-  let targetModel = process.env.GEMINI_MODEL;
-
-  if (!targetModel) {
-    try {
-      // 키는 URL 쿼리(?key=) 대신 헤더로 보낸다 — URL이 에러 텍스트·프록시 로그로 새지 않도록.
-      const listRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
-        headers: { "x-goog-api-key": apiKey, "User-Agent": "bean-hoarder-ai-reviewer" },
-      });
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const available = (listData.models || [])
-          .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
-          .map((m) => m.name.replace(/^models\//, ""));
-
-        console.log(`📋 사용 가능한 모델 목록: ${available.join(", ")}`);
-        // 모델 탐색 우선순위 — **flash가 먼저다.**
-        // 예전에는 품질을 노리고 pro를 앞에 뒀는데, 이 키로는 pro 계열이 매번 429(쿼터)라 실제로는
-        // 한 번도 쓰이지 못하면서 왕복만 두 번 버렸다(2026-09-03 실측: 3.1-pro-preview 429 →
-        // pro-latest 429 → 2.5-pro 404 → …). pro는 티어가 바뀌면 쓸 수 있으므로 맨 뒤에 남겨 둔다.
-        const preferredModels = [
-          "gemini-3.8-flash",
-          "gemini-3.7-flash",
-          "gemini-3.6-flash",
-          "gemini-flash-latest",
-          "gemini-3.5-flash",
-          "gemini-3.1-pro-preview",
-          "gemini-pro-latest",
-          "gemini-flash-lite-latest",
-        ];
-        targetModel = preferredModels.find((m) => available.includes(m));
-        if (!targetModel) {
-          // 목록에 없으면 flash > pro 순으로, 이미지·비전 전용 모델은 제외하고 고른다.
-          const usable = (m) => !m.includes("image") && !m.includes("vision") && !m.includes("lite");
-          targetModel =
-            available.find((m) => m.includes("flash") && usable(m)) ||
-            available.find((m) => m.includes("pro") && usable(m));
-        }
-        targetModel = targetModel || available[0];
-      }
-    } catch (e) {
-      console.warn("⚠️ 모델 목록 조회 실패, 기본 fallback 사용:", e);
+  let ranked = [];
+  try {
+    // 키는 URL 쿼리(?key=) 대신 헤더로 보낸다 — URL이 에러 텍스트·프록시 로그로 새지 않도록.
+    const listRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+      headers: { "x-goog-api-key": apiKey, "User-Agent": "bean-hoarder-ai-reviewer" },
+    });
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const available = (listData.models || [])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""));
+      ranked = rankModels(available);
+      // 원본 목록은 마흔 줄이라 로그에서 읽히지 않는다. 실제로 쓸 순서만 남긴다.
+      console.log(`📋 후보 ${available.length}개 중 리뷰용 ${ranked.length}개: ${ranked.join(" > ")}`);
+    } else {
+      console.warn(`⚠️ 모델 목록 조회 실패(${listRes.status}) — 고정 목록으로 진행합니다.`);
     }
+  } catch (e) {
+    console.warn("⚠️ 모델 목록 조회 실패, 고정 목록으로 진행합니다:", e);
   }
+  if (!ranked.length) ranked = FALLBACK_MODELS;
 
-  targetModel = targetModel || "gemini-3.7-flash";
-  console.log(`🎯 선택된 모델: ${targetModel}`);
+  // GEMINI_MODEL이 있으면 그것을 먼저 쓴다 — 특정 모델을 못박아 재현해야 할 때의 손잡이다.
+  const pinned = process.env.GEMINI_MODEL;
+  // 사슬을 여섯으로 자른다. 키가 말라 429가 이어질 때 끝까지 내려가 봐야 답은 같고,
+  // 그 왕복이 리뷰 등록만 늦춘다(검증 패스에서 실측 8회 낭비).
+  const modelsToTry = [...new Set([pinned, ...ranked].filter(Boolean))].slice(0, 6);
+  let targetModel = modelsToTry[0];
+  console.log(`🎯 선택된 모델: ${targetModel}${pinned ? " (GEMINI_MODEL 고정)" : ""}`);
 
   console.log("🤖 Gemini API에 코드 리뷰 요청 중...");
   const prompt = `당신은 Bean-Hoarder 프로젝트의 시니어 풀스택 코드 리뷰어입니다.
@@ -684,20 +716,6 @@ ${CHECKLIST.map((c, i) => `    ${i + 1}. ${c}`).join("\n")}
 담기는 모든 문자열(summary·strengths·description·suggestion)은 한국어로 쓴다.** 그 값이 그대로 PR
 코멘트가 되어 사람이 읽는다. 코드 식별자·파일 경로·API 이름·원문 에러 메시지는 번역하지 않고 그대로 둔다.
 문체는 친절하고 전문적으로.`;
-
-  // targetModel 먼저, 이후 flash > pro 순 폴백 — 하나가 5xx/429여도 다음으로 넘어간다.
-  const candidateModels = [
-    targetModel,
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-flash-latest",
-    "gemini-3.5-flash",
-    "gemini-3.1-pro-preview",
-    "gemini-pro-latest",
-    "gemini-flash-lite-latest",
-  ];
-  const modelsToTry = [...new Set(candidateModels.filter(Boolean))];
 
   // 사고 예산 — 모델에게 "더 오래 생각하라"고 말할 수 있는 유일한 손잡이다. 필드 이름이 세대마다
   // 달라(3.x는 thinkingLevel, 2.5 계열은 thinkingConfig.thinkingBudget) 어느 쪽이 먹는지 미리 알 수
