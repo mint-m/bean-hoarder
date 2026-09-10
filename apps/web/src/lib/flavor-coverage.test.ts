@@ -7,7 +7,7 @@
 // 예외 목록을 두지 않는 것이 요점이다 — 노트를 더하려면 색도 함께 가르쳐야 한다.
 import { FLAVOR_NOTES } from "@bnhd/schema/flavor";
 import { expect, test } from "vitest";
-import { matchFlavorFamilies } from "./coffee-color";
+import { FLAVOR_FAMILIES, matchFlavorFamilies } from "./coffee-color";
 
 test("어휘의 모든 노트가 향미 계열 하나에는 걸린다", () => {
   const dead = FLAVOR_NOTES.filter((n) => matchFlavorFamilies(n.en).length === 0).map(
@@ -31,20 +31,71 @@ test("다른 계열의 키워드를 품은 노트가 제 계열로 간다", () =
   expect(first("Grapefruit")).toBe("citrus"); // `grape`(베리)를 앞에 품는다
   expect(first("Hazelnut")).toBe("nutty"); // 반대로 여기서는 `nut`이 제 계열이어야 한다
   expect(first("Peanut")).toBe("nutty");
+  expect(first("Pineapple")).toBe("tropical"); // `apple`(초록 과일)을 뒤에 품는다
+  expect(first("Orange Blossom")).toBe("floral"); // `orange`(시트러스)를 앞에 품는다
+  expect(first("오렌지꽃")).toBe("floral");
+  expect(first("담배")).toBe("spice"); // `배`(초록 과일)를 뒤에 품는다
 });
 
-test("계열마다 색이 다르다 — 같은 hue를 쓰는 계열이 없다", () => {
-  // citrus와 nutty가 같은 hue 70을 쓰던 시절이 있었다. 그러면 카드 띠만 봐선 두 결이 구분되지 않는다.
-  const hues = FLAVOR_NOTES.map((n) => matchFlavorFamilies(n.en)[0])
-    .filter((f) => f !== undefined)
-    .map((f) => `${f.name}:${f.hue}`);
-  const byHue = new Map<number, Set<string>>();
-  for (const entry of new Set(hues)) {
-    const [name, hue] = entry.split(":") as [string, string];
-    const set = byHue.get(Number(hue)) ?? new Set<string>();
-    set.add(name);
-    byHue.set(Number(hue), set);
+// 복숭아·살구는 주황 과일인데 사과·배·멜론과 한 계열로 묶여 hue 148 순초록을 받았다 —
+// "Yellow Peach"를 고른 카드가 초록 워시를 받은 것이 이 분리의 계기다.
+test("핵과와 초록 과일이 서로 다른 계열로 간다", () => {
+  const first = (note: string) => matchFlavorFamilies(note)[0]?.name;
+  for (const n of ["Yellow Peach", "White Peach", "Apricot", "Nectarine", "천도복숭아"]) {
+    expect(first(n)).toBe("stonefruit");
   }
-  const collisions = [...byHue.entries()].filter(([, names]) => names.size > 1);
-  expect(collisions).toEqual([]);
+  for (const n of ["Green Apple", "Pear", "Melon", "Watermelon", "수박"]) {
+    expect(first(n)).toBe("green");
+  }
+  // 청포도는 초록이지만 베리다 — 저장값 "White Grape"가 `grape`로 그쪽에 걸리므로,
+  // 한글로 쳤을 때만 초록이 되면 같은 노트가 표기에 따라 색이 갈린다.
+  expect(first("White Grape")).toBe("berry");
+  expect(first("청포도")).toBe("berry");
+});
+
+// citrus와 nutty가 **같은** hue 70을 쓰던 시절이 있었다. 그때의 검사는 "완전히 같은 hue 금지"였는데,
+// 20도 떨어진 이웃도 저알파 워시로 깔리면 눈에는 한 색이라 그 검사는 통과하면서 문제는 남았다.
+//
+// 그래서 두 조항으로 못박는다. 따뜻한 구간(40~115)에 다섯이 몰리는 것은 커피 향미가 실제로 거기
+// 몰려 있어 피할 수 없고, 그 줄은 chocolate·nutty가 예전부터 쓰던 방식대로 **명도로** 갈린다.
+const MIN_HUE_GAP = 12;
+const CLOSE_HUE = 25; // 이보다 가까우면 hue만으로는 못 가른다고 본다
+const MIN_L_GAP = 0.15;
+
+const hueGap = (a: number, b: number) => {
+  const raw = Math.abs(a - b);
+  return Math.min(raw, 360 - raw); // 색상환이라 340과 15는 35도 차이다
+};
+
+test("계열끼리 색이 충분히 떨어져 있다", () => {
+  const tooClose: string[] = [];
+  for (let i = 0; i < FLAVOR_FAMILIES.length; i++) {
+    for (let j = i + 1; j < FLAVOR_FAMILIES.length; j++) {
+      const a = FLAVOR_FAMILIES[i];
+      const b = FLAVOR_FAMILIES[j];
+      if (!a || !b) continue;
+      const dh = hueGap(a.hue, b.hue);
+      const dl = Math.abs(a.l - b.l);
+      if (dh < MIN_HUE_GAP) {
+        tooClose.push(`${a.name} ↔ ${b.name}: hue ${dh}도차 (최소 ${MIN_HUE_GAP})`);
+      } else if (dh < CLOSE_HUE && dl < MIN_L_GAP) {
+        tooClose.push(
+          `${a.name} ↔ ${b.name}: hue ${dh}도차라 명도로 갈려야 하는데 L ${dl.toFixed(2)}차 (최소 ${MIN_L_GAP})`,
+        );
+      }
+    }
+  }
+  expect(tooClose).toEqual([]);
+});
+
+test("어휘가 실제로 쓰는 계열에 이름이 겹치는 hue가 없다", () => {
+  const used = new Map<number, Set<string>>();
+  for (const n of FLAVOR_NOTES) {
+    const f = matchFlavorFamilies(n.en)[0];
+    if (!f) continue;
+    const set = used.get(f.hue) ?? new Set<string>();
+    set.add(f.name);
+    used.set(f.hue, set);
+  }
+  expect([...used.entries()].filter(([, names]) => names.size > 1)).toEqual([]);
 });

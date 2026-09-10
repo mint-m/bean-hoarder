@@ -8,9 +8,9 @@ import {
   IMPORT_REQUIRED_LABELS,
   KEY_RE,
   missingRequired,
+  normalizeRoastery,
   parseArchivedCell,
   pickFields,
-  ROASTERY_MAX_LEN,
 } from "@bnhd/schema";
 import { eq, sql } from "drizzle-orm";
 import type { Context } from "hono";
@@ -101,7 +101,8 @@ export async function importCsv(c: Context<AppEnv>): Promise<Response> {
       skipped.push({ key, reason: "내 유저코드의 KEY가 아님" });
       continue;
     }
-    const roastery = col(row, "ROASTERY").slice(0, ROASTERY_MAX_LEN);
+    // 등록·수정과 같은 정규화를 건다 — 안 걸면 복원한 원두만 표기가 갈린다
+    const roastery = normalizeRoastery(col(row, "ROASTERY"));
     const body: Record<string, unknown> = {};
     for (const h of CSV_HEADERS) body[h] = col(row, h);
     const vals = pickFields(body) as Record<BeanColumn, string>;

@@ -221,9 +221,14 @@ export function visibleChips(
  * `SEY`(48px)와 `LEAVES COFFEE`(140px)가 같은 한 칸을 쓴다. 그래서 개수(limit)는 상한으로만 두고,
  * 실제로 몇 개가 남는지는 잰 폭으로 정한다.
  *
- * k를 1부터 올리며 **그 k에서 실제로 보일 조합**(visibleChips)의 폭을 더한다 — 앞에서 k개를 자르는
- * 것과 다르다. pin이나 현재 값이 뒤쪽에서 끌려 올라오면 조합이 바뀌고 폭도 바뀌기 때문이다.
- * 더보기 버튼도 같은 줄에 서야 하므로 감출 것이 남는 동안은 그 폭을 미리 뗀다.
+ * 재는 대상은 **그 k에서 실제로 보일 조합**이다 — 앞에서 k개를 자르는 것과 다르다. pin이나 현재
+ * 값이 뒤쪽에서 끌려 올라오면 조합이 바뀌고 폭도 바뀌기 때문이다. 더보기 버튼도 같은 줄에 서야
+ * 하므로 감출 것이 남는 동안은 그 폭을 미리 뗀다.
+ *
+ * 예전에는 k마다 visibleChips를 다시 불러 조합을 통째로 다시 골랐다. 그럴 필요가 없다 —
+ * 고정 노출(pin·현재 값)은 k와 무관하게 늘 들어가고, k가 하나 오르면 나머지에서 **하나 더**
+ * 받을 뿐이다. 그래서 배분을 한 번만 계산하고 누적 합으로 전진한다. 폭의 합은 순서와 무관하고
+ * 간격은 개수만 따르므로, 담은 순서가 렌더 순서(정렬 순)와 달라도 결과는 같다.
  */
 export function fitChipCount(
   options: readonly ChipOption[],
@@ -232,11 +237,31 @@ export function fitChipCount(
   opts: { limit?: number; pin?: string; value?: string } = {},
 ): number {
   const max = Math.min(opts.limit ?? options.length, options.length);
+
+  // visibleChips와 같은 배분 — 여기만 바뀌면 잰 조합과 그려진 조합이 어긋난다.
+  const ranked = rankChips(options, opts.value);
+  const cur = (opts.value ?? "").trim();
+  const isForced = (o: ChipOption) => optionValue(o) === opts.pin || optionValue(o) === cur;
+  const forced = ranked.filter(isForced);
+  const rest = ranked.filter((o) => !isForced(o));
+
+  let count = forced.length;
+  let width = forced.reduce((a, o, i) => a + (i ? layout.gap : 0) + widthOf(o), 0);
+  let taken = 0;
   let best = 1;
+
   for (let k = 1; k <= max; k++) {
-    const { shown, hiddenCount } = visibleChips(options, { ...opts, limit: k });
-    let total = shown.reduce((a, o, i) => a + (i ? layout.gap : 0) + widthOf(o), 0);
-    if (hiddenCount > 0) total += layout.gap + layout.moreWidth;
+    // 고정 노출이 예산을 먼저 쓰고 남는 만큼만 앞에서 채운다 — k가 고정 노출 수보다 작으면
+    // 남는 자리가 없어 조합이 그대로다(그래서 여기서 아무것도 더 담지 않는다).
+    const room = Math.max(0, k - forced.length);
+    while (taken < room && taken < rest.length) {
+      const o = rest[taken] as ChipOption;
+      width += (count ? layout.gap : 0) + widthOf(o);
+      count += 1;
+      taken += 1;
+    }
+    const hiddenCount = options.length - count;
+    const total = width + (hiddenCount > 0 ? layout.gap + layout.moreWidth : 0);
     if (total > layout.rowWidth) break;
     best = k;
   }

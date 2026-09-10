@@ -188,6 +188,37 @@ test("공개 조회: 인증 없이 GET, KEY 형식 오류 400, 미등록 404, �
   expect((await api(`/bean/ZZZZ${YY}-999`)).status).toBe(404);
 });
 
+test("로스터리는 저장될 때 대문자로 정규화된다 — 등록·수정·CSV 복원 모두", async () => {
+  // 화면이 CSS로 대문자로 보여 주고 저장은 원문이던 시절, 보이는 글자를 복사하면 다른 표기가
+  // 나왔다("BIGSUR COFFEE"로 보고 복사하면 "BigSur Coffee"). 표시가 아니라 저장을 올려서 맞춘다.
+  // 로고 R2 키(logoPutBodySchema)가 이미 대문자로 살고 있어, 이제 둘의 표기가 같아진다.
+  const user = await signupUser();
+
+  const { data } = await addBean(user.auth, { ROASTERY: "BigSur Coffee" });
+  const created = (await (await api(`/bean/${data.key}`)).json()) as { bean: { ROASTERY: string } };
+  expect(created.bean.ROASTERY).toBe("BIGSUR COFFEE");
+
+  await api(`/bean/${data.key}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...BEAN, ROASTERY: "  leaves coffee  " }),
+    headers: user.auth,
+  });
+  const edited = (await (await api(`/bean/${data.key}`)).json()) as { bean: { ROASTERY: string } };
+  expect(edited.bean.ROASTERY).toBe("LEAVES COFFEE");
+
+  // 복원 경로에 같은 정규화가 없으면 복원한 원두만 표기가 갈린다
+  const csv = `KEY,ROASTERY,ORIGIN,ROAST_DATE,PACKAGE_DATE\r\n${data.key},Sey Coffee,KENYA,26.06.28,26.07.03`;
+  const imported = await api("/import", { method: "POST", body: csv, headers: user.auth });
+  expect(imported.status).toBe(200);
+  const restored = (await (await api(`/bean/${data.key}`)).json()) as { bean: { ROASTERY: string } };
+  expect(restored.bean.ROASTERY).toBe("SEY COFFEE");
+
+  // 한글 로스터리명은 대문자 개념이 없어 그대로 남는다
+  const ko = await addBean(user.auth, { ROASTERY: "커피리브레" });
+  const koBean = (await (await api(`/bean/${ko.data.key}`)).json()) as { bean: { ROASTERY: string } };
+  expect(koBean.bean.ROASTERY).toBe("커피리브레");
+});
+
 test("수정: 소유자만 가능, 타인 KEY는 404", async () => {
   const alice = await signupUser();
   const bob = await signupUser();

@@ -105,6 +105,26 @@ export function CopyButton({
  *
  * 예전에는 같은 풀을 datalist로도 달아 뒀는데 걷어냈다. 브라우저가 그리는 그 창은 우리가 모양도
  * 여는 시점도 정할 수 없고, 칸에 친 글자로 칩이 스스로 정렬되는 지금은 같은 일을 두 번 하는 셈이다.
+ *
+ * ── 줄맞춤 장치가 왜 이렇게 많은지 (#80의 결론) ──────────────────────────────
+ * "칩이 두 줄로 접히지 않는다"는 표현상의 제약 하나에 조각이 다섯이다(widths · layout · learned ·
+ * useLayoutEffect · ResizeObserver). 줄일 수 있는지 실제로 재 봤고, **줄일 수 없다**는 것이 결론이다.
+ * 조각마다 다른 불변식을 지고 있어 하나를 빼면 다른 하나가 깨진다.
+ *
+ *  - `widths` — 폭은 검색어와 무관하다(타이핑은 순서와 부분집합만 바꾼다). 캐시가 없으면 글자를
+ *    칠 때마다 후보를 전부 그려야 하고, 그때 산지 줄이 29px에서 236px로 부풀어 문서 높이가 출렁인다.
+ *  - `layout.moreWidth`가 넓어질 때만 자라는 것 — "폭 → 개수 → 라벨 → 폭"의 순환을 수렴시킨다.
+ *  - `learned` — 값은 안 쓴다. ref에 담은 측정값으로 다시 그리게 하는 유일한 방법이다.
+ *  - 의존성 없는 effect — 렌더마다 DOM을 읽어야 측정이 끝난다. 다만 수렴 뒤에는 `settled`로 잠든다.
+ *  - `ResizeObserver`가 **폭만** 보는 것 — 높이에도 반응하면 칩이 줄어든 것 자체가 다시 "재라"는
+ *    신호가 되어 재기와 접기를 번갈아 반복한다.
+ *
+ * CSS만으로 되는 선도 다시 봤지만 안 된다. 컨테이너 쿼리는 줄 폭을 알려 줄 뿐이고, 여기서 필요한
+ * 것은 **내용마다 다른 칩 폭**이다(`SEY` 48px vs `LEAVES COFFEE` 140px). `overflow` 클립은 잘린
+ * 칩을 누를 수 없게 만들고, 고정 `limit`은 애초에 이 장치가 대신하려던 그 방식이다.
+ *
+ * 줄인 것은 조각 수가 아니라 **일하는 양**이다 — `fitChipCount`가 k마다 조합을 다시 고르는 대신
+ * 누적 합으로 전진하고(lib/suggest.ts), effect는 수렴한 뒤 잠든다.
  */
 export function SuggestChips({
   options,
@@ -155,6 +175,15 @@ export function SuggestChips({
   const widths = useRef(new Map<string, number>());
   const layout = useRef({ gap: 0, moreWidth: 0, rowWidth: 0 });
   const [learned, setLearned] = useState(0); // 새로 안 폭이 생기면 올려서 다시 계산하게 한다
+  /**
+   * 값이 다 수렴하면 아래 effect가 잠든다.
+   *
+   * `known`만으로는 못 잠근다. 재는 동안 더보기 버튼의 라벨은 "+0"이고(감출 것이 아직 없다)
+   * 개수를 정한 뒤라야 "+16"이 되는데, 그 순간 버튼이 넓어진다. known이 서자마자 멈추면 좁은
+   * "+0" 폭을 한도로 잡아 실제로는 한 줄을 넘긴다. 그래서 "읽었는데 아무것도 안 바뀐" 다음에야
+   * 잠근다 — 보통 세 번째 패스다. 줄 폭이 바뀌면(ResizeObserver) 다시 깨운다.
+   */
+  const settled = useRef(false);
 
   const known = !!layout.current.rowWidth && options.every((o) => widths.current.has(optionValue(o)));
   // 아직 못 잰 폭이 있으면 후보를 전부 그린다 — 그림만 감추고 자리는 그대로 둔다.
@@ -178,8 +207,10 @@ export function SuggestChips({
   });
 
   // 그려진 칩의 폭을 캐시에 담는다. 페인트 전에 끝내야 부푼 줄이 보이지 않으므로 useLayoutEffect다.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 렌더마다 DOM을 읽어야 해 의존성이 없다
+  // 의존성 배열이 없는 것은 렌더마다 DOM을 읽어야 하기 때문인데, 수렴한 뒤로는 그 읽기가 낭비다
+  // (글자를 칠 때마다 querySelectorAll + offsetWidth가 돈다) — settled가 그때부터 건너뛴다.
   useLayoutEffect(() => {
+    if (settled.current && known) return;
     const row = rowRef.current;
     if (!row) return;
     let changed = false;
@@ -206,6 +237,8 @@ export function SuggestChips({
       changed = true;
     }
     if (changed) setLearned((n) => n + 1);
+    // 더 읽어도 바뀌는 게 없고 폭을 다 안다 — 여기서 잠근다
+    else settled.current = known;
   });
 
   // 회전·창 크기로 줄 폭이 바뀌면 들어가는 개수도 달라진다. **폭만 본다** — 높이에도 반응하면
@@ -216,6 +249,7 @@ export function SuggestChips({
     const ro = new ResizeObserver(() => {
       if (row.clientWidth === layout.current.rowWidth) return;
       layout.current = { ...layout.current, rowWidth: row.clientWidth };
+      settled.current = false; // 줄 폭이 달라졌으니 다시 재야 한다
       setLearned((n) => n + 1);
     });
     ro.observe(row);

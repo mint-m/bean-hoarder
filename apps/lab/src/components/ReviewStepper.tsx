@@ -212,6 +212,9 @@ export default function ReviewStepper(p: Props) {
             <Field label="로스터리" required invalid={iv("ROASTERY")} fromAi={ai("ROASTERY")}>
               <input
                 type="text"
+                // 저장될 때 대문자로 올라가므로(@bnhd/schema normalizeRoastery) 치는 동안에도
+                // 그렇게 보여 준다 — 유저코드 칸이 쓰는 그 장치다(lab.css의 input.upper).
+                className="upper"
                 autoComplete="off"
                 placeholder="SEY"
                 {...bind("ROASTERY")}

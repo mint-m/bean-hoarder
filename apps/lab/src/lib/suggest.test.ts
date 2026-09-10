@@ -6,6 +6,7 @@ import {
   appendNote,
   BLEND_VALUE,
   blendCascade,
+  type ChipOption,
   collectMyNotes,
   fitChipCount,
   isBlend,
@@ -152,6 +153,52 @@ test("더보기 버튼 자리를 미리 뗀다", () => {
     moreWidth: 34,
   });
   expect(wide).toBe(2);
+});
+
+// 전진 패스로 바꾸면서 잃은 것이 없는지 못박는다. 예전 구현은 k마다 visibleChips를 다시 불러
+// 조합을 통째로 다시 골랐다 — 그 정의를 여기 그대로 적어 두고 새 구현과 답이 같은지 본다.
+test("전진 패스가 k마다 조합을 다시 고르던 예전 계산과 같은 답을 낸다", () => {
+  const widthOf = (o: ChipOption) => W[optionValue(o)] ?? 0;
+  const naive = (
+    layout: { rowWidth: number; gap: number; moreWidth: number },
+    opts: { limit?: number; pin?: string; value?: string },
+  ) => {
+    const max = Math.min(opts.limit ?? OPTS.length, OPTS.length);
+    let best = 1;
+    for (let k = 1; k <= max; k++) {
+      const { shown, hiddenCount } = visibleChips(OPTS, { ...opts, limit: k });
+      let total = shown.reduce((a, o, i) => a + (i ? layout.gap : 0) + widthOf(o), 0);
+      if (hiddenCount > 0) total += layout.gap + layout.moreWidth;
+      if (total > layout.rowWidth) break;
+      best = k;
+    }
+    return best;
+  };
+
+  const cases: { limit?: number; pin?: string; value?: string }[] = [
+    {},
+    { limit: 4 },
+    { limit: 2 },
+    { pin: BLEND_VALUE },
+    { limit: 3, pin: BLEND_VALUE },
+    { value: "KENYA" }, // 뒤쪽 값이 정렬로 앞에 올라온다
+    { value: "KENYA", pin: BLEND_VALUE }, // 고정 노출이 둘이라 예산을 먼저 다 쓴다
+    { value: "co" }, // 부분 일치 — 조합이 아니라 순서만 바뀐다
+    { limit: 1, value: "GUATEMALA", pin: BLEND_VALUE }, // k < 고정 노출 수
+  ];
+  for (const opts of cases) {
+    for (const rowWidth of [0, 120, 200, 282, 322, 330, 480, 900]) {
+      for (const moreWidth of [0, 34, 60]) {
+        const layout = { rowWidth, gap: 6, moreWidth };
+        expect({ opts, rowWidth, moreWidth, n: fitChipCount(OPTS, widthOf, layout, opts) }).toEqual({
+          opts,
+          rowWidth,
+          moreWidth,
+          n: naive(layout, opts),
+        });
+      }
+    }
+  }
 });
 
 // 앞에서 k개를 자르는 것과 다르다 — pin이 뒤에서 끌려 올라오면 조합이 통째로 바뀐다.

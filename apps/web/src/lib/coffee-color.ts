@@ -53,7 +53,7 @@ export function originSignature(origin: string): string | null {
 // ── 향미 무드 그라데이션 ──
 // 계열 판정은 "노트 문자열 어딘가에 키워드가 있는가"로 충분하다 — 자유입력이라 정확 분류보다
 // 무드의 방향이 맞는 게 중요하고, 오판정해도 저알파라 해가 없다.
-interface FlavorFamily {
+export interface FlavorFamily {
   name: string;
   hue: number;
   c: number;
@@ -61,57 +61,75 @@ interface FlavorFamily {
   re: RegExp;
 }
 
-// 색상환을 **아홉 계열이 서로 밀어내도록** 벌려 둔다. 예전에는 citrus와 nutty가 같은 hue 70이었고
-// chocolate·tropical·spice·stonegreen까지 55~125의 좁은 노란 구간에 몰려 있어, 카드가 다 비슷한
-// 누런 띠로 보였다("어느 원두가 어떤 결인지 띠만 봐선 모르겠다"). 초록~보라 구간이 통째로 비어
-// 있었으므로 차·허브 계열은 청록으로, 꽃 계열은 라일락으로 옮겨 그 빈자리를 쓴다.
+// 색상환을 **열 계열이 서로 밀어내도록** 벌려 둔다. 예전에는 citrus와 nutty가 같은 hue 70이었고
+// chocolate·tropical·spice까지 55~125의 좁은 노란 구간에 몰려 있어, 카드가 다 비슷한 누런 띠로
+// 보였다("어느 원두가 어떤 결인지 띠만 봐선 모르겠다"). 초록~보라 구간이 통째로 비어 있었으므로
+// 차·허브 계열은 청록으로, 꽃 계열은 라일락으로 옮겨 그 빈자리를 쓴다.
 //
-// 이웃한 hue가 남는 곳(따뜻한 과일·견과 구간)은 채도와 명도로 한 번 더 가른다 — chocolate은
-// 낮은 채도·낮은 명도, nutty는 낮은 채도·높은 명도라 같은 갈색 계열이어도 겹쳐 보이지 않는다.
+// 그래도 따뜻한 구간(40~115)에 다섯이 몰리는 것은 피할 수 없다 — 커피 향미가 실제로 거기 몰려
+// 있다. 그래서 그 줄은 **채도와 명도로 한 번 더 가른다**: chocolate은 낮은 채도·낮은 명도,
+// nutty는 낮은 채도·중간 명도, stonefruit·tropical·citrus는 높은 채도에 명도가 층으로 오른다.
+//
+// 규칙의 단일 소스는 DESIGN.md §3 — 이 표를 고치면 그 문서의 계열표도 같은 커밋에서 고친다.
 const FAMILIES: readonly FlavorFamily[] = [
   {
     name: "berry",
-    hue: 18,
+    hue: 15,
     c: 0.17,
-    l: 0.58,
+    l: 0.56,
+    // `포도`가 여기 있어 "청포도"도 이쪽으로 온다 — 저장값 "White Grape"가 `grape`로 여기 걸리므로,
+    // 한글로 쳤을 때만 초록이 되면 같은 노트가 표기에 따라 다른 색을 받는다.
     re: /berr|strawberr|cherr|grape(?!fruit)|cassis|plum|prune|currant|베리|딸기|체리|포도|자두/i,
   },
   {
     name: "chocolate",
-    hue: 42,
-    c: 0.09,
-    l: 0.36,
+    hue: 40,
+    c: 0.08,
+    l: 0.34,
     re: /chocolat|cocoa|cacao|초콜|카카오|코코아/i,
+  },
+  {
+    // 복숭아·살구는 주황 과일이다. 예전에는 사과·배·멜론과 한 계열(stonegreen)로 묶여 hue 148
+    // 순초록을 받았고, 그래서 "Yellow Peach"를 고른 카드가 초록 워시를 받았다.
+    name: "stonefruit",
+    hue: 58,
+    c: 0.16,
+    l: 0.74,
+    re: /peach|apricot|nectarine|복숭아|살구|천도/i,
   },
   {
     // `nut`은 Nutmeg(육두구)의 앞 세 글자이기도 하다 — 계열 판정이 등장 위치로 정렬되므로 둘 다
     // 0에서 걸리면 배열 순서가 앞선 이쪽이 이겨 향신료가 견과류 색을 쓴다. 그래서 여기서 뺀다.
     name: "nutty",
-    hue: 65,
-    c: 0.11,
-    l: 0.64,
+    hue: 70,
+    c: 0.09,
+    l: 0.56,
     re: /nut(?!meg)|almond|hazel|peanut|pecan|caramel|toffee|brown sugar|molasses|vanilla|honey|maple|butterscotch|넛|아몬드|헤이즐|땅콩|피칸|캐러멜|카라멜|흑설탕|당밀|바닐라|꿀|메이플/i,
   },
   {
     name: "tropical",
-    hue: 85,
+    hue: 90,
     c: 0.17,
     l: 0.72,
     re: /tropical|mango|pineapple|passion|papaya|lychee|banana|coconut|guava|망고|파인애플|패션|파파야|리치|바나나|코코넛|열대/i,
   },
   {
     name: "citrus",
-    hue: 105,
+    hue: 115,
     c: 0.17,
-    l: 0.78,
-    re: /citrus|lemon|orange|lime|bergamot|grapefruit|tangerine|mandarin|yuzu|시트러스|레몬|오렌지|라임|자몽|귤|유자/i,
+    l: 0.84,
+    // "Orange Blossom"은 시트러스가 아니라 꽃이다. 판정이 등장 위치로 정렬되는 탓에 `orange`(0)가
+    // floral의 `blossom`(7)을 이겨 꽃인데 시트러스 색을 받았다 — 여기서 비켜 준다.
+    re: /citrus|lemon|orange(?!\s*blossom)|lime|bergamot|grapefruit|tangerine|mandarin|yuzu|시트러스|레몬|오렌지(?!\s*꽃)|라임|자몽|귤|유자/i,
   },
   {
-    name: "stonegreen",
-    hue: 148,
+    // 사과·배·멜론 — 초록 과일만 남긴다(복숭아·살구는 stonefruit로 갈라져 나갔다).
+    // `배`는 "담배"에도 들어 있지만 spice가 `담배`를 0에서 잡아 이긴다.
+    name: "green",
+    hue: 145,
     c: 0.14,
     l: 0.68,
-    re: /apple|peach|apricot|melon|pear|nectarine|사과|복숭아|살구|멜론|배(?![럴리])|청포도/i,
+    re: /apple|pear|melon|사과|배(?![럴리])|멜론|수박/i,
   },
   {
     // 허브·차·시더·담뱃잎이 모인 줄이라 따뜻한 갈색보다 청록이 결에 맞고, 비어 있던 구간이라
@@ -120,20 +138,20 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 190,
     c: 0.09,
     l: 0.52,
-    re: /spice|cinnamon|clove|cardamom|nutmeg|ginger|pepper|herb|black tea|green tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|카다멈|육두구|생강|후추|허브|홍차|녹차|얼그레이|시더/i,
+    re: /spice|cinnamon|clove|cardamom|nutmeg|ginger|pepper|herb|black tea|green tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|카다멈|육두구|생강|후추|허브|홍차|녹차|얼그레이|담배|시더/i,
   },
   {
     name: "floral",
     hue: 305,
     c: 0.14,
-    l: 0.72,
+    l: 0.74,
     re: /floral|jasmine|rose|lavender|hibiscus|chamomile|blossom|flower|magnolia|osmanthus|플로럴|자스민|재스민|장미|라벤더|히비스커스|캐모마일|목련|금목서|계화|꽃/i,
   },
   {
     name: "winey",
-    hue: 345,
+    hue: 340,
     c: 0.15,
-    l: 0.42,
+    l: 0.4,
     re: /wine|winey|boozy|rum|whisk|ferment|brandy|와인|와이니|럼|위스키|발효|브랜디/i,
   },
 ];
@@ -145,16 +163,14 @@ function moodColor(f: Omit<FlavorFamily, "name" | "re">, alpha: number, dark: bo
   return `oklch(${l} ${f.c} ${f.hue} / ${alpha})`;
 }
 
+/** 계열 표 자체 — 색끼리 충분히 떨어졌는지 검사하는 테스트가 읽는다. */
+export const FLAVOR_FAMILIES: readonly FlavorFamily[] = FAMILIES;
+
 /**
  * 노트 문자열에서 향미 계열을 찾는다 — 등장 순서대로 최대 3개.
  *
  * 그라데이션 생성과 나눠 둔 이유: 어휘(@bnhd/schema/flavor)의 모든 노트가 계열 하나에는 걸리는지를
  * 테스트가 전수로 확인해야 하는데, 그라데이션 쪽은 테마를 읽느라 DOM이 필요하다.
- */
-/**
- * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
- * 검출된 계열을 노트 등장 순서대로 최대 3색. 매칭 없으면 중립 웜브라운, 노트가 비면 null.
- * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
  */
 export function matchFlavorFamilies(notes: string): FlavorFamily[] {
   const raw = (notes || "").trim();
@@ -166,6 +182,11 @@ export function matchFlavorFamilies(notes: string): FlavorFamily[] {
     .map((x) => x.f);
 }
 
+/**
+ * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
+ * 검출된 계열을 노트 등장 순서대로 최대 3색. 매칭 없으면 중립 웜브라운, 노트가 비면 null.
+ * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
+ */
 export function flavorGradient(notes: string): string | null {
   const raw = (notes || "").trim();
   if (!raw) return null;
