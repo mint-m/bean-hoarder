@@ -288,6 +288,39 @@ function rankModels(available) {
 const FALLBACK_MODELS = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"];
 
 /**
+ * 후보 순위별 시도 횟수 — **앞자리일수록 오래 붙잡는다.**
+ *
+ * 503은 "지금 붐빈다"는 뜻이지 "못 쓴다"가 아니다(구글이 응답에 그렇게 적는다: "Spikes in demand
+ * are usually temporary"). 그런데 예전에는 한 번만 더 묻고 곧장 아래 세대로 내려갔고, 그 결과
+ * 09-04·09-09·09-10 **세 번 연속** 3.8과 3.7이 밀려 3.6이 리뷰를 썼다. 무료 티어에서 최신 모델이
+ * 상시 붐빈다는 뜻이라, 이대로 두면 "최신을 고른다"는 규칙이 로그에서만 참이고 실제로는 늘
+ * 한두 세대 아래가 검토하게 된다.
+ *
+ * PR 리뷰는 **늦어도 되지만 얕으면 안 되는** 일이라 시간을 쓰는 쪽으로 바꾼다. 저장소가 공개라
+ * 러너 시간은 무료고, 드는 것은 벽시계 시간뿐이다.
+ */
+const ATTEMPTS_BY_RANK = [6, 4, 2, 1];
+/** 재시도 간격 — 붐비는 구간을 넘길 만큼 벌린다. 1순위 기준 합 3.3분. */
+const RETRY_BACKOFF_MS = [5_000, 15_000, 30_000, 60_000, 90_000];
+/** 구글이 알려 준 대기 시간이 이보다 길면 기다리지 않는다 — 하루 한도는 기다려도 안 풀린다. */
+const MAX_HINTED_WAIT_MS = 120_000;
+
+/** 오류 본문에서 구글이 알려 준 재시도 대기(RetryInfo)를 꺼낸다. 없으면 null. */
+function retryDelayMs(errText) {
+  const m = errText.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  return m ? Math.ceil(Number(m[1]) * 1000) : null;
+}
+
+/** 오류 본문에서 사람이 읽을 한 줄만 뽑는다 — 재시도가 길어지면 JSON 전문이 로그를 덮는다. */
+function errorLine(errText) {
+  try {
+    return (JSON.parse(errText)?.error?.message || errText).slice(0, 140);
+  } catch (_e) {
+    return errText.slice(0, 140);
+  }
+}
+
+/**
  * 프로젝트 규칙 — CLAUDE.md를 그대로 싣는다.
  *
  * 예전에는 규칙 네 줄을 프롬프트에 손으로 적어 뒀는데, 그 사이 CLAUDE.md가 자라면서 어긋났다
@@ -738,14 +771,13 @@ ${CHECKLIST.map((c, i) => `    ${i + 1}. ${c}`).join("\n")}
    */
   async function askGemini(text, schema, { label, models }) {
     let lastError = null;
-    for (const model of models) {
+    for (const [rank, model] of models.entries()) {
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-      // 5xx는 일시적 과부하라 한 번은 다시 묻는다 — 2026-09-03에 gemini-3.7-flash가 503 하나로 밀려
-      // 한 단계 아래 모델이 리뷰를 썼다. 429(쿼터)·404(없는 모델)는 곧바로 다시 물어도 같은 답이라
-      // 재시도하지 않고 다음 후보로 넘어간다.
-      let retried5xx = false;
+      const budget = ATTEMPTS_BY_RANK[Math.min(rank, ATTEMPTS_BY_RANK.length - 1)];
+      let attempt = 0;
       for (;;) {
-        console.log(`🤖 ${label} — ${model} 호출 중...`);
+        attempt += 1;
+        console.log(`🤖 ${label} — ${model} 호출 중...${attempt > 1 ? ` (${attempt}/${budget})` : ""}`);
         const res = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -767,18 +799,31 @@ ${CHECKLIST.map((c, i) => `    ${i + 1}. ${c}`).join("\n")}
         const errText = await res.text();
         lastError = `${res.status} ${errText}`;
         // 400이면서 아직 내려갈 형식이 남았다면 사고 예산 필드부터 의심한다 — 같은 모델로 다시.
+        // 이건 모델 탓이 아니라 우리가 보낸 형식 탓이므로 **시도 횟수를 쓰지 않는다.**
         if (res.status === 400 && thinkingIdx < THINKING_VARIANTS.length - 1) {
           thinkingIdx += 1;
+          attempt -= 1;
           console.warn(`⚠️ 사고 예산 형식이 거절돼(400) 낮춥니다: ${JSON.stringify(THINKING_VARIANTS[thinkingIdx])}`);
           continue;
         }
-        console.warn(`⚠️ 모델 ${model} 실패 (${res.status}): ${errText}`);
-        if (res.status >= 500 && !retried5xx) {
-          retried5xx = true;
-          await new Promise((r) => setTimeout(r, 3000));
+        console.warn(`⚠️ ${model} 실패 (${res.status}): ${errorLine(errText)}`);
+
+        // 기다려서 풀릴 수 있는 것만 기다린다.
+        //  - 5xx: 구글이 스스로 "일시적"이라고 말한다 → 예산만큼 이 모델을 붙잡는다
+        //  - 429: RetryInfo가 있고 그 값이 짧을 때만(분당 한도). 하루 한도면 기다려도 같은 답이다
+        //  - 404(없는 모델)·그 밖의 4xx: 다시 물어도 같으므로 곧장 다음 후보로
+        const hinted = retryDelayMs(errText);
+        const waitable =
+          res.status >= 500 || (res.status === 429 && hinted != null && hinted <= MAX_HINTED_WAIT_MS);
+        if (waitable && attempt < budget) {
+          const step = RETRY_BACKOFF_MS[Math.min(attempt - 1, RETRY_BACKOFF_MS.length - 1)];
+          const wait = Math.max(step, hinted || 0);
+          console.log(`⏳ ${Math.round(wait / 1000)}초 뒤 ${model}에 다시 묻습니다 — 아래 세대로 내리지 않습니다.`);
+          await new Promise((r) => setTimeout(r, wait));
           continue;
         }
-        break; // 다음 모델로
+        if (waitable) console.warn(`⚠️ ${model}을 ${budget}번 시도했으나 계속 막혀 다음 후보로 넘어갑니다.`);
+        break; // 다음 후보로
       }
     }
     return { res: null, model: null, error: lastError };
@@ -790,6 +835,13 @@ ${CHECKLIST.map((c, i) => `    ${i + 1}. ${c}`).join("\n")}
   const first = await askGemini(prompt, REVIEW_SCHEMA, { label: "1차 리뷰", models: modelsToTry });
   if (!first.res) {
     throw new Error(`모든 Gemini 모델 호출 실패. 마지막 오류: ${first.error}`);
+  }
+  // 1순위가 끝내 안 열려 아래 세대가 썼다면 그 사실을 리뷰에 남긴다. 푸터의 모델명만으로는
+  // "원래 이걸로 도는 것"인지 "밀려서 이걸로 돈 것"인지 구별되지 않는데, 그 둘은 신뢰도가 다르다.
+  const intendedModel = modelsToTry[0];
+  const degraded = first.model !== intendedModel;
+  if (degraded) {
+    console.warn(`⚠️ 1순위 ${intendedModel}이 끝내 열리지 않아 ${first.model}이 검토했습니다.`);
   }
   targetModel = first.model;
 
@@ -956,7 +1008,11 @@ reason은 한국어로 쓴다. 코드 식별자·파일 경로·원문 에러 �
 ${review ? renderBody(review, { inlineCount: inline.length, unanchored, dupCount, refutedCount, skippedFiles: skipped }) : reviewText}
 
 ---
-*\`${targetModel}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC · 대상 커밋 \`${headSha.slice(0, 7)}\`*`;
+*\`${targetModel}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC · 대상 커밋 \`${headSha.slice(0, 7)}\`*${
+    degraded
+      ? `\n> ⚠️ 1순위 \`${intendedModel}\`이 과부하(503)로 끝내 열리지 않아 한 세대 아래가 검토했습니다. 더 정확한 검토가 필요하면 \`/gemini review\`로 다시 불러 주세요.`
+      : ""
+  }`;
 
   // ── 4. 리뷰 등록 ───────────────────────────────────────────────
   // event는 언제나 COMMENT다. 봇이 APPROVE를 남기면 사람 리뷰를 대신해 버리고,
