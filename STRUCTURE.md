@@ -50,6 +50,7 @@
 | 경로 | 역할 |
 |---|---|
 | `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
+| `scripts/gen-how-it-works.mjs` | 사람이 읽는 문서 페이지(HOW_IT_WORKS.html)를 저장소의 .md 네 개에서 생성한다. |
 | `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
 
 **API 라우트** — 모두 `/api` 접두. 표시가 없으면 인증 없이 열려 있다.

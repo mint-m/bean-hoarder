@@ -14,8 +14,8 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 | 랩 (등록·QR 발급) | **[bnhd.pages.dev/lab](https://bnhd.pages.dev/lab)** — 가입/로그인 필요 |
 | 덱 (내 원두 카드) | **[bnhd.pages.dev/deck](https://bnhd.pages.dev/deck)** — 로그인 필요 |
 | 데모 (로그인 없이 둘러보기) | **[bnhd.pages.dev/demo](https://bnhd.pages.dev/demo)** — 정적 페이지 |
-| 작동 방식 (그래픽 문서) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
-| 디자인 시스템 | [DESIGN.md](DESIGN.md) · 저장소 구조 [STRUCTURE.md](STRUCTURE.md) |
+| 문서 한 장 (사람용 — 아래 문서 넷을 렌더한 생성물) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 디자인 시스템 · 저장소 구조 · 작업 원칙 | [DESIGN.md](DESIGN.md) · [STRUCTURE.md](STRUCTURE.md) · [CLAUDE.md](CLAUDE.md) |
 
 ## 사용 흐름
 
@@ -34,7 +34,8 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙은 단일 서비스다.
 
 저장소 배치·API 라우트·D1 테이블은 저장소에서 생성되는 **[STRUCTURE.md](STRUCTURE.md)** 에 있다.
-작업 시 지켜야 할 원칙과 함정은 [CLAUDE.md](CLAUDE.md).
+작업 시 지켜야 할 원칙과 함정은 [CLAUDE.md](CLAUDE.md). 이 문서 넷을 한 페이지로 렌더한 사람용 생성물이
+[HOW_IT_WORKS.html](HOW_IT_WORKS.html)이다(`npm run gen:html`).
 
 - 쓰기(등록·수정·삭제·백업·복원·로고)는 **세션 토큰** 인증(`POST /api/login`으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 `Bearer 유저코드:암호` 인증도 이행기 동안 동작.
 - 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드). **인증 실패는 D1 기반 rate limit**(유저코드당 10회/10분, IP당 30회/10분 — 초과 시 429)으로 4자리 암호 전수 대입을 차단
@@ -135,7 +136,7 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - 로그인 없이 둘러보는 화면은 정적 데모(`/demo`)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.
 - 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
   **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
-- 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
+- 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + 생성 문서·문서 참조 검증) — 커밋 전 필수.
   `npm run e2e`는 Playwright가 wrangler를 직접 띄우므로 별도 서버 기동이 필요 없다.
 
 ## 주요 변경
