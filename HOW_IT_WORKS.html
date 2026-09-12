@@ -732,9 +732,14 @@ README &quot;운영&quot;의 &quot;프로덕션 승격 절차&quot;·&quot;릴�
 </ul>
 <h3 id="design-향미-무드-그라데이션"><a class="anchor" href="#design-향미-무드-그라데이션" aria-hidden="true">#</a>향미 — 무드 그라데이션</h3>
 <ul>
+<li><p><strong>목적 — 노트 도표가 아니라 한 모금의 인상을 미리 겪게 하는 것.</strong> 그라데이션으로 커피 향미를 정확하고
+전체적으로 표현하는 데는 한계가 있다. 그 정확도를 쫓는 대신 <strong>전체 인상(톤·바이브)이 시각적으로 선험</strong>되게
+한다 — 출력은 &quot;주된 톤 + 포인트&quot;다. 아래 노트 색 표는 그 톤을 조합하는 <strong>팔레트</strong>다.</p>
+</li>
 <li><p>테이스팅 노트(<code>TASTING_NOTE</code>, 콤마/<code>·</code> 구분 자유입력)를 <strong>토큰으로 분해</strong> → 토큰마다 색을 매긴다:
 어휘(<code>@bnhd/schema/flavor</code>)에 있는 노트는 <strong>노트 색</strong>(아래 표), 그 밖(계열 일반어·자유입력)은 <strong>계열
-색</strong>(그 아래 표) → 색들을 조합한 <code>linear-gradient</code>. 조회 카드가 칩을 쪼개는 구분자와 같아야 색과 칩이 맞는다.</p>
+색</strong>(그 아래 표) → 톤 모델(아래 &quot;조합 규칙&quot;)로 <code>linear-gradient</code>. 조회 카드가 칩을 쪼개는 구분자와 같아야
+색과 칩이 맞는다.</p>
 </li>
 <li><p><strong>노트 색 — 계열 한 색이 아니라 노트마다 제 색</strong> (#89). 계열 색만 있던 시절에는 꽃 열 개(Jasmine·Rose·
 Lavender·Orange Blossom…)가 전부 라일락이었다 — 장미는 레드, 라벤더는 퍼플, 오렌지꽃은 크림인데 띠만
@@ -756,7 +761,7 @@ L .86~.88 · C .05~.08의 크림으로 두어 라이트에서 아이보리 한 �
 </thead>
 <tbody><tr>
 <td>꽃</td>
-<td>Jasmine 95/.06/.87 아이보리 · Rose 5/.15/.68 핑크레드 · Magnolia 345/.06/.87 · Osmanthus 75/.13/.80 금빛 · Lavender 280/.13/.64 퍼플블루 · Hibiscus 352/.17/.50 딥 핑크레드 · Chamomile 98/.11/.88 · Elderflower 120/.06/.87 · Orange Blossom 68/.09/.88 크림오렌지</td>
+<td>Jasmine 95/.06/.87 아이보리 · Rose 5/.15/.68 핑크레드 · Magnolia 345/.06/.87 · Osmanthus 75/.13/.80 금빛 · Lavender 280/.13/.64 퍼플블루 · Hibiscus 352/.17/.50 딥 핑크레드 · Chamomile 98/.11/.88 · Elderflower 120/.06/.87 · Orange Blossom 68/.09/.88 크림오렌지 · Acacia 95/.07/.88 아이보리</td>
 </tr>
 <tr>
 <td>시트러스</td>
@@ -780,7 +785,7 @@ L .86~.88 · C .05~.08의 크림으로 두어 라이트에서 아이보리 한 �
 </tr>
 <tr>
 <td>향신료·차</td>
-<td>Cinnamon 40/.12/.50 레드브라운 · Clove 45/.07/.36 · Cardamom 150/.06/.62 · Nutmeg 60/.08/.50 · Ginger 85/.10/.76 · Black Pepper 60/.02/.36 차콜 · Herbal 150/.10/.58 그린 · Black Tea 40/.10/.44 · Green Tea 145/.10/.66 · Earl Grey 50/.08/.50 · Tobacco 55/.07/.34 · Cedar 45/.09/.48</td>
+<td>Cinnamon 40/.12/.50 레드브라운 · Clove 45/.07/.36 · Cardamom 150/.06/.62 · Nutmeg 60/.08/.50 · Ginger 85/.10/.76 · Black Pepper 60/.02/.36 차콜 · Herbal 150/.10/.58 그린 · Black Tea 40/.10/.44 · Green Tea 145/.10/.66 · White Tea 100/.05/.86 · Earl Grey 50/.08/.50 · Tobacco 55/.07/.34 · Cedar 45/.09/.48</td>
 </tr>
 <tr>
 <td>발효·주류</td>
@@ -830,7 +835,7 @@ L .86~.88 · C .05~.08의 크림으로 두어 라이트에서 아이보리 한 �
 </tr>
 <tr>
 <td><span class="swatch" style="background:oklch(.56 .09 70)"></span>넛티·캐러멜</td>
-<td>nutty, hazelnut, peanut, caramel</td>
+<td>nutty, hazelnut, peanut, macadamia, caramel</td>
 <td>탠</td>
 <td>70</td>
 <td>.09</td>
@@ -904,18 +909,64 @@ L .86~.88 · C .05~.08의 크림으로 두어 라이트에서 아이보리 한 �
 <p><strong>청포도는 그린이 아니라 베리다</strong>: 저장값 <code>White Grape</code>가 <code>grape</code>로 베리에 걸리므로, 한글 &quot;청포도&quot;만
 그린으로 보내면 같은 노트가 표기에 따라 다른 색을 받는다. 색이 표기를 따라가면 안 된다.</p>
 </li>
-<li><p><strong>조합 규칙</strong>: 토큰마다 매긴 색을 등장 순서대로 그라데이션으로. 색이 하나면 그 색의 명도 두 단계로.
-매칭이 없으면 중립 커피 그라데이션.</p>
+<li><p><strong>조합 규칙 — 톤은 개수, 순서는 면적.</strong> 색이 하나면 그 색의 명도 두 단계, 매칭이 없으면 중립 커피
+그라데이션. 둘 이상이면:</p>
 <ul>
-<li><strong>같은 색은 합친다</strong> — hue 12도 안(흰빛은 명도만)이면 한 색으로 모으고 가중치를 올린다. 따로 두면
+<li><strong>같은 색은 한 stop으로 합친다</strong> — hue 12도 안(흰빛은 명도만)이면 하나로 모은다. 따로 두면
 <code>Lemon, Yuzu, Lime, Bergamot</code>가 노란 줄무늬 넷이 된다.</li>
-<li><strong>가중치는 면적으로</strong> — 색이 차지하는 구간을 토큰 수에 비례시키고, 각 색을 제 구간의 <strong>가운데</strong>에
-놓는다(꽃 3 : 초콜릿 1이면 37.5% · 87.5%). 양 끝(0·100)에 놓으면 색이 둘일 때 가중치가 사라진다.
-<strong>알파나 채도로 드러내지 않는다</strong> — 밴드 위에 헤드라인이 얹히므로 텍스트 대비(#32)가 먼저다.</li>
-<li><strong>상한 4색</strong> — 넘으면 <strong>가벼운 것부터</strong> 뺀다(같은 무게면 뒤에 나온 것). 많이 쓰인 색이 살아남아야
-&quot;비슷한 게 많으면 그쪽이 짙어진다&quot;가 성립한다.</li>
+<li><strong>톤 그룹</strong> — stop을 **색 거리(OKLab ΔE &lt; 0.25)**로 묶는다(등장순, 그룹 첫 색 기준). 계열(regex)은
+친족을 가르기에 너무 거칠다 — floral에 Rose(레드)와 Jasmine(화이트)이, winey에 Rum(갈색)과 Red Wine(레드)이
+같이 있다. 무드 그룹표를 손으로 두면 어휘가 늘 때마다 낡는다. &quot;향미는 컬러감을 갖고 비슷한 컬러감은 같은
+분위기&quot;라면 친족은 곧 색이 가까운 것이고, 노트 색 표에서 파생된다. Chocolate↔Hazelnut .23은 한 톤,
+Chocolate↔Orange .41은 아니다.</li>
+<li><strong>메인은 검출량으로</strong> — 그룹의 <strong>토큰 수</strong>가 가장 큰 그룹과 그 2/3 이상인 그룹이 메인, 나머지는 악센트.
+비중이 비슷하면(1:1, 2:2, 3:2) 모두 메인으로 함께 전개한다. <strong>첫 노트가 메인을 정하지 않는다</strong> — 커피의
+톤은 노트 하나가 아니라 같은 결의 노트가 얼마나 모였는가다.</li>
+<li><strong>순서는 면적으로</strong> — stop 면적은 순서 가중치 합(첫 토큰 ×1.5, 나머지 ×1)에 메인이면 ×1.5. 각 색을 제
+구간의 <strong>가운데</strong>에 놓는다(양 끝에 놓으면 색이 둘일 때 가중치가 사라진다). 배치는 <strong>노트 등장순 그대로</strong> —
+톤이 강한 원두는 면적·채도로 알아서 위계가 서니 순서를 뒤집지 않는다. 그래서 첫 노트는 악센트여도
+포인트로 남고, 같은 노트라도 순서가 다르면 포인트 크기가 다르다.</li>
+<li><strong>채도는 톤으로</strong> — 메인 그룹의 stop은 C × (1 + 0.15 × (검출량 − 1)), 최대 ×1.45, <strong>절대 상한 .20</strong>.
+같은 결이 많을수록 그 톤이 짙어진다. 악센트는 제 채도 그대로 — 갈색 몸통 위에 오렌지 포인트가 산다.
+<strong>알파는 전 stop 동일</strong>(라이트 .19 / 다크 .26) — 악센트를 물리지 않고, 텍스트 대비(#32)도 지킨다.</li>
+<li><strong>상한 4 stop</strong> — 넘으면 악센트를 면적 작은 것부터, 그래도 넘으면 메인 안에서 면적 작은 것부터 뺀다.</li>
+<li><strong>왜 두 가중치를 섞지 않는가</strong> — 순서 가산이 톤 계산에도 들어가면 <code>Orange, Dark Chocolate, Brown Sugar</code>에서
+오렌지 1.5 vs 갈색 2가 2/3 규칙에 걸려 공동 메인이 된다. 원하는 것은 &quot;톤은 갈색, 오렌지는 묻히지 않는
+포인트&quot;다 — 톤은 개수로만 정하고 순서는 면적에서만 산다.</li>
 </ul>
-</li>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>노트</th>
+<th>결과 (역할 · 면적 · 채도 원값→적용값)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Orange, Dark Chocolate, Brown Sugar</code></td>
+<td>Orange <strong>악센트 33%</strong> .17 · DC 메인 33% .08→.092 · BS 메인 33% .09→.103 — 톤 갈색, 오렌지 포인트</td>
+</tr>
+<tr>
+<td><code>Dark Chocolate, Brown Sugar, Orange</code></td>
+<td>DC 47% · BS 32% · Orange <strong>악센트 21%</strong> — 같은 노트, 순서만 달라 포인트가 작다</td>
+</tr>
+<tr>
+<td><code>Dark Chocolate, Macadamia, Brown Sugar, Orange</code></td>
+<td>갈색 3 stop 84%(×1.30) · Orange 16%</td>
+</tr>
+<tr>
+<td><code>Raspberry, Cranberry, Wine, Grape</code></td>
+<td>한 톤 4 — 레드→퍼플, .17×1.45=.246 → <strong>.20 캡</strong></td>
+</tr>
+<tr>
+<td><code>Jasmine, Bergamot, White Tea, Acacia</code></td>
+<td>Jasmine(+White Tea·Acacia 합침) 78% · Bergamot 22% — 아이보리 톤</td>
+</tr>
+<tr>
+<td><code>Chocolate, Orange</code></td>
+<td>1:1 → 둘 다 메인 60:40, 채도 원값</td>
+</tr>
+</tbody></table>
+</div></li>
 <li><p><strong>제약</strong>: <strong>저채도·저알파</strong>로 얹어 본문 가시성(#32)을 해치지 않는다 — 텍스트 뒤 은은한 워시로,
 콘텐츠 대비를 항상 우선한다. 다만 알파가 지나치게 낮으면 벌려 둔 hue가 회색빛 한 겹으로 뭉개져
 구별이라는 목적 자체가 사라지므로, 계열이 읽히는 선(라이트 0.19 / 다크 0.26)까지는 올린다.</p>
@@ -938,15 +989,16 @@ L .86~.88 · C .05~.08의 크림으로 두어 라이트에서 아이보리 한 �
 </ul>
 <blockquote>
 <p>구현 노트: 국가·향미 엔진 모두 <a href="apps/web/src/lib/coffee-color.ts">apps/web/src/lib/coffee-color.ts</a>
-(<code>originSignature</code> · <code>flavorGradient</code> · <code>flavorStops</code> · <code>matchFlavorFamilies</code>), 로스팅 레벨은
+(<code>originSignature</code> · <code>flavorGradient</code> · <code>flavorStops</code> · <code>boostedMood</code> · <code>matchFlavorFamilies</code>), 로스팅 레벨은
 <a href="packages/schema/src/roast.ts">packages/schema/src/roast.ts</a>. 규칙의 단일 소스는 이 문서 —
 계열표·노트 색 표를 바꾸면 코드도 함께 고친다. 반대로 <strong>향미 어휘</strong>(<code>@bnhd/schema/flavor</code>)에 노트를
 더할 때는 계열 정규식에 걸리는지 <code>apps/web/src/lib/flavor-coverage.test.ts</code>가 전수로 검사한다 — 같은
 파일이 계열끼리 충분히 떨어져 있는지(<strong>hue 최소 12도 차</strong>, <strong>25도보다 가까우면 명도 최소 0.15 차</strong> —
 &quot;같은 hue만 금지&quot;이던 시절에는 20도 이웃이 통과하면서도 눈에는 한 색이었다), 노트 색 표의 키가 전부
 어휘에 실존하는지(어휘에서 지우면 표도 따라 죽어야 한다), 표의 항목이 제 계열 기본색과 눈에 띄게
-다른지, 그리고 이슈의 계기였던 꽃 노트들이 서로 다른 색인지도 지킨다. 가중치·합치기·상한은 테마를
-읽지 않는 순수 함수(<code>flavorStops</code> · <code>stopPositions</code>)로 떼어 같은 파일이 검사한다.</p>
+다른지, 그리고 이슈의 계기였던 꽃 노트들이 서로 다른 색인지도 지킨다. 톤 모델(그룹·메인 판정·면적·채도·
+상한)은 테마를 읽지 않는 순수 함수(<code>flavorStops</code> · <code>boostedMood</code> · <code>stopArea</code> · <code>stopPositions</code>)로 떼어
+위 시뮬레이션 표를 그대로 못박고, 어휘 전체를 4번 반복해도 채도가 .20을 넘지 않는지(톤 밸런스 가드)도 본다.</p>
 </blockquote>
 <h2 id="design-4-타이포그래피"><a class="anchor" href="#design-4-타이포그래피" aria-hidden="true">#</a>4. 타이포그래피</h2>
 <ul>

@@ -6,7 +6,7 @@
 //
 // 예외 목록을 두지 않는 것이 요점이다 — 노트를 더하려면 색도 함께 가르쳐야 한다.
 import { FLAVOR_NOTES } from "@bnhd/schema/flavor";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { FLAVOR_FAMILIES, matchFlavorFamilies } from "./coffee-color";
 
 test("어휘의 모든 노트가 향미 계열 하나에는 걸린다", () => {
@@ -103,7 +103,15 @@ test("어휘가 실제로 쓰는 계열에 이름이 겹치는 hue가 없다", (
 // ── 노트 단위 색 (#89) ─────────────────────────────────────────
 // 계열 한 색으로는 꽃 열 개가 전부 라일락이었다. 이 아래는 "노트마다 제 색"이 지켜지는지와,
 // 그 표가 어휘와 함께 움직이는지를 본다.
-import { FLAVOR_NOTE_COLORS, flavorStops, stopPositions } from "./coffee-color";
+import {
+  boostedMood,
+  FLAVOR_NOTE_COLORS,
+  flavorGradient,
+  flavorStops,
+  oklabDistance,
+  stopArea,
+  stopPositions,
+} from "./coffee-color";
 
 const enSet = new Set(FLAVOR_NOTES.map((n) => n.en));
 
@@ -187,36 +195,134 @@ test("표기 차이로 색이 갈리지 않는다", () => {
   expect(moodOf("ORANGE  BLOSSOM")).toEqual(moodOf("Orange Blossom"));
 });
 
-test("같은 색이 여럿이면 하나로 모여 가중치가 오른다", () => {
+test("같은 색이 여럿이면 한 stop으로 모여 개수가 오른다", () => {
   const stops = flavorStops("Jasmine, Rose, Lavender, Chocolate");
   // 네 토큰이 네 색 — 꽃끼리도 이제 다른 색이라 합쳐지지 않는다
-  expect(stops.map((s) => s.weight)).toEqual([1, 1, 1, 1]);
+  expect(stops.map((s) => s.count)).toEqual([1, 1, 1, 1]);
   // 같은 hue 이웃은 하나로 — Yuzu(96)·Pineapple(계열 앰버 90)·Banana(98)는 한 노란빛이다
   const yellow = flavorStops("Yuzu, Pineapple, Banana, Chocolate");
-  expect(yellow.map((s) => [s.note, s.weight])).toEqual([
+  expect(yellow.map((s) => [s.note, s.count])).toEqual([
     ["Yuzu", 3],
     ["Chocolate", 1],
   ]);
   // 흰빛은 hue가 달라도 한 색 — Jasmine(95)과 Magnolia(345)
-  expect(flavorStops("Jasmine, Magnolia").map((s) => s.weight)).toEqual([2]);
+  expect(flavorStops("Jasmine, Magnolia").map((s) => s.count)).toEqual([2]);
 });
 
-test("stop 상한을 넘으면 가벼운 것부터 빠지고, 순서는 등장순을 지킨다", () => {
-  // 5색 → 4색. 무게가 다 1이면 뒤에 나온 것이 빠진다 — Blueberry는 둘이라 앞의 Lime이 먼저 빠진다
+// ── 톤 모델 — 톤은 개수, 순서는 면적 ─────────────────────────────
+// flavorGradient는 테마를 읽으므로 Node 환경에는 document를 가짜로 심는다(wallet-card.test.ts와 같은 이유).
+vi.stubGlobal("document", { documentElement: { dataset: {} } });
+// 그라데이션은 노트 도표가 아니라 한 모금의 인상을 미리 겪게 하는 것이다. 비슷한 색의 노트가 많은 쪽이
+// 톤(메인)이고, 첫 노트는 톤이 아니어도 면적으로 포인트가 된다. 아래 표는 설계 시뮬레이션을 그대로 못박는다.
+const pct = (stops: readonly { area: number; role: "main" | "accent" }[]) => {
+  const areas = stops.map((s) => stopArea(s as Parameters<typeof stopArea>[0]));
+  const total = areas.reduce((a, b) => a + b, 0);
+  return areas.map((a) => Math.round((a / total) * 100));
+};
+const applied = (s: ReturnType<typeof flavorStops>[number]) => boostedMood(s.mood, s.role, s.groupCount).c;
+
+test("톤은 개수로 정해진다 — 첫 노트가 오렌지여도 갈색이 메인이고, 오렌지는 면적으로 포인트가 된다", () => {
+  const orangeFirst = flavorStops("Orange, Dark Chocolate, Brown Sugar");
+  expect(orangeFirst.map((s) => [s.note, s.role])).toEqual([
+    ["Orange", "accent"],
+    ["Dark Chocolate", "main"],
+    ["Brown Sugar", "main"],
+  ]);
+  expect(pct(orangeFirst)).toEqual([33, 33, 33]); // 오렌지 1.5 · 갈색 1×1.5 둘
+  // 같은 노트, 순서만 뒤로 — 톤은 그대로, 포인트만 작아진다
+  const orangeLast = flavorStops("Dark Chocolate, Brown Sugar, Orange");
+  expect(orangeLast.map((s) => s.role)).toEqual(["main", "main", "accent"]);
+  expect(pct(orangeLast)).toEqual([47, 32, 21]);
+  // 악센트는 제 채도 그대로, 메인은 검출량 2 → ×1.15
+  const orange = orangeFirst[0];
+  const dc = orangeFirst[1];
+  if (!orange || !dc) throw new Error("stops missing");
+  expect(applied(orange)).toBe(orange.mood.c);
+  expect(applied(dc)).toBeCloseTo(dc.mood.c * 1.15, 3);
+});
+
+test("전개 예시 — 초콜릿·레드베리·플로럴 중심 커피가 한 톤으로 묶인다", () => {
+  // 초콜릿 중심: 다크초콜릿·마카다미아·흑설탕은 한 톤, 오렌지는 포인트
+  const choc = flavorStops("Dark Chocolate, Macadamia, Brown Sugar, Orange");
+  expect(choc.map((s) => s.role)).toEqual(["main", "main", "main", "accent"]);
+  expect(choc.map((s) => s.groupCount)).toEqual([3, 3, 3, 1]);
+  expect(pct(choc)).toEqual([36, 24, 24, 16]);
+  // 레드베리 중심: 라즈베리·크랜베리(한 stop)·와인·포도가 한 톤 — 검출량 4 → ×1.45, 상한 .20
+  const berry = flavorStops("Raspberry, Cranberry, Wine, Grape");
+  expect(berry.map((s) => [s.note, s.count, s.role])).toEqual([
+    ["Raspberry", 2, "main"],
+    ["Wine", 1, "main"],
+    ["Grape", 1, "main"],
+  ]);
+  expect(berry.map(applied)).toEqual([0.2, 0.2, 0.16]);
+  // 플로럴 중심: 자스민·화이트티·아카시아는 아이보리 한 stop, 베르가못이 같은 톤으로 전개
+  const floral = flavorStops("Jasmine, Bergamot, White Tea, Acacia");
+  expect(floral.map((s) => [s.note, s.count, s.role])).toEqual([
+    ["Jasmine", 3, "main"],
+    ["Bergamot", 1, "main"],
+  ]);
+  expect(pct(floral)).toEqual([78, 22]);
+  // 부정: 초콜릿은 플로럴 톤에 들어오지 않는다
+  const dc = flavorStops("Dark Chocolate")[0];
+  const jas = flavorStops("Jasmine")[0];
+  if (!dc || !jas) throw new Error("stops missing");
+  expect(oklabDistance(jas.mood, dc.mood)).toBeGreaterThan(0.25);
+});
+
+test("비중이 비슷하면 모두 메인으로 함께 전개한다 — 2/3 규칙", () => {
+  expect(flavorStops("Chocolate, Orange").map((s) => s.role)).toEqual(["main", "main"]); // 1:1
+  expect(flavorStops("Chocolate, Hazelnut, Orange, Lemon").map((s) => s.role)).toEqual([
+    "main",
+    "main",
+    "main",
+    "main",
+  ]); // 2:2
+  expect(flavorStops("Lemon, Chocolate, Hazelnut").map((s) => s.role)).toEqual(["accent", "main", "main"]); // 1:2
+  // 3:2는 경계 — 2×3 ≥ 3×2 라 공동 메인
+  expect(flavorStops("Chocolate, Hazelnut, Brown Sugar, Orange, Lemon", 5).map((s) => s.role)).toEqual([
+    "main",
+    "main",
+    "main",
+    "main",
+    "main",
+  ]);
+  // 1:1일 때 채도 부스트는 없다 — 검출량 1
+  expect(flavorStops("Chocolate, Orange").map(applied)).toEqual([0.08, 0.17]);
+});
+
+test("채도 부스트는 검출량 단계로 오르고 .20에서 멈춘다", () => {
+  const c = (notes: string) => flavorStops(notes).map(applied);
+  expect(c("Chocolate")).toEqual([0.08]); // 1 → 원값
+  expect(c("Chocolate, Cocoa")).toEqual([0.092]); // 2 → ×1.15
+  expect(c("Chocolate, Cocoa, Cacao Nib")).toEqual([0.104]); // 3 → ×1.30
+  expect(c("Chocolate, Cocoa, Cacao Nib, Dark Chocolate")).toEqual([0.116]); // 4 → ×1.45
+  expect(c("Chocolate, Cocoa, Cacao Nib, Dark Chocolate, Milk Chocolate")).toEqual([0.116, 0.131]); // 5 → 여전히 ×1.45
+  expect(c("Berry, Strawberry, Cherry")).toEqual([0.2]); // .17 × 1.30 = .221 → 캡
+});
+
+test("톤 밸런스 가드 — 어휘 전체를 4번 반복해도 채도 .20을 넘지 않고, 알파는 한 값이다", () => {
+  for (const n of FLAVOR_NOTES) {
+    const notes = Array(4).fill(n.en).join(", ");
+    for (const s of flavorStops(notes)) expect(applied(s), n.en).toBeLessThanOrEqual(0.2);
+  }
+  const alphas = new Set(
+    (flavorGradient("Dark Chocolate, Brown Sugar, Orange") ?? "").match(/\/ ([\d.]+)\)/g),
+  );
+  expect([...alphas]).toEqual(["/ 0.19)"]);
+});
+
+test("stop 상한을 넘으면 악센트가 면적 작은 것부터 빠지고, 남은 것은 등장순을 지킨다", () => {
+  // Rose·Cinnamon·Lavender가 한 톤(3), Blueberry 2 → 공동 메인, Lime 1 → 악센트. 5 stop → Lime이 빠진다
   const stops = flavorStops("Rose, Cinnamon, Lavender, Blueberry, Lime, Blueberry");
-  expect(stops.map((s) => [s.note, s.weight])).toEqual([
-    ["Rose", 1],
-    ["Cinnamon", 1],
-    ["Lavender", 1],
-    ["Blueberry", 2],
+  expect(stops.map((s) => [s.note, s.role])).toEqual([
+    ["Rose", "main"],
+    ["Cinnamon", "main"],
+    ["Lavender", "main"],
+    ["Blueberry", "main"],
   ]);
-  // 무게가 다르면 가벼운 쪽이 앞에 있어도 빠진다 — Lavender·Blueberry(1)가 빠지고 Rose는 가장 앞이라 남는다
-  const heavy = flavorStops("Rose, Cinnamon, Cinnamon, Lavender, Blueberry, Lime, Lime", 3);
-  expect(heavy.map((s) => [s.note, s.weight])).toEqual([
-    ["Rose", 1],
-    ["Cinnamon", 2],
-    ["Lime", 2],
-  ]);
+  // 악센트를 다 빼도 넘으면 메인 안에서 면적 작은 것부터 — 첫 노트 Rose(1.5)는 남고 Cinnamon·Lavender(1) 중 뒤의 Lavender가 빠진다
+  const tight = flavorStops("Rose, Cinnamon, Lavender, Blueberry, Lime, Blueberry", 3);
+  expect(tight.map((s) => s.note)).toEqual(["Rose", "Cinnamon", "Blueberry"]);
 });
 
 test("stop 위치는 가중치에 비례해 제 구간 가운데에 놓인다", () => {

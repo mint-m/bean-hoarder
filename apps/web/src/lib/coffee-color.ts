@@ -2,9 +2,10 @@
 // 화면 전용이다 — 라벨 인쇄(흑백/2도)와 무관하며, 색이 없어도 정보는 성립해야 한다.
 // 산지: DB에 색을 저장하지 않는 결정론(구 origin-color.ts) 계승. 자주 쓰는 산지는 큐레이션 hue,
 // 그 외는 문자열 해시 폴백. HSL 대신 OKLCH — 어느 hue든 지각적 밝기·채도가 고르게 나온다.
-// 향미: 테이스팅 노트를 토큰마다 색으로 옮겨 저알파 그라데이션 CSS를 만든다 — 어휘에 있는 노트는
-// 제 색(NOTE_COLORS), 어휘 밖 자유입력은 계열 키워드로 판정한 계열 색(FAMILIES). 본문 대비를
-// 해치지 않는 "무드"까지만 (#32 가시성 회귀 금지).
+// 향미: 그라데이션은 노트 도표가 아니라 **한 모금의 인상(톤)을 미리 겪게 하는 것**이다 — 노트마다 정확한
+// 색을 쫓기보다 주된 톤과 포인트가 읽히게 한다. 노트 색 표(NOTE_COLORS)는 그 톤을 조합하는 팔레트이고,
+// 어휘 밖 자유입력은 계열 키워드로 판정한 계열 색(FAMILIES)을 받는다. 본문 대비를 해치지 않는
+// "무드"까지만 (#32 가시성 회귀 금지).
 
 // 기본은 라이트이고 다크는 사용자가 설정에서 켰을 때만이다 — OS 설정이 아니라 적용된 테마를 본다
 // (theme.css의 :root[data-theme="dark"]와 같은 기준이어야 색이 배경과 어긋나지 않는다).
@@ -109,7 +110,7 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 70,
     c: 0.09,
     l: 0.56,
-    re: /nut(?!meg)|almond|hazel|peanut|pecan|caramel|toffee|brown sugar|molasses|vanilla|honey|maple|butterscotch|넛|아몬드|헤이즐|땅콩|피칸|캐러멜|카라멜|흑설탕|당밀|바닐라|꿀|메이플/i,
+    re: /nut(?!meg)|almond|hazel|peanut|pecan|macadamia|caramel|toffee|brown sugar|molasses|vanilla|honey|maple|butterscotch|넛|아몬드|헤이즐|땅콩|피칸|마카다미아|캐러멜|카라멜|흑설탕|당밀|바닐라|꿀|메이플/i,
   },
   {
     name: "tropical",
@@ -143,14 +144,14 @@ const FAMILIES: readonly FlavorFamily[] = [
     hue: 190,
     c: 0.09,
     l: 0.52,
-    re: /spice|cinnamon|clove|cardamom|nutmeg|ginger|pepper|herb|black tea|green tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|카다멈|육두구|생강|후추|허브|홍차|녹차|얼그레이|담배|시더/i,
+    re: /spice|cinnamon|clove|cardamom|nutmeg|ginger|pepper|herb|black tea|green tea|white tea|earl grey|tobacco|cedar|스파이스|시나몬|계피|정향|카다멈|육두구|생강|후추|허브|홍차|녹차|백차|얼그레이|담배|시더/i,
   },
   {
     name: "floral",
     hue: 305,
     c: 0.14,
     l: 0.74,
-    re: /floral|jasmine|rose|lavender|hibiscus|chamomile|blossom|flower|magnolia|osmanthus|플로럴|자스민|재스민|장미|라벤더|히비스커스|캐모마일|목련|금목서|계화|꽃/i,
+    re: /floral|jasmine|rose|lavender|hibiscus|chamomile|blossom|flower|magnolia|osmanthus|acacia|플로럴|자스민|재스민|장미|라벤더|히비스커스|캐모마일|목련|금목서|계화|아카시아|꽃/i,
   },
   {
     name: "winey",
@@ -187,6 +188,7 @@ const NOTE_COLORS: Readonly<Record<string, Mood>> = {
   Chamomile: { hue: 98, c: 0.11, l: 0.88 }, // 연한 옐로
   Elderflower: { hue: 120, c: 0.06, l: 0.87 }, // 흰빛 그린
   "Orange Blossom": { hue: 68, c: 0.09, l: 0.88 }, // 크림 오렌지
+  Acacia: { hue: 95, c: 0.07, l: 0.88 }, // 아이보리 — Jasmine과 한 색으로 합쳐진다
   // 시트러스 — 계열 기본은 옐로(115)
   Lime: { hue: 135, c: 0.15, l: 0.78 },
   Orange: { hue: 60, c: 0.17, l: 0.74 },
@@ -243,6 +245,7 @@ const NOTE_COLORS: Readonly<Record<string, Mood>> = {
   Herbal: { hue: 150, c: 0.1, l: 0.58 }, // 그린
   "Black Tea": { hue: 40, c: 0.1, l: 0.44 },
   "Green Tea": { hue: 145, c: 0.1, l: 0.66 },
+  "White Tea": { hue: 100, c: 0.05, l: 0.86 }, // 연한 볏짚색
   "Earl Grey": { hue: 50, c: 0.08, l: 0.5 },
   Tobacco: { hue: 55, c: 0.07, l: 0.34 },
   Cedar: { hue: 45, c: 0.09, l: 0.48 },
@@ -290,11 +293,17 @@ export function matchFlavorFamilies(notes: string): FlavorFamily[] {
     .map((x) => x.f);
 }
 
-/** 그라데이션의 색 하나 — 무드와, 그 색으로 판정된 토큰 수(가중치). */
+/** 그라데이션의 색 하나. 같은 색으로 판정된 토큰들이 한 stop으로 모인다. */
 export interface FlavorStop {
   mood: Mood;
-  /** 이 색으로 모인 토큰 수 — 띠에서 차지하는 면적이 이에 비례한다 */
-  weight: number;
+  /** 이 색으로 모인 토큰 수 — **톤**(메인/악센트·채도)을 정하는 데 쓴다. 순서는 안 본다 */
+  count: number;
+  /** 순서 가중치의 합(첫 토큰 ×ORDER_LEAD) — **면적**을 정하는 데 쓴다 */
+  area: number;
+  /** 톤 그룹 안에서 메인인가 — 메인은 면적·채도가 오르고, 악센트는 제 색 그대로 포인트로 남는다 */
+  role: "main" | "accent";
+  /** 이 stop이 속한 톤 그룹의 토큰 수 — 채도 부스트의 단계 */
+  groupCount: number;
   /** 첫 토큰 원문 — 테스트·디버깅용 */
   note: string;
 }
@@ -306,6 +315,22 @@ const MERGE_HUE = 12;
 const MERGE_L = 0.15;
 const ACHROMATIC_C = 0.08;
 
+// ── 톤 모델의 손잡이 ──
+// 톤은 **개수**, 순서는 **면적** — 둘을 섞지 않는다. 순서 가산이 톤 계산에도 들어가면
+// `Orange, Dark Chocolate, Brown Sugar`에서 오렌지 1.5 vs 갈색 2가 아래 2/3 규칙에 걸려 공동 메인이 된다.
+// 사용자가 원한 것은 "톤은 갈색, 오렌지는 묻히지 않는 포인트"다.
+/** 색이 이보다 가까우면 같은 톤 그룹(OKLab ΔE). Chocolate↔Hazelnut .23은 한 톤, Chocolate↔Orange .41은 아니다 */
+const KIN_DE = 0.25;
+/** 첫 토큰의 면적 가산 — 첫 노트는 악센트여도 포인트로 남을 만큼 자리를 받는다 */
+const ORDER_LEAD = 1.5;
+/** 메인 그룹 stop의 면적 가산 — 톤이 몸통이 되게 */
+const MAIN_AREA = 1.5;
+/** 메인 그룹의 채도 부스트: 1 + BOOST_STEP × (검출량 − 1), 최대 BOOST_MAX. 같은 결이 많을수록 그 톤이 짙어진다 */
+const BOOST_STEP = 0.15;
+const BOOST_MAX = 1.45;
+/** 채도 절대 상한 — 톤 밸런스 가드. 계열 최대 .17 × 1.45 = .246을 여기서 자른다 */
+const C_MAX = 0.2;
+
 function hueGap(a: number, b: number): number {
   const raw = Math.abs(a - b);
   return Math.min(raw, 360 - raw);
@@ -315,6 +340,18 @@ function sameMood(a: Mood, b: Mood): boolean {
   if (Math.abs(a.l - b.l) >= MERGE_L) return false;
   if (a.c < ACHROMATIC_C && b.c < ACHROMATIC_C) return true;
   return hueGap(a.hue, b.hue) < MERGE_HUE;
+}
+
+/**
+ * OKLab 거리 — 톤 그룹 판정. 계열(regex)은 친족을 가르기에 너무 거칠다(floral에 Rose 레드와 Jasmine 화이트가
+ * 같이 있다). "향미는 컬러감을 갖고 비슷한 컬러감은 같은 분위기"라면 친족은 곧 색이 가까운 것이고,
+ * 무드 그룹표를 손으로 두지 않아도 노트 색 표에서 파생된다.
+ */
+export function oklabDistance(a: Mood, b: Mood): number {
+  const rad = Math.PI / 180;
+  const da = a.c * Math.cos(a.hue * rad) - b.c * Math.cos(b.hue * rad);
+  const db = a.c * Math.sin(a.hue * rad) - b.c * Math.sin(b.hue * rad);
+  return Math.hypot(a.l - b.l, da, db);
 }
 
 /** 토큰 하나의 색 — 어휘 노트면 제 색, 아니면 계열 폴백, 어디에도 안 걸리면 null. */
@@ -335,29 +372,72 @@ const splitNotes = (raw: string): string[] =>
 /**
  * 테이스팅 노트 → 그라데이션 색 목록. 순수 함수 — 테마를 읽지 않아 Node 테스트가 직접 검사한다.
  *
- * 토큰마다 색을 매기고(tokenMood), 눈으로 한 색인 것은 하나로 모아 가중치를 올린다(sameMood).
- * 등장 순서를 지키되 `max`를 넘으면 **가중치가 낮은 것부터** 뺀다 — 많이 쓰인 계열이 살아남아야
- * "비슷한 게 많으면 그쪽이 짙어진다"가 성립한다. 색을 하나도 못 매기면 빈 배열(호출부가 중립을 깐다).
+ * 1. 토큰마다 색을 매기고(tokenMood) 눈으로 한 색인 것은 한 stop으로 모은다(sameMood) — count·area 누적.
+ * 2. stop을 색 거리로 톤 그룹에 묶는다(oklabDistance < KIN_DE, 등장순 greedy, 그룹 첫 색 기준).
+ * 3. 검출량(토큰 수)이 가장 큰 그룹과 그 2/3 이상인 그룹이 메인 — 비중이 비슷하면 함께 전개한다.
+ *    나머지는 악센트. 첫 노트여도 개수에서 밀리면 악센트다 — 대신 면적(ORDER_LEAD)으로 포인트가 된다.
+ * 4. `max`를 넘으면 악센트를 면적 작은 것부터, 그래도 넘으면 메인 안에서 면적 작은 것부터 뺀다.
+ * 반환은 **등장순** — 노트 순서와 띠가 일치한다. 색을 하나도 못 매기면 빈 배열(호출부가 중립을 깐다).
  */
 export function flavorStops(notes: string, max = 4): FlavorStop[] {
-  const groups: FlavorStop[] = [];
+  const stops: FlavorStop[] = [];
+  let first = true;
   for (const token of splitNotes(notes || "")) {
     const mood = tokenMood(token);
     if (!mood) continue;
-    const near = groups.find((g) => sameMood(g.mood, mood));
-    if (near) near.weight += 1;
-    else groups.push({ mood, weight: 1, note: token });
+    const lead = first ? ORDER_LEAD : 1;
+    first = false;
+    const near = stops.find((s) => sameMood(s.mood, mood));
+    if (near) {
+      near.count += 1;
+      near.area += lead;
+    } else {
+      stops.push({ mood, count: 1, area: lead, role: "accent", groupCount: 1, note: token });
+    }
   }
-  if (groups.length <= max) return groups;
-  // 가벼운 것부터 떨어내되, 같은 무게면 뒤에 나온 것이 먼저 빠진다
+  if (stops.length === 0) return stops;
+
+  // 톤 그룹 — 그룹의 첫 색(seed)과 비교한다. 결정적이고 단순하다.
+  const groups: { seed: Mood; members: FlavorStop[]; count: number }[] = [];
+  for (const s of stops) {
+    const g = groups.find((g) => oklabDistance(g.seed, s.mood) < KIN_DE);
+    if (g) {
+      g.members.push(s);
+      g.count += s.count;
+    } else groups.push({ seed: s.mood, members: [s], count: s.count });
+  }
+  const top = Math.max(...groups.map((g) => g.count));
+  for (const g of groups) {
+    const main = g.count * 3 >= top * 2;
+    for (const s of g.members) {
+      s.role = main ? "main" : "accent";
+      s.groupCount = g.count;
+    }
+  }
+
+  if (stops.length <= max) return stops;
+  // 악센트를 면적 작은 것부터(같으면 뒤에 나온 것) 뺀다. 그래도 넘으면 메인 안에서 같은 규칙으로.
+  const rank = (s: FlavorStop) => (s.role === "main" ? 1 : 0);
   const keep = new Set(
-    groups
-      .map((g, i) => ({ g, i }))
-      .sort((a, b) => b.g.weight - a.g.weight || a.i - b.i)
+    stops
+      .map((s, i) => ({ s, i }))
+      .sort((a, b) => rank(b.s) - rank(a.s) || b.s.area - a.s.area || a.i - b.i)
       .slice(0, max)
-      .map((x) => x.g),
+      .map((x) => x.s),
   );
-  return groups.filter((g) => keep.has(g));
+  return stops.filter((s) => keep.has(s));
+}
+
+/** 톤 모델을 색에 적용 — 메인은 검출량만큼 채도가 오르고(C_MAX에서 멈춘다), 악센트는 제 채도 그대로. */
+export function boostedMood(mood: Mood, role: FlavorStop["role"], groupCount: number): Mood {
+  if (role !== "main") return mood;
+  const boost = Math.min(1 + BOOST_STEP * (groupCount - 1), BOOST_MAX);
+  return { ...mood, c: Math.min(Math.round(mood.c * boost * 1000) / 1000, C_MAX) };
+}
+
+/** stop의 면적 가중치 — 순서 가중 면적에, 메인이면 MAIN_AREA를 곱한다. */
+export function stopArea(s: FlavorStop): number {
+  return s.area * (s.role === "main" ? MAIN_AREA : 1);
 }
 
 /**
@@ -376,8 +456,8 @@ export function stopPositions(weights: readonly number[]): number[] {
 
 /**
  * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
- * 색은 노트 단위(flavorStops) — 같은 색이 여럿이면 그 색이 띠를 더 차지한다. 색이 하나면 같은 hue의
- * 명도 두 단계, 매칭이 없으면 중립 웜브라운, 노트가 비면 null.
+ * 색은 노트 단위(flavorStops)이고, 톤은 개수·순서는 면적으로 드러난다(boostedMood·stopArea). 색이 하나면
+ * 같은 hue의 명도 두 단계, 매칭이 없으면 중립 웜브라운, 노트가 비면 null.
  * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
  */
 export function flavorGradient(notes: string): string | null {
@@ -385,19 +465,19 @@ export function flavorGradient(notes: string): string | null {
   if (!raw) return null;
   const dark = isDark();
   // 벌려 놓은 hue도 알파가 너무 낮으면 회색빛 한 겹으로 뭉개진다 — 계열이 읽히는 선까지만 올린다.
-  // 밴드 위에 헤드라인·로스터리가 얹히므로 더 올리지는 않는다(텍스트 대비가 먼저다). 가중치도 알파가
-  // 아니라 면적으로 드러낸다 — 같은 이유다.
+  // 밴드 위에 헤드라인·로스터리가 얹히므로 더 올리지는 않는다(텍스트 대비가 먼저다). 톤도 알파가 아니라
+  // 면적·채도로 드러낸다 — 같은 이유다. 모든 stop이 같은 알파라 악센트가 물리지 않는다.
   const alpha = dark ? 0.26 : 0.19;
 
   const stops = flavorStops(raw);
+  const moods = stops.map((s) => boostedMood(s.mood, s.role, s.groupCount));
 
-  const single = stops.length === 1 ? stops[0]?.mood : stops.length === 0 ? NEUTRAL : null;
+  const single = moods.length === 1 ? moods[0] : moods.length === 0 ? NEUTRAL : null;
   const css = single
     ? // 단일 색(또는 무매칭 → 중립 웜브라운) — 같은 hue의 명도 두 단계
       [moodColor(single, alpha, dark), moodColor({ ...single, l: single.l + 0.14 }, alpha * 0.7, dark)]
-    : // 뒤 색을 너무 죽이면 두 색짜리 노트가 단일 색처럼 보인다 — 순서만 드러날 만큼만 뺀다
-      stopPositions(stops.map((s) => s.weight)).map(
-        (pos, i) => `${moodColor(stops[i]?.mood ?? NEUTRAL, alpha * (1 - i * 0.12), dark)} ${pos}%`,
+    : stopPositions(stops.map(stopArea)).map(
+        (pos, i) => `${moodColor(moods[i] ?? NEUTRAL, alpha, dark)} ${pos}%`,
       );
   return `linear-gradient(135deg, ${css.join(", ")})`;
 }
