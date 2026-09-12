@@ -6,6 +6,12 @@ export interface Env {
   /** 가입 초대코드 — Cloudflare secret (wrangler pages secret put INVITE_CODE) */
   INVITE_CODE?: string;
   /**
+   * 관리자 유저코드 목록(콤마 구분) — Cloudflare secret (wrangler pages secret put ADMIN_USERCODES).
+   * DB에는 특별한 계정이 없다 — 관리자는 일반 계정으로 로그인하고 서버가 이 목록과 대조한다(lib/admin.ts).
+   * 비어 있으면 관리자가 없다: /api/admin/* 는 전부 404다.
+   */
+  ADMIN_USERCODES?: string;
+  /**
    * AI 인식 대행용 서비스 키 — Cloudflare secret (wrangler pages secret put GEMINI_API_KEY).
    * 본인 키를 넣지 않은 사용자에게 하루 몇 번 AI 인식을 제공한다(lib/ai-quota.ts).
    * 없어도 서비스는 정상 동작한다 — 클라이언트가 규칙 기반 파서로 폴백한다.

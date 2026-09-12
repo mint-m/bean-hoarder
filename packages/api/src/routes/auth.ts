@@ -17,12 +17,19 @@ import {
 import { json } from "../lib/http";
 import { clientIp, IP_BUCKET_LIMIT, isRateLimited, RATE_LIMIT_ERROR, recordFailure } from "../lib/ratelimit";
 import { createSession, revokeSession } from "../lib/session";
+import { getSignupMode } from "../lib/settings";
+
+export const SIGNUP_CLOSED_ERROR = "지금은 가입을 받지 않습니다.";
 
 export async function signup(c: Context<AppEnv>): Promise<Response> {
   const body = signupBodySchema.parse(await c.req.json().catch(() => ({})));
   const db = createDb(c.env.DB);
   const signupBucket = `signup:${clientIp(c.req.raw)}`;
-  if (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE) {
+  // 가입 모드(관리자 설정, lib/settings.ts): closed면 문을 닫고, open이면 초대코드를 묻지 않는다.
+  // invite(기본)는 종전 그대로 — 아래 403과 메시지가 계약이다(app.test.ts).
+  const mode = await getSignupMode(db);
+  if (mode === "closed") return json({ ok: false, error: SIGNUP_CLOSED_ERROR }, 403);
+  if (mode === "invite" && (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE)) {
     if (await isRateLimited(db, signupBucket, IP_BUCKET_LIMIT)) {
       return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
     }

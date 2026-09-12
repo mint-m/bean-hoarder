@@ -35,6 +35,7 @@
 
 | 경로 | 역할 |
 |---|---|
+| `db/migrate_settings.sql` | 서비스 설정 key/value (#88) — 첫 키는 signup_mode: invite | open | closed. |
 | `db/schema.sql` | D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다. |
 | `db/seed.sql` | 로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건. |
 
@@ -74,6 +75,11 @@
 | DELETE | `/logos` | 필요 |
 | POST | `/fetch` | 필요 |
 | POST | `/extract` | 필요 |
+| GET | `/me` | 필요 |
+| GET | `/admin/stats` | 필요 |
+| GET | `/admin/flavor-candidates` | 필요 |
+| GET | `/admin/settings` | 필요 |
+| PUT | `/admin/settings` | 필요 |
 
 **D1 테이블** (`bnhd-v2`)
 
@@ -86,3 +92,4 @@
 | `auth_attempts` | `bucket`, `count`, `reset_at` |
 | `r2_usage` | `id`, `month`, `write_count` |
 | `ai_usage` | `bucket`, `count`, `reset_at` |
+| `settings` | `key`, `value`, `updated_at` |

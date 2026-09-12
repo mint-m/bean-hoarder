@@ -79,3 +79,11 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   count    INTEGER NOT NULL DEFAULT 0,
   reset_at TEXT NOT NULL
 );
+
+-- 서비스 설정 key/value — signup_mode(invite | open | closed) 등. 관리자 페이지(#88)가 읽고 쓴다.
+-- 행이 없으면 코드는 기본값으로 본다(signup_mode → invite).
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

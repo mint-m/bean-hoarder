@@ -1231,6 +1231,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 </tr>
 </thead>
 <tbody><tr>
+<td><code>db/migrate_settings.sql</code></td>
+<td>서비스 설정 key/value (#88) — 첫 키는 signup_mode: invite</td>
+</tr>
+<tr>
 <td><code>db/schema.sql</code></td>
 <td>D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다.</td>
 </tr>
@@ -1371,6 +1375,31 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 <td><code>/extract</code></td>
 <td><span class="auth need">🔒 필요</span></td>
 </tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/me</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/stats</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/flavor-candidates</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/settings</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method put">PUT</span></td>
+<td><code>/admin/settings</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
 </tbody></table>
 </div><p><strong>D1 테이블</strong> (<code>bnhd-v2</code>)</p>
 <div class="table-wrap"><table>
@@ -1407,6 +1436,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 <tr>
 <td><code>ai_usage</code></td>
 <td><code>bucket</code>, <code>count</code>, <code>reset_at</code></td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td><code>key</code>, <code>value</code>, <code>updated_at</code></td>
 </tr>
 </tbody></table>
 </div></article>
