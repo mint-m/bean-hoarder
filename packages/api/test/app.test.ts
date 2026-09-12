@@ -583,65 +583,95 @@ test("AI 대행: 400은 다음 후보로 넘어가지 않는다", async () => {
   }
 });
 
-test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
-  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+test("rate limit: 만료된 auth_attempts 버킷은 다음 실패 기록 때 지워진다 (#41)", async () => {
+  const { recordFailure } = await import("../src/lib/ratelimit");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(2, 100); // 계정 2회로 낮춰 경계를 바로 검증
-  try {
-    const db = createDb(env.DB);
-    const uc = `Q${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    expect(await remainingAiCalls(db, uc)).toBe(2);
+  const db = createDb(env.DB);
+  const stale = `ip:203.0.113.${Math.floor(Math.random() * 250)}`;
+  await recordFailure(db, stale);
+  await env.DB.prepare("UPDATE auth_attempts SET reset_at = datetime('now', '-1 second') WHERE bucket = ?")
+    .bind(stale)
+    .run();
+  // 다른 버킷의 실패가 기록되면서 만료된 행이 함께 사라진다
+  await recordFailure(db, `ip:198.51.100.${Math.floor(Math.random() * 250)}`);
+  const row = await env.DB.prepare("SELECT count(*) AS n FROM auth_attempts WHERE bucket = ?")
+    .bind(stale)
+    .first<{ n: number }>();
+  expect(row?.n).toBe(0);
+});
 
-    expect(await reserveAiCall(db, uc)).toBe(1); // 1회차 → 1회 남음
-    expect(await reserveAiCall(db, uc)).toBe(0); // 2회차 → 0회 남음
-    expect(await reserveAiCall(db, uc)).toBeNull(); // 3회차 → 한도 초과
-    expect(await remainingAiCalls(db, uc)).toBe(0);
-  } finally {
-    restore();
-  }
+test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const quota = { perAccount: 2, global: 100 }; // 계정 2회로 낮춰 경계를 바로 검증 — 인자라 다른 테스트와 안 섞인다
+  const db = createDb(env.DB);
+  const uc = `Q${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2);
+
+  expect(await reserveAiCall(db, uc, quota)).toBe(1); // 1회차 → 1회 남음
+  expect(await reserveAiCall(db, uc, quota)).toBe(0); // 2회차 → 0회 남음
+  expect(await reserveAiCall(db, uc, quota)).toBeNull(); // 3회차 → 한도 초과
+  expect(await remainingAiCalls(db, uc, quota)).toBe(0);
+
+  // 행은 계정당 하나 — 날짜별로 새 행이 생기지 않는다(#71)
+  const rows = await env.DB.prepare("SELECT count(*) AS n FROM ai_usage WHERE bucket LIKE ?")
+    .bind(`acct:${uc}%`)
+    .first<{ n: number }>();
+  expect(rows?.n).toBe(1);
+});
+
+test("AI 대행 할당량: reset_at이 지나면 카운터가 1부터 다시 센다 — 같은 행을 재사용한다", async () => {
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const quota = { perAccount: 2, global: 100 };
+  const db = createDb(env.DB);
+  const uc = `S${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await reserveAiCall(db, uc, quota)).toBe(1);
+  expect(await reserveAiCall(db, uc, quota)).toBe(0);
+  expect(await reserveAiCall(db, uc, quota)).toBeNull();
+  // 어제로 만료시킨다 — 실제로는 D1 시계가 자정을 넘기며 하는 일
+  await env.DB.prepare("UPDATE ai_usage SET reset_at = datetime('now', '-1 second') WHERE bucket = ?")
+    .bind(`acct:${uc}`)
+    .run();
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2); // 만료된 카운터는 없는 것으로 본다
+  expect(await reserveAiCall(db, uc, quota)).toBe(1); // 1부터 다시
+  const rows = await env.DB.prepare("SELECT count(*) AS n FROM ai_usage WHERE bucket = ?")
+    .bind(`acct:${uc}`)
+    .first<{ n: number }>();
+  expect(rows?.n).toBe(1);
 });
 
 test("AI 대행 할당량: 전역 한도는 계정이 달라도 함께 소진된다 (한 사람이 하루치를 독식하지 못하게)", async () => {
-  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(50, 2); // 전역 2회
-  try {
-    const db = createDb(env.DB);
-    // 전역 버킷은 날짜 단위 공유라 앞 테스트의 사용분이 남아 있을 수 있다 — 0으로 맞추고 시작
-    await env.DB.prepare("DELETE FROM ai_usage WHERE bucket LIKE 'global:%'").run();
-    const a = `G${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    const b = `H${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    expect(await reserveAiCall(db, a)).not.toBeNull();
-    expect(await reserveAiCall(db, b)).not.toBeNull();
-    expect(await reserveAiCall(db, b)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
+  const quota = { perAccount: 50, global: 2 }; // 전역 2회
+  const db = createDb(env.DB);
+  // 전역 버킷은 서비스 공유라 앞 테스트의 사용분이 남아 있을 수 있다 — 0으로 맞추고 시작
+  await env.DB.prepare("DELETE FROM ai_usage WHERE bucket = 'global'").run();
+  const a = `G${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const b = `H${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await reserveAiCall(db, a, quota)).not.toBeNull();
+  expect(await reserveAiCall(db, b, quota)).not.toBeNull();
+  expect(await reserveAiCall(db, b, quota)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
 
-    // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
-    // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
-    // 소진하고 전역이 풀린 뒤에도 막힌다.
-    const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    const before = await remainingAiCalls(db, c);
-    expect(await reserveAiCall(db, c)).toBeNull();
-    expect(await reserveAiCall(db, c)).toBeNull();
-    expect(await remainingAiCalls(db, c)).toBe(before);
-  } finally {
-    restore();
-  }
+  // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
+  // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
+  // 소진하고 전역이 풀린 뒤에도 막힌다.
+  const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const before = await remainingAiCalls(db, c, quota);
+  expect(await reserveAiCall(db, c, quota)).toBeNull();
+  expect(await reserveAiCall(db, c, quota)).toBeNull();
+  expect(await remainingAiCalls(db, c, quota)).toBe(before);
 });
 
 test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리 잘못으로 사용자 몫을 깎지 않는다)", async () => {
-  const { reserveAiCall, releaseAiCall, remainingAiCalls, setAiQuotaForTest } = await import(
-    "../src/lib/ai-quota"
-  );
+  const { reserveAiCall, releaseAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(3, 100);
-  try {
-    const db = createDb(env.DB);
-    const uc = `R${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    await reserveAiCall(db, uc);
-    expect(await remainingAiCalls(db, uc)).toBe(2);
-    await releaseAiCall(db, uc);
-    expect(await remainingAiCalls(db, uc)).toBe(3);
-  } finally {
-    restore();
-  }
+  const quota = { perAccount: 3, global: 100 };
+  const db = createDb(env.DB);
+  const uc = `R${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  await reserveAiCall(db, uc, quota);
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2);
+  await releaseAiCall(db, uc);
+  expect(await remainingAiCalls(db, uc, quota)).toBe(3);
 });
