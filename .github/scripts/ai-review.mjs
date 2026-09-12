@@ -350,6 +350,14 @@ const SEV_LABEL = {
   medium: "🟡 MEDIUM",
   low: "🔵 LOW",
   nit: "⚪ NIT",
+  unknown: "⚫ 미분류",
+};
+// responseSchema를 무시하는 모델(폴백 목록의 구형 모델이 특히 그렇다)이 "blocker"·"Warning" 같은 값을 준다.
+// 그대로 두면 배지 자리에 원문이 찍히고 집계에서는 통째로 빠져, 집계는 "0건"인데 본문엔 여러 건이 나열된다(#73).
+// 대소문자는 흡수하고, 모르는 값은 짐작해 등급을 매기지 않고 "미분류"로 드러낸다.
+const sevKey = (s) => {
+  const k = String(s || "").toLowerCase();
+  return SEV_ORDER.includes(k) ? k : "unknown";
 };
 const VERDICT_LABEL = {
   APPROVE: "✅ 승인 권고",
@@ -464,7 +472,7 @@ const VERIFY_LABEL = { CONFIRMED: "🔎 확인됨", PLAUSIBLE: "🤔 가능성" 
 function renderFinding(f) {
   const badge = VERIFY_LABEL[f.verifiedAs];
   const out = [
-    `**${SEV_LABEL[f.severity] || f.severity || ""}** · _${f.category || "review"}_${badge ? ` · ${badge}` : ""}`,
+    `**${SEV_LABEL[sevKey(f.severity)]}** · _${f.category || "review"}_${badge ? ` · ${badge}` : ""}`,
   ];
   out.push(f.description || "");
   if (f.suggestion) out.push(`\n> 제안: ${f.suggestion}`);
@@ -482,10 +490,12 @@ function renderFinding(f) {
  */
 function renderBody(review, { inlineCount, unanchored, dupCount, refutedCount, skippedFiles }) {
   const findings = Array.isArray(review.findings) ? review.findings : [];
-  const tally = SEV_ORDER.map((sev) => {
-    const n = findings.filter((f) => f.severity === sev).length;
-    return n ? `${SEV_LABEL[sev]} ${n}` : null;
-  }).filter(Boolean);
+  const tally = [...SEV_ORDER, "unknown"]
+    .map((sev) => {
+      const n = findings.filter((f) => sevKey(f.severity) === sev).length;
+      return n ? `${SEV_LABEL[sev]} ${n}` : null;
+    })
+    .filter(Boolean);
 
   const out = [`**판정: ${VERDICT_LABEL[review.verdict] || review.verdict || "—"}**`];
   if (tally.length) out.push(tally.join(" · "));
@@ -530,7 +540,7 @@ function renderBody(review, { inlineCount, unanchored, dupCount, refutedCount, s
       const loc = f.line != null ? `\`${f.file}:${f.line}\`` : `\`${f.file || "?"}\``;
       const badge = VERIFY_LABEL[f.verifiedAs];
       out.push(
-        `\n**${SEV_LABEL[f.severity] || f.severity || ""}** ${loc} · _${f.category || "review"}_${badge ? ` · ${badge}` : ""}\n${f.description || ""}`,
+        `\n**${SEV_LABEL[sevKey(f.severity)]}** ${loc} · _${f.category || "review"}_${badge ? ` · ${badge}` : ""}\n${f.description || ""}`,
       );
       if (f.suggestion) out.push(`> 제안: ${f.suggestion}`);
       if (f.verifiedWhy) out.push(`> 검증: ${f.verifiedWhy}`);
