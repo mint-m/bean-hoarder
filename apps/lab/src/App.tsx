@@ -1,7 +1,9 @@
 import { type Account, clearSession, migrateLegacyPin } from "@bnhd/session";
 import { useCallback, useEffect, useState } from "react";
+import AdminView from "./AdminView";
 import AuthView from "./AuthView";
-import SettingsMenu from "./components/SettingsMenu";
+import SettingsMenu, { type AiQuota } from "./components/SettingsMenu";
+import { api } from "./lib/api";
 import Workspace from "./Workspace";
 
 const EXPIRED_NOTICE = "로그인이 만료되었습니다. 다시 로그인해 주세요.";
@@ -12,6 +14,10 @@ export default function App() {
   // 설정 서랍은 보통 톱바 버튼으로 열지만, 인식이 부실했을 때 그 자리에서도 열 수 있어야 한다
   // (실패를 해결할 UI를 실패 안내 옆에 두는 규칙 — DESIGN.md §1).
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 로그인 직후 /api/me 한 번 — 관리자면 진입점을 보이고, AI 한도는 설정 문구가 쓴다(#72).
+  // 실패해도 등록 동선은 멀쩡하다 — 둘 다 "있으면 보여 주는" 정보다.
+  const [me, setMe] = useState<{ is_admin: boolean; ai_quota: AiQuota } | null>(null);
+  const [view, setView] = useState<"work" | "admin">("work");
   const signedIn = !!account?.usercode && !!account?.token;
 
   useEffect(() => {
@@ -22,6 +28,21 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle("signed-in", signedIn);
   }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn || !account) {
+      setMe(null);
+      setView("work");
+      return;
+    }
+    let alive = true;
+    api<{ is_admin: boolean; ai_quota: AiQuota }>("/api/me", account.token).then((res) => {
+      if (alive && res.body?.ok) setMe({ is_admin: res.body.is_admin, ai_quota: res.body.ai_quota });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [signedIn, account]);
 
   // 서버가 세션을 거부했다(만료 90일 경과, 또는 다른 기기에서 로그아웃해 폐기됨).
   // 토큰이 남아 있어도 아무것도 저장할 수 없으므로 지우고 로그인 화면으로 돌린다 —
@@ -67,15 +88,22 @@ export default function App() {
           {signedIn && (
             <div className="acct-chip">
               <code>{account.usercode}</code>
+              {me?.is_admin && (
+                <button type="button" onClick={() => setView(view === "admin" ? "work" : "admin")}>
+                  {view === "admin" ? "등록" : "관리"}
+                </button>
+              )}
               <button type="button" onClick={signOut}>
                 로그아웃
               </button>
             </div>
           )}
-          <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen} />
+          <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen} aiQuota={me?.ai_quota ?? null} />
         </div>
       </header>
-      {signedIn ? (
+      {signedIn && view === "admin" ? (
+        <AdminView account={account} onBack={() => setView("work")} onSessionExpired={handleSessionExpired} />
+      ) : signedIn ? (
         <Workspace
           account={account}
           onSessionExpired={handleSessionExpired}
