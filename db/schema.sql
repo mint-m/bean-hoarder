@@ -1,3 +1,7 @@
+-- D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다.
+-- 기존 DB에 컬럼·테이블을 더할 때는 migrate_*.sql을 새로 추가하고, 같은 변경을 여기에도 반영한다
+-- (CREATE TABLE IF NOT EXISTS는 있는 테이블에 컬럼을 더해 주지 않는다).
+
 CREATE TABLE IF NOT EXISTS users (
   usercode      TEXT PRIMARY KEY,
   pass_hash     TEXT NOT NULL,

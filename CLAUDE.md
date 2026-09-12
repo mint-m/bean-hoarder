@@ -1,7 +1,8 @@
 # Bean-Hoarder 작업 가이드
 
 커피 원두 소분 라벨링(QR) & 조회 서비스. Cloudflare Pages + Functions + D1 + R2, 운영비 0원.
-실서비스 전환은 2026-07-13에 끝났고, 패스키(WebAuthn) 도입만 후속 과제로 남아 있다.
+실서비스 전환은 2026-07-13에 끝났다. 패스키(WebAuthn)는 검토 끝에 도입하지 않기로 했다(#24, 2026-08-06) —
+PIN + 세션 토큰 + D1 rate limit 조합을 유지한다.
 
 **이 문서는 원칙과 함정만 다룬다.** 디렉터리·파일 배치와 API 라우트는 생성되는
 [STRUCTURE.md](STRUCTURE.md), 사용법·운영 절차는 [README.md](README.md)에 있고
@@ -30,8 +31,9 @@ npm run lint           # Biome 체크
 npm run lint:fix       # Biome 자동 수정
 npm run typecheck      # tsc (워크스페이스 + functions + e2e)
 npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
+npm run gen:html       # HOW_IT_WORKS.html 재생성 (문서 넷을 사람용 한 페이지로 렌더)
 npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
-npm run check          # lint + typecheck + test + 문서 검증 — 커밋 전 필수
+npm run check          # lint + typecheck + test + 생성 문서·문서 참조 검증 — 커밋 전 필수
 npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
 npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler 설정)를 건드렸다면 이걸로
 
@@ -137,14 +139,17 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 | 변경 이력 (한 줄 요약) | [README.md](README.md) "주요 변경" |
 | 릴리스 노트 (전문) | GitHub Releases — 태그가 버전의 단일 소스 |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
-| 설계 배경·아키텍처 근거 | [README.md](README.md) "구조" · [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 설계 배경·아키텍처 근거 | [README.md](README.md) "구조" |
 | 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙) | [DESIGN.md](DESIGN.md) — 값의 단일 소스는 `apps/web/public/theme.css` |
 | 원칙·금지 사항·함정 | 이 문서 |
+| 위 문서 전부를 사람이 한눈에 보는 페이지 | **생성** — `npm run gen:html` → [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
 
 - **문서 파일을 늘리지 않는다.** 새 `.md`를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수
   없는지 먼저 본다. 문서가 늘면 같은 사실이 여러 곳에 흩어지고, 그게 곧 낡는 원인이다.
-  `STRUCTURE.md`는 예외인데 — 전부 생성물이라 사람이 유지할 게 없고, README에서 덜어낸
-  것이지 새로 더한 게 아니다.
+  `STRUCTURE.md`와 `HOW_IT_WORKS.html`은 예외인데 — 둘 다 전부 생성물이라 사람이 유지할 게 없고,
+  STRUCTURE.md는 README에서 덜어낸 것이지 새로 더한 게 아니다. HOW_IT_WORKS.html은 `.md` 넷(README·
+  CLAUDE·DESIGN·STRUCTURE)을 사람이 읽기 좋게 한 페이지로 렌더한 것이라 **손으로 고치지 않는다** —
+  문장을 바꾸려면 원본 `.md`를 고치고 다시 생성한다.
 - **문서는 독자로 가른다.** README는 사람이 읽는다(무엇인지·어떻게 쓰는지·어떻게 운영하는지),
   STRUCTURE.md는 코드 파악용, DESIGN.md는 디자인 시스템(색·타이포·컴포넌트 규칙), 이 문서는 원칙.
   한 파일이 여러 독자를 상대하기 시작하면 양쪽 모두에게 불친절해진다.

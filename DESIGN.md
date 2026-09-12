@@ -5,8 +5,9 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
 **무엇을 위한 것이고 어떻게 조합하는지 — 규칙과 근거**를 다룬다. 값을 바꾸려면 theme.css를,
 규칙을 바꾸려면 이 문서를 고친다. 값을 여기 옮겨 적으면 낡으므로 하지 않는다.
 
-> 설계 배경·아키텍처는 [README.md](README.md) "구조"와 [HOW_IT_WORKS.html](HOW_IT_WORKS.html),
-> 저장소 구조는 [STRUCTURE.md](STRUCTURE.md), 작업 원칙·함정은 [CLAUDE.md](CLAUDE.md).
+> 설계 배경·아키텍처는 [README.md](README.md) "구조", 저장소 구조는 [STRUCTURE.md](STRUCTURE.md),
+> 작업 원칙·함정은 [CLAUDE.md](CLAUDE.md). 이 문서들을 한 페이지로 렌더한 사람용 생성물이
+> [HOW_IT_WORKS.html](HOW_IT_WORKS.html)이다.
 
 ## 1. 아이덴티티 — 중립 크롬, 커피가 부여하는 색
 
@@ -275,4 +276,4 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 - 라벨에 화면 색(산지·향미)을 가정.
 - 텍스트 대비를 해치는 배경(향미 그라데이션도 저알파 유지).
 - theme.css 밖에 색·반경 하드코딩(불가피하면 이유를 주석으로).
-- 카드 반경(16)·컨트롤 반경(9)·알약(999)을 서로 바꿔 쓰기.
+- 카드 반경(10)·컨트롤 반경(7)·알약(999)을 서로 바꿔 쓰기.

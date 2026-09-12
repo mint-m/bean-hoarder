@@ -1,260 +1,1290 @@
 <!DOCTYPE html>
+<!-- 생성물 — 손으로 고치지 말 것. scripts/gen-how-it-works.mjs가 README.md·CLAUDE.md·DESIGN.md·STRUCTURE.md를 렌더해 만든다 (npm run gen:html). -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bean-Hoarder v2 — 작동 방식</title>
+<title>Bean-Hoarder — 문서</title>
 <style>
+:root {
+  --bg: #fafaf8; --surface: #fff; --surface-2: #f3f2ee; --ink: #16130f; --sub: #6b655c; --line: #e3e0d9;
+  --accent: #e8641c; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+  --code-bg: #f1efea; --radius: 10px; --radius-sm: 7px;
+  --sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+  --mono: "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
   :root {
-    --ink: #111; --sub: #666; --line: #ddd; --bg: #fafafa; --accent: #0a6b52;
-    --mono: Consolas, "SF Mono", Menlo, monospace;
-    --sans: "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --bg: #121110; --surface: #1b1917; --surface-2: #232019; --ink: #ece8e1; --sub: #a39c91; --line: #2e2b26;
+    --accent: #f0803f; --code-bg: #26231f;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg);
-    display: flex; justify-content: center; padding: 40px 16px 80px;
-  }
-  main { width: 100%; max-width: 760px; }
-  header { margin-bottom: 40px; }
-  header .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--sub); }
-  h1 { font-size: 28px; margin: 6px 0 10px; }
-  header p { font-size: 15px; color: var(--sub); line-height: 1.6; max-width: 560px; }
-  .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-  .badge { font-family: var(--mono); font-size: 11px; background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; color: var(--sub); }
-  section { margin-bottom: 48px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--sub); margin: 0 0 6px; }
-  h3 { font-size: 20px; margin: 0 0 12px; }
-  section > p.lede { font-size: 14px; color: #333; line-height: 1.7; margin: 0 0 20px; max-width: 620px; }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.65;
+  word-break: keep-all; overflow-wrap: break-word;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, kbd { font-family: var(--mono); }
+code { background: var(--code-bg); border-radius: 4px; padding: .1em .35em; font-size: .88em; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote { margin: 16px 0; padding: 10px 16px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--ink); }
+blockquote p { margin: .4em 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+img { max-width: 100%; }
 
-  /* 아키텍처 다이어그램 */
-  .arch { display: flex; flex-direction: column; align-items: center; }
-  .arch-node { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; font-size: 13px; text-align: center; }
-  .arch-arrow { color: var(--sub); font-size: 18px; line-height: 1; margin: 4px 0; }
-  .arch-platform { width: 100%; border: 1.5px dashed var(--line); border-radius: 16px; padding: 28px 20px 22px; margin-top: 4px; }
-  .arch-platform-label { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--sub); margin-bottom: 18px; }
-  .arch-platform-label b { color: var(--ink); }
-  .arch-inner { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; justify-content: center; }
-  .arch-box { background: #f3f3f0; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; flex: 1; min-width: 160px; }
-  .arch-box strong { display: block; font-size: 14px; margin-bottom: 4px; }
-  .arch-box span { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--sub); }
-  .arch-col { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: 1; min-width: 180px; }
-  .arch-hstep { display: flex; align-items: center; }
-  .arch-hstep .arch-arrow { margin: 0 10px; }
+.page { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0 40px; max-width: 1240px; margin: 0 auto; padding: 0 24px 80px; }
+.top { grid-column: 1 / -1; padding: 40px 0 28px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+.wordmark { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--sub); }
+.top h1 { font-size: 30px; margin: 6px 0 8px; letter-spacing: -.01em; }
+.top p { margin: 0; color: var(--sub); max-width: 720px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 22px; }
+.card { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; color: inherit; transition: border-color .15s ease; }
+.card:hover { border-color: var(--accent); text-decoration: none; }
+.card .name { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+.card .blurb { font-size: 13px; color: var(--sub); margin-top: 6px; line-height: 1.5; }
+.badge { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--sub); margin-left: 8px; vertical-align: 2px; }
 
-  /* 흐름 스텝 */
-  .flow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 2px; }
-  .step { width: 132px; text-align: center; }
-  .step .circle {
-    width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff;
-    display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
-    font-weight: 700; font-size: 13px;
-  }
-  .step strong { display: block; font-size: 13px; margin-bottom: 4px; }
-  .step span { display: block; font-size: 11.5px; color: var(--sub); line-height: 1.4; }
-  .step code { font-family: var(--mono); font-size: 11px; }
-  .flow-arrow { width: 24px; padding-top: 6px; text-align: center; color: var(--line); font-size: 18px; flex-shrink: 0; }
+nav.side { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 8px 0 40px; font-size: 13px; }
+nav.side .group { margin-bottom: 18px; }
+nav.side .group > a { display: block; font-family: var(--mono); font-weight: 700; font-size: 12.5px; color: var(--ink); padding: 4px 0; letter-spacing: .04em; }
+nav.side ul { list-style: none; margin: 2px 0 0; padding: 0 0 0 10px; border-left: 1px solid var(--line); }
+nav.side li a { display: block; padding: 3px 0 3px 8px; color: var(--sub); line-height: 1.4; }
+nav.side li.d3 a { padding-left: 20px; font-size: 12px; }
+nav.side li a:hover { color: var(--accent); text-decoration: none; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--sub); font-weight: 600; }
-  td.old { color: var(--sub); }
-  td.new { color: var(--accent); font-weight: 500; }
-  ul.plain { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.8; }
-  .filelist { font-family: var(--mono); font-size: 12px; color: var(--sub); line-height: 2; }
-  .filelist b { color: var(--ink); }
+main { min-width: 0; }
+article { margin-bottom: 72px; }
+.doc-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; padding: 0 0 12px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
+.doc-head h1 { font-family: var(--mono); font-size: 22px; margin: 0; }
+.doc-head .source { margin-left: auto; font-size: 12.5px; color: var(--sub); }
+.doc-head .blurb { flex-basis: 100%; margin: 0; color: var(--sub); font-size: 13.5px; }
+article h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 8px; letter-spacing: -.01em; }
+article h3 { font-size: 16.5px; margin: 28px 0 8px; }
+article h4 { font-size: 14.5px; margin: 20px 0 6px; }
+article h2 .anchor, article h3 .anchor, article h4 .anchor { color: var(--line); margin-right: 8px; font-weight: 400; }
+article h2:hover .anchor, article h3:hover .anchor, article h4:hover .anchor { color: var(--accent); }
+article p, article li { max-width: 78ch; }
+article li { margin: .25em 0; }
+article ul, article ol { padding-left: 1.4em; }
 
-  @media (max-width: 560px) {
-    .arch-inner { flex-direction: column; }
-    .flow { flex-direction: column; align-items: center; }
-    .flow-arrow { transform: rotate(90deg); padding: 2px 0; }
-  }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); font-weight: 600; background: var(--surface-2); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+.method { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .04em; border-radius: 4px; padding: 2px 7px; color: #fff; background: var(--sub); }
+.method.get { background: #2f7d5a; }
+.method.post { background: #2a6db5; }
+.method.put, .method.patch { background: #b07a12; }
+.method.delete { background: #b43a2f; }
+.auth { font-size: 12.5px; white-space: nowrap; }
+.auth.need { font-weight: 600; }
+.auth.open { color: var(--sub); }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--ink) 25%, transparent); vertical-align: -2px; margin-right: 8px; }
+
+@media (max-width: 860px) {
+  .page { grid-template-columns: 1fr; gap: 0; padding: 0 16px 60px; }
+  nav.side { position: static; max-height: none; display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 0 24px; }
+  nav.side ul { display: none; }
+  nav.side .group { margin: 0; }
+  .top { padding-top: 28px; }
+}
 </style>
 </head>
 <body>
-<main>
-
-<header>
-  <div class="eyebrow">Bean-Hoarder v2</div>
-  <h1>작동 방식</h1>
-  <p>구글시트 대신 Cloudflare D1(데이터베이스)과 Pages Functions(서버 코드)로 처음부터 다시 설계한 버전.
-  "웹에 게시" 같은 수동 단계 없이, 가입하면 바로 등록하고 조회할 수 있다.</p>
-  <div class="badges">
-    <span class="badge">비용 0원</span>
-    <span class="badge">Cloudflare Pages 프로젝트 1개</span>
-    <span class="badge">D1 (SQLite)</span>
-    <span class="badge">Pages Functions</span>
-    <span class="badge">백엔드 서버 없음</span>
+<div class="page" id="top">
+<header class="top">
+  <div class="wordmark">Bean-Hoarder</div>
+  <h1>문서 한 장</h1>
+  <p>저장소의 문서 네 개를 한 페이지로 렌더한 것이다. README는 사람이, 나머지 .md는 주로 에이전트가 읽는다 —
+  이 페이지는 그 넷을 사람이 한눈에 훑기 위한 생성물이라 손으로 고치지 않는다.
+  문장을 바꾸려면 원본 .md를 고치고 <code>npm run gen:html</code>로 다시 만든다.</p>
+  <div class="cards">
+<a class="card" href="#readme"><span class="name">README.md</span><span class="badge">사람</span><div class="blurb">서비스가 무엇이고 어떻게 쓰고 어떻게 운영하는지.</div></a>
+<a class="card" href="#claude"><span class="name">CLAUDE.md</span><span class="badge">AI</span><div class="blurb">작업 원칙과 절대 바꾸면 안 되는 것, 걸려 넘어지기 쉬운 함정. 에이전트가 매 세션 읽는다.</div></a>
+<a class="card" href="#design"><span class="name">DESIGN.md</span><span class="badge">AI</span><div class="blurb">디자인 시스템 — 색·타이포·컴포넌트 규칙과 그 근거. 값의 단일 소스는 theme.css.</div></a>
+<a class="card" href="#structure"><span class="name">STRUCTURE.md</span><span class="badge">AI · 사람 · 생성물</span><div class="blurb">파일 배치·API 라우트·D1 테이블. 저장소에서 생성되며 설명은 각 파일의 머리 주석에서 온다.</div></a>
   </div>
 </header>
 
-<section>
-  <h2>01 · 전체 구조</h2>
-  <h3>한 프로젝트 안에 정적 페이지, API, DB가 모두 있다</h3>
-  <p class="lede">
-    v1은 조회 웹앱(Cloudflare Pages) · 원두 DB(구글시트) · 라벨 도구(로컬 파이썬)가 서로 다른 세 곳에 흩어져 있었다.
-    v2는 이 세 가지를 <b>하나의 Cloudflare Pages 프로젝트</b> 안으로 합쳤다 — 정적 파일과 서버 코드(Functions)와
-    데이터베이스(D1)가 같은 배포 단위에 있어서, 저장소를 <code style="font-family:var(--mono)">git push</code> 하나로
-    셋 다 함께 배포된다.
-  </p>
+<nav class="side" aria-label="목차">
+<div class="group"><a href="#readme">README.md</a><ul>
+<li class="d2"><a href="#readme-사용-흐름">사용 흐름</a></li>
+<li class="d2"><a href="#readme-구조">구조</a></li>
+<li class="d2"><a href="#readme-운영">운영</a></li>
+<li class="d2"><a href="#readme-로컬-개발">로컬 개발</a></li>
+<li class="d2"><a href="#readme-주요-변경">주요 변경</a></li>
+<li class="d2"><a href="#readme-로드맵-남은-작업">로드맵 / 남은 작업</a></li>
+<li class="d3"><a href="#readme-열린-이슈-전체-보기">👉 열린 이슈 전체 보기</a></li>
+</ul></div>
+<div class="group"><a href="#claude">CLAUDE.md</a><ul>
+<li class="d2"><a href="#claude-작업-방식">작업 방식</a></li>
+<li class="d2"><a href="#claude-명령어">명령어</a></li>
+<li class="d2"><a href="#claude-절대-바꾸지-말-것">절대 바꾸지 말 것</a></li>
+<li class="d2"><a href="#claude-걸려-넘어지기-쉬운-것">걸려 넘어지기 쉬운 것</a></li>
+<li class="d2"><a href="#claude-문서-관리-원칙">문서 관리 원칙</a></li>
+</ul></div>
+<div class="group"><a href="#design">DESIGN.md</a><ul>
+<li class="d2"><a href="#design-1-아이덴티티-중립-크롬-커피가-부여하는-색">1. 아이덴티티 — 중립 크롬, 커피가 부여하는 색</a></li>
+<li class="d3"><a href="#design-quot-ai가-만든-것-같다-quot-를-부르는-것-그-대신-이슈-32의-핵심">&quot;AI가 만든 것 같다&quot;를 부르는 것 → 그 대신 (이슈 #32의 핵심)</a></li>
+<li class="d2"><a href="#design-2-색-시스템">2. 색 시스템</a></li>
+<li class="d2"><a href="#design-3-커피-컬러-국가-모노-향미-그라데이션-화면-전용">3. 커피 컬러 — 국가(모노) · 향미(그라데이션) — 화면 전용</a></li>
+<li class="d3"><a href="#design-국가-시그니처-모노컬러">국가 — 시그니처 모노컬러</a></li>
+<li class="d3"><a href="#design-향미-무드-그라데이션">향미 — 무드 그라데이션</a></li>
+<li class="d3"><a href="#design-로스팅-레벨-원두-색-견본">로스팅 레벨 — 원두 색 견본</a></li>
+<li class="d2"><a href="#design-4-타이포그래피">4. 타이포그래피</a></li>
+<li class="d3"><a href="#design-줄바꿈-한국어는-어절-단위로">줄바꿈 — 한국어는 어절 단위로</a></li>
+<li class="d2"><a href="#design-5-여백-레이아웃">5. 여백 · 레이아웃</a></li>
+<li class="d2"><a href="#design-6-반경-입체-모션">6. 반경 · 입체 · 모션</a></li>
+<li class="d2"><a href="#design-7-컴포넌트-패턴">7. 컴포넌트 패턴</a></li>
+<li class="d3"><a href="#design-필요할-때만-보여준다-점진적-노출">필요할 때만 보여준다 (점진적 노출)</a></li>
+<li class="d3"><a href="#design-테마">테마</a></li>
+<li class="d2"><a href="#design-8-해야-할-것-하지-말-것">8. 해야 할 것 · 하지 말 것</a></li>
+</ul></div>
+<div class="group"><a href="#structure">STRUCTURE.md</a></div>
+</nav>
 
-  <div class="arch">
-    <div class="arch-node">브라우저 · 폰 카메라</div>
-    <div class="arch-arrow">↓</div>
-    <div class="arch-platform">
-      <div class="arch-platform-label"><b>bnhd.pages.dev</b> — Cloudflare Pages 프로젝트 (무료)</div>
-      <div class="arch-inner">
-        <div class="arch-box">
-          <strong>정적 페이지 (dist/)</strong>
-          <span>조회·덱 — apps/web (MPA)<br>랩(/lab) — apps/lab (React)<br>라벨 렌더러 — packages/label</span>
-        </div>
-        <div class="arch-col">
-          <div class="arch-hstep">
-            <span class="arch-arrow">→</span>
-            <div class="arch-box" style="flex:1">
-              <strong>Functions API</strong>
-              <span>/api/signup · /api/login · /api/recover<br>/api/beans · /api/bean/{KEY} (GET·PUT·DELETE)<br>/api/export.csv · /api/import<br>/api/logos · /api/fetch · /api/extract<br>라우팅: packages/api (Hono)</span>
-            </div>
-          </div>
-          <div class="arch-arrow" style="margin-left:34px">↓</div>
-          <div class="arch-box" style="margin-left:34px">
-            <strong>D1 데이터베이스</strong>
-            <span>users (usercode, pass_hash, recovery_hash)<br>beans (key, roastery, …)<br>logos · sessions · auth_attempts · r2_usage</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<main>
+<article id="readme">
+<div class="doc-head"><h1>README.md</h1><span class="badge">사람</span><a class="source" href="README.md">원본 README.md ↗</a><p class="blurb">서비스가 무엇이고 어떻게 쓰고 어떻게 운영하는지.</p></div>
+<p>여러 로스터리에서 원두를 사 모아 소분·보관하는 <strong>원두 호더</strong>를 위한 라벨링 &amp; 조회 서비스.
+소분 용기에 QR을 붙이고 스캔하면 그 원두의 상세 정보가 뜬다. 서비스가 책임지는 것은 세 가지다 —
+<strong>① 최적화된 정보 입력</strong>(상품 페이지 링크를 넣으면 AI가 채우고, 우선순위대로 확인만 하면 된다)
+<strong>② 인쇄에 최적화된 QR</strong>(감열 203dpi 도트 격자에 맞춘 크기, 콰이엇존 포함 PNG·SVG)
+<strong>③ 유지관리</strong>(수정·삭제·CSV 백업). 라벨 도안까지 원하면 3종(40×20 / 50×30 / 50×60mm)을 만들어 주지만,
+쓰는 양식과 프린터가 제각각이라 <strong>선택 기능</strong>으로 둔다.
+Cloudflare Pages + Functions + D1 하나로 동작하며 <strong>총 운영 비용 0원</strong>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>조회 (QR 스캔 대상)</td>
+<td><strong><a href="https://bnhd.pages.dev">bnhd.pages.dev</a></strong> — 인증 없음</td>
+</tr>
+<tr>
+<td>랩 (등록·QR 발급)</td>
+<td><strong><a href="https://bnhd.pages.dev/lab">bnhd.pages.dev/lab</a></strong> — 가입/로그인 필요</td>
+</tr>
+<tr>
+<td>덱 (내 원두 카드)</td>
+<td><strong><a href="https://bnhd.pages.dev/deck">bnhd.pages.dev/deck</a></strong> — 로그인 필요</td>
+</tr>
+<tr>
+<td>데모 (로그인 없이 둘러보기)</td>
+<td><strong><a href="https://bnhd.pages.dev/demo">bnhd.pages.dev/demo</a></strong> — 정적 페이지</td>
+</tr>
+<tr>
+<td>문서 한 장 (사람용 — 아래 문서 넷을 렌더한 생성물)</td>
+<td><a href="#top">HOW_IT_WORKS.html</a></td>
+</tr>
+<tr>
+<td>디자인 시스템 · 저장소 구조 · 작업 원칙</td>
+<td><a href="#design">DESIGN.md</a> · <a href="#structure">STRUCTURE.md</a> · <a href="#claude">CLAUDE.md</a></td>
+</tr>
+</tbody></table>
+</div><h2 id="readme-사용-흐름"><a class="anchor" href="#readme-사용-흐름" aria-hidden="true">#</a>사용 흐름</h2>
+<ol>
+<li><strong>가입</strong> — 운영자에게 받은 초대코드 + 내가 정한 숫자 4자리 암호 → 유저코드(4자리) 자동 발급 + <strong>복구키</strong>(오프라인 백업용, 1회만 표시) 발급. 브라우저에 저장되며, 유저코드+암호만 기억하면 어느 기기에서든 로그인. 복구키는 유저코드·암호를 모두 잊었을 때 재설정하는 유일한 수단.</li>
+<li><strong>입력</strong> — 상품 페이지 <strong>링크를 붙여넣으면 AI가 초안을 채운다</strong>. 그다음은 <strong>순서대로 확인만</strong> 하면 된다 — 로스터리·산지 → 가공·품종 → 날짜 → 플레이버·이름 → 용량·로스팅 포인트 → 상세(선택) 순으로 한 번에 한 단계씩 열리고, <strong>각 단계는 건너뛸 수 있다</strong>. 칸마다 추천 칩(산지·가공·품종·날짜·용량·로스팅 포인트 등)이 붙어 대부분 타이핑 없이 채워지고, AI가 채운 칸에는 &quot;확인&quot; 표시가 남아 무엇을 검토해야 하는지 드러난다. 링크가 막히는 사이트는 같은 칸에 페이지 내용을 그대로 붙여넣으면 된다 — 링크든 본문이든 한 칸에서 받는다. 같은 상품 페이지로 이미 등록한 원두가 있으면 가져오기 전에 알려 준다. 등록 버튼을 누르면 서버가 KEY(<code>{유저코드}{연도}-{순번}</code>)를 채번한다. 언제든 &quot;처음부터&quot;(입력 화면)나 &quot;새 원두 등록&quot;(QR 화면)으로 다시 시작할 수 있다.<ul>
+<li><strong>자동 채우기</strong>: 상품 페이지 URL 또는 붙여넣은 텍스트에서 휴리스틱 파서가 빈 칸을 채움 — &quot;라벨: 값&quot;이 한 줄에 붙은 형식뿐 아니라, 라벨과 값이 서로 다른 블록(줄)으로 나뉘는 사이트 구조도 인식한다. <strong>AI 인식은 키가 없어도 하루 10번</strong>(계정별) 쓸 수 있다 — 서비스 키로 서버가 대신 부른다. 더 쓰려면 설정에서 본인 Google AI 키를 넣으면 되고, 그 경우 브라우저에서 Google로 직접 전송돼 제한이 없다(키는 브라우저에만 저장). 한도를 다 쓰면 규칙 기반 인식으로 자동으로 내려간다 — 어느 경우에도 채우기는 동작한다.</li>
+<li><strong>로고 재사용</strong>: 로스터리 이름을 입력한 상태에서 로고를 올리면 서버(D1)에 저장되어, 다음부터 어느 기기에서든 이름만 입력하면 자동 적용. 로스터리 이름도 내 등록 이력에서 자동 제안.</li>
+<li><strong>기타 정보</strong>: 개인 감상평이 아니라 산지·로스터리·생산자의 스토리나 배경 정보를 적는 칸(예: &quot;About Beans&quot; 형식의 소개글) — QR 조회 페이지에 공개 표시된다. 자동 채우기가 상품 페이지의 소개글(About/Description/Story 등)도 후보로 인식한다.</li>
+</ul>
+</li>
+<li><strong>QR 발급</strong> — 등록으로 KEY가 확정되면 인쇄용 QR을 받는다. 인쇄 크기는 <strong>203dpi 도트 격자의 정수배</strong>(약 9.4 / 12.5 / 15.6mm)로만 제시해 모듈 경계가 픽셀에 정확히 떨어지고, <strong>최소 여백(2모듈)이 이미지에 포함</strong>돼 어떤 라벨 소프트웨어에 얹어도 그대로 쓸 수 있다(주변은 흰 바탕이어야 한다 — 라벨의 흰 여백이 나머지를 대신한다). PNG·<strong>SVG(벡터)</strong> 다운로드와 QR 이미지·상세 URL 복사를 제공하며, KEY나 인쇄 크기가 바뀔 때마다 203dpi로 래스터화해 <strong>실제 디코드되는지 자동 검증</strong>한다(타이핑마다 돌지 않는다 — 검증 대상이 라벨 도안이 아니라 QR이기 때문). QR은 KEY를 담으므로 등록 전(예상 KEY)에는 내보내지 않는다 — 확정 전 QR을 인쇄하면 없는 곳을 가리키게 된다.</li>
+<li><strong>라벨 이미지 — 선택</strong> — 직접 쓰는 라벨 양식이 있으면 위 QR만 가져다 쓰면 되고, 도안까지 필요할 때만 편다. 사이즈는 40×20(기본)·50×30(여유형)·50×60(카드형) 중 선택. 사이즈가 커질수록 부제목·스펙 칸에 기본으로 더 많은 정보(품종·고도 등)를 표시한다(직접 커스터마이즈한 항목은 사이즈를 바꿔도 유지). 인쇄 색상은 컬러(레드+블랙)·흑백 중 선택 가능하며 <strong>기본값은 흑백</strong>(2도 인쇄를 지원하지 않는 감열 프린터가 많음). 부제목 줄(지역·랏·워싱스테이션·생산자 중 최대 3개)은 라벨의 핵심 정보라 <strong>절대 잘리지 않고</strong> 필요하면 여러 줄로 줄바꿈해 전문을 싣는다. 하단 스펙 칸(용량·로스팅포인트·가공·품종·고도·수확시기)에 표시할 정보는 값이 있는 항목만 선택 가능(빈 항목은 체크박스 비활성화)하고 ↑↓ 버튼으로 <strong>표시 우선순위를 직접 조정</strong>할 수 있으며 기본 순위는 용량·로스팅포인트·가공·품종·고도·수확시기 순. 값이 길면 자동으로 줄바꿈되며, 공간이 부족하면 잘리는 대신 우선순위 낮은 스펙부터 자동으로 숨겨진다(부제목·필수 날짜는 항상 유지, 스펙이 노트보다 우선). 테이스팅 노트는 스펙 칸 아래·날짜 바로 위에 <strong>한 줄만</strong> 표시하고, 콤마로 구분된 항목 중 그 줄에 다 들어가는 항목까지만 보여준다(중간에서 말줄임(…)으로 자르지 않음) — 남는 공간이 있으면 항상 표시. 로스팅일·소분일은 항상 고정 표시 — 가로형(40×20·50×30)은 라벨 최하단에 한 줄(2열)로, 카드형(50×60)은 QR 좌측에 &quot;RSTD26.06.29 PKGD26.07.09&quot; 식으로 한 줄에 촘촘히 이어 QR 하단과 맞춰 배치한다. 특히 가장 작은 40×20은 감열 인쇄 가독성을 위해 글자를 키우고 표시 정보량을 줄였다 — 자세한 정보는 QR로 확인. QR은 스캔에 필요한 크기(약 9.4mm)로 3사이즈 모두 동일하게 고정 — 커진 여백은 QR 확대가 아니라 표시 정보량 차이로 쓴다.</li>
+<li><strong>유지관리</strong> — &quot;내 원두 목록&quot;에서 수정·삭제·URL 복사. 덱(<code>/deck</code>)의 카드 메뉴에서 &quot;정보 수정&quot;을 고르면 랩이 그 원두의 편집 상태로 바로 열린다. <strong>CSV 백업 다운로드 / 백업 복원</strong>(내 유저코드 KEY만, 같은 KEY는 백업 내용으로 덮어쓰기 — 실수 삭제·악의적 변조를 백업 시점으로 되돌림).</li>
+<li><strong>조회</strong> — QR 스캔 → <code>bnhd.pages.dev/{KEY}</code> → 원두 카드(테이스팅 노트·기타 정보 포함). 누구나 볼 수 있고 빈 필드는 자동 숨김. 코드 없이 접속하면 랩(<code>/lab</code>)으로 안내. 조회 카드와 덱(<code>/deck</code>)은 **산지 시그니처 색(작은 스와치·닷)**과 <strong>향미 무드 그라데이션</strong>으로 원두를 구별한다 — 라벨 인쇄 색과는 무관한 화면 전용 표시다(<a href="#design">DESIGN.md</a> §3).</li>
+</ol>
+<h2 id="readme-구조"><a class="anchor" href="#readme-구조" aria-hidden="true">#</a>구조</h2>
+<p>Cloudflare Pages 프로젝트 하나에 D1(<code>bnhd-v2</code>)과 R2(<code>bnhd-logos</code>)가 붙은 단일 서비스다.</p>
+<p>저장소 배치·API 라우트·D1 테이블은 저장소에서 생성되는 <strong><a href="#structure">STRUCTURE.md</a></strong> 에 있다.
+작업 시 지켜야 할 원칙과 함정은 <a href="#claude">CLAUDE.md</a>. 이 문서 넷을 한 페이지로 렌더한 사람용 생성물이
+<a href="#top">HOW_IT_WORKS.html</a>이다(<code>npm run gen:html</code>).</p>
+<ul>
+<li>쓰기(등록·수정·삭제·백업·복원·로고)는 <strong>세션 토큰</strong> 인증(<code>POST /api/login</code>으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 <code>Bearer 유저코드:암호</code> 인증도 이행기 동안 동작.</li>
+<li>암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드). <strong>인증 실패는 D1 기반 rate limit</strong>(유저코드당 10회/10분, IP당 30회/10분 — 초과 시 429)으로 4자리 암호 전수 대입을 차단</li>
+<li>복구키는 계정 복구 전용 고엔트로피 값 — 해시만 저장, 사용 시(재설정 성공 시) 자동 회전(1회용)</li>
+<li>수정·삭제·복원은 KEY 앞 4자리가 내 유저코드인 원두만 가능</li>
+<li>CSV 내보내기는 스프레드시트 수식 인젝션 가드(<code>&#39;</code> 접두) 적용, 복원 시 자동 복원</li>
+</ul>
+<h2 id="readme-운영"><a class="anchor" href="#readme-운영" aria-hidden="true">#</a>운영</h2>
+<ul>
+<li><p><strong>배포(자동)</strong>: <code>main</code>과 <code>deploy</code> 푸시 모두 GitHub Actions(<code>.github/workflows/deploy.yml</code>)가 lint·테스트(Vitest)·랩 빌드 + <strong>Playwright e2e 통과</strong>를 게이트로 <code>wrangler pages deploy</code>를 실행하되, 도착지가 다르다.</p>
+<ul>
+<li><code>main</code> 푸시 → <strong>프리뷰</strong> <code>preview.bnhd.pages.dev</code> (개발 중 확인용)</li>
+<li><code>deploy</code> 푸시 → <strong>프로덕션</strong> <code>bnhd.pages.dev</code> (실 서비스 — <code>main → deploy</code> PR을 <strong>Create a merge commit</strong>으로 승격)</li>
+<li>필요 시 Actions 탭에서 <code>workflow_dispatch</code>로 수동 재배포도 가능.</li>
+<li>최초 1회 리포 secret 등록 필요: <code>CLOUDFLARE_API_TOKEN</code>(Pages 편집 권한), <code>CLOUDFLARE_ACCOUNT_ID</code> — 둘 중 하나라도 누락되면 배포 잡이 실패한다(테스트 잡은 별개로 통과).</li>
+</ul>
+</li>
+<li><p><strong>프로덕션 승격 절차</strong> — <code>main</code>을 <code>deploy</code>로 올릴 때 순서를 지킨다. 배포가 먼저 나가면 스키마가 없어 깨진다.</p>
+<ol>
+<li><strong>원격 D1에 미적용 마이그레이션이 있는지 먼저 확인한다.</strong> 아래 &quot;스키마&quot; 항목의 목록과 대조:
+<code>npx wrangler d1 execute bnhd-v2 --remote --command &quot;PRAGMA table_info(beans);&quot;</code>,
+<code>npx wrangler d1 execute bnhd-v2 --remote --command &quot;SELECT name FROM sqlite_master WHERE type=&#39;table&#39;;&quot;</code>
+— v1.2.0 승격 때 <code>r2_usage</code>·<code>coffee_name</code> 둘 다 빠져 있었다. 마이그레이션은 전부 비파괴라
+<strong>배포 전에 미리 적용해도 안전하다</strong> (구 코드는 새 컬럼·테이블을 모르고도 동작한다).</li>
+<li>승격 → <code>deploy</code> 푸시가 프로덕션 배포를 트리거한다.</li>
+<li>배포된 커밋에 <strong>버전 태그</strong>를 달고 <strong>릴리스 노트</strong>를 쓴다 (아래 &quot;릴리스&quot;).</li>
+<li>라이브에서 조회·로그인·등록·로고 저장을 한 번씩 확인한다.</li>
+</ol>
+</li>
+<li><p><strong>릴리스</strong> — 버전은 <strong>프로덕션에 나간 단위</strong>다. <code>main</code> 병합이 아니라 <code>deploy</code> 승격 시점에 붙으므로
+한 릴리스가 여러 변경을 묶는다. semver를 쓰되 판단 기준은 <strong>사용자·API 관점</strong>이다 —
+필드나 기능 추가는 minor, API 계약 파괴는 major(QR 호환 때문에 사실상 없다), 저장소 구조 변경만으로는
+올리지 않는다. 태그는 실제 배포된 커밋에 달고(<code>git tag -a vX.Y.Z &lt;sha&gt;</code>), 노트는 GitHub Releases에 쓴다
+(README &quot;주요 변경&quot; 표에는 한 줄만 남기고 전문은 릴리스로). 버전을 코드에 적지는 않는다 —
+루트 <code>package.json</code>은 <code>private</code>이고 태그가 단일 소스다.</p>
+</li>
+<li><p><strong>브랜치 보호 규칙</strong> (GitHub Settings &gt; Rules &gt; Rulesets):</p>
+<ul>
+<li><code>main</code> — PR 없이 직접 push 허용, 삭제만 방지(Restrict deletions).</li>
+<li><code>deploy</code> — PR 필수 + <strong>병합 방식은 merge commit만</strong> + 필수 검사(<code>unit</code>·<code>e2e</code>) + 삭제·강제푸시 방지.
+승격 PR은 반드시 <strong>Create a merge commit</strong>으로 병합한다 — Squash·Rebase는 규칙이 막는다.</li>
+<li><strong>왜 merge commit인가 (Squash를 쓰면 안 되는 이유).</strong> squash와 rebase는 새 커밋 객체를 만들어
+<code>main</code>의 커밋을 <code>deploy</code>의 조상으로 남기지 않는다. 그래서 승격을 반복하면 두 브랜치의
+merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 다툼이 아닌 <code>add/add</code> 충돌 수십 건</strong>으로
+막힌다 — v1.2.0 승격 때 충돌 36건으로 실제로 겪었고 <code>deploy</code>를 <code>main</code>과 같은 커밋으로 맞춰
+(계보 리셋) 풀어야 했다. merge commit은 부모가 둘이라 <code>main</code>의 HEAD가 그대로 조상이 되고,
+다음 승격의 merge-base가 이번 릴리스 지점이 되어 새 변경만 깔끔하게 보인다.
+릴리스마다 커밋이 하나씩 찍히므로 <code>git log deploy --first-parent</code>가 곧 릴리스 목록이다.
+<code>deploy</code>는 rebase·bisect 대상이 아니라 &quot;지금 라이브가 무엇인가&quot;를 가리키는 포인터라
+선형 이력이 사줄 게 없다.</li>
+<li>⚠️ <strong>필수 검사의 &quot;Require branches to be up to date before merging&quot;은 켜지 않는다.</strong>
+켜면 승격이 영구히 막힌다 — merge commit 방식에서는 병합 후 <code>deploy</code>에 <code>main</code>에 없는 병합
+커밋이 생기는데, 이 옵션은 head(<code>main</code>)가 base(<code>deploy</code>)의 최신 상태를 포함할 것을 요구하므로
+매번 <code>deploy</code>를 <code>main</code>으로 역병합해야 하고 그게 방금 없앤 계보 꼬임을 되살린다.</li>
+<li>승인 수는 0이다. 1인 저장소라 올릴 수 없다 — GitHub은 자기 PR 자가승인을 허용하지 않아
+1로 두면 승격 자체가 불가능해진다.</li>
+</ul>
+</li>
+<li><p><strong>의존성 갱신</strong>: <code>.github/dependabot.yml</code>이 매주 월요일 <code>main</code>으로 PR을 연다(액션은 월 1회). 자동 병합은 켜지 않는다 — <code>main</code> 푸시가 프리뷰 배포를 트리거하므로 사람이 검사 결과를 보고 병합한다. Cloudflare 툴체인(<code>wrangler</code>·<code>miniflare</code>·<code>@cloudflare/*</code>)은 한 PR로 묶여 오고, <code>hono</code>·<code>drizzle-orm</code>·<code>zod</code> 같은 런타임 의존성은 API 계약에 닿으므로 개별 PR로 온다.</p>
+</li>
+<li><p><strong>배포(수동/로컬)</strong>: <code>npx wrangler pages deploy public</code> — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.</p>
+</li>
+<li><p><strong>초대코드</strong>: Cloudflare <strong>secret</strong>으로 관리 — <code>npx wrangler pages secret put INVITE_CODE</code> (교체도 동일, 저장소에 커밋하지 않는다)</p>
+</li>
+<li><p><strong>AI 인식 키(선택)</strong>: <code>npx wrangler pages secret put GEMINI_API_KEY</code> — 키를 넣지 않으면 AI 대행이 503으로 응답하고 클라이언트가 규칙 기반 인식으로 내려가므로 서비스는 그대로 동작한다. 하루 한도는 계정별 10회·전역 100회(<code>packages/api/src/lib/ai-quota.ts</code>) — 무료 등급을 넘겨 조용히 죽는 대신 코드가 먼저 막는다.</p>
+</li>
+<li><p><strong>무차별 대입 완화</strong>: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.</p>
+</li>
+<li><p><strong>R2 비용 백스톱</strong>: 로고 저장(<code>PUT /api/logos</code>)에 서비스 전역 물리적 상한 내장(<code>packages/api/src/lib/budget.ts</code>) — 월간 R2 쓰기 10만 회·R2 저장 로고 2만 개 초과 시 503으로 저장 거부(무료 티어를 넘겨 과금되기 전에 차단). 삭제는 무과금이라 제한하지 않는다(한도에 걸려도 삭제로 공간 확보 가능). 코드 밖 안전망으로 <strong>Cloudflare 대시보드 → R2/Billing 사용량 알림</strong>을 별도로 설정할 것(대시보드 예산은 서비스를 멈추지 않는 알림뿐이라 코드 백스톱이 실제 상한).</p>
+</li>
+<li><p><strong>DB 백업 (3중 안전망)</strong>:</p>
+<ol>
+<li><strong>D1 Time Travel</strong> — 최근 30일 내 임의 시점 복구: <code>npx wrangler d1 time-travel info bnhd-v2</code>로 북마크 확인, <code>npx wrangler d1 time-travel restore bnhd-v2 --timestamp=&lt;unix|ISO&gt;</code>로 복구.</li>
+<li><strong>자동 덤프</strong> — <code>.github/workflows/backup.yml</code>이 매일 04:17 KST에 <code>wrangler d1 export</code>를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 <code>bnhd-v2-backup.sql</code>을 받아 <code>npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql</code> (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 <code>CLOUDFLARE_API_TOKEN</code>에 D1:Edit 권한 추가.</li>
+<li><strong>사용자 셀프 백업</strong> — 각자 랩에서 CSV 내보내기/복원.
+(R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)</li>
+</ol>
+</li>
+<li><p><strong>서버 로그</strong>: 5xx는 구조화 JSON(<code>level/msg/stack/method/path</code>)으로 <code>console.error</code> — 실시간 확인은 <code>npx wrangler pages deployment tail</code>, 또는 대시보드 &gt; Pages &gt; bnhd &gt; Real-time Logs.</p>
+</li>
+<li><p><strong>스키마</strong>: 새 환경은 <code>db/schema.sql</code> 하나로 생성. 기존 DB에는 <code>db/</code> 아래 남아 있는
+<code>migrate_*.sql</code>을 파일명 순서대로 적용한다 — <strong>적용이 끝난 마이그레이션은 지운다</strong>(이력은 git에
+남는다). 그래서 <code>db/</code>에 파일이 보인다는 것 자체가 &quot;원격에 아직 안 넣었다&quot;는 뜻이다.
+적용: <code>npx wrangler d1 execute bnhd-v2 --remote --file=&lt;그 파일&gt;</code>
+<strong>코드보다 먼저 적용할 것</strong> — 컬럼을 쓰는 코드가 먼저 뜨면 그 쿼리가 통째로 깨진다
+(컬럼을 없애는 마이그레이션이라면 반대로 코드를 먼저 올린다).</p>
+</li>
+<li><p><strong>데모 갱신</strong>: 데모는 DB가 아니라 <strong>콘텐츠</strong>다. 덱(<code>/demo</code>)도 카드(<code>/DEMO…</code>)도
+<code>apps/web/src/demo-beans.json</code> 하나로 그리는 정적 페이지라 D1을 전혀 타지 않는다.
+그 파일이 데모 콘텐츠가 존재하는 <strong>유일한 곳</strong>이다 — 고치고, <code>git diff</code>로 검토하고,
+배포하면 끝이다. 운영 중 손댈 것도, 동기화할 곳도 없다.</p>
+<p>손으로 쓰는 파일이라 형식은 <code>apps/web/src/demo-beans.test.ts</code>가 지킨다 — 필수 항목 누락,
+KEY 형식·<code>DEMO</code> 접두·중복, 알 수 없는 필드명을 <code>npm run check</code>가 잡는다.
+(<code>DEMO</code> 접두는 유저코드 알파벳에 <code>O</code>가 없어 실계정에 발급될 수 없는, 예약된 접두다.)</p>
+</li>
+</ul>
+<h2 id="readme-로컬-개발"><a class="anchor" href="#readme-로컬-개발" aria-hidden="true">#</a>로컬 개발</h2>
+<p><strong>Node 22 이상</strong>이 필요하다 — wrangler가 Node 20에서 실행을 거부해 아래 <code>wrangler</code> 명령과
+<code>npm run e2e</code>가 모두 시작하지 못한다. 버전의 단일 소스는 <code>.nvmrc</code>이고 CI(setup-node)도
+같은 파일을 읽으므로 <strong>지우면 CI가 멈춘다</strong>. nvm을 쓴다면 저장소 루트에서 <code>nvm use</code>로 맞춘다.
+(루트 <code>package.json</code>의 <code>engines</code>는 npm이 경고를 내는 하한일 뿐이다.)</p>
+<pre><code class="language-bash">npm ci                                                        # 루트에서 1회 (npm workspaces)
+npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
+npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
+npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
+  --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
+# (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
+# /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
+</code></pre>
+<ul>
+<li><code>db/seed.sql</code>의 <code>TEST</code> 계정(암호 <code>0000</code>)과 픽스처 원두는 <strong>로컬·e2e 전용</strong>이다.
+자격증명이 저장소에 적혀 있으므로 <strong>원격 D1에 seed를 실행하지 않는다</strong> — 실행하면 라이브에
+누구나 로그인할 수 있는 계정이 생긴다. 서비스에는 특별 취급되는 계정이 없다.</li>
+<li>로그인 없이 둘러보는 화면은 정적 데모(<code>/demo</code>)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.</li>
+<li>랩을 고치는 중이라면 <code>npm run dev -w @bnhd/lab</code>(Vite HMR)를 쓰고, 이때 위 wrangler는
+**<code>--port 8790</code>**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.</li>
+<li>검증: 저장소 루트에서 <code>npm run check</code> (lint + typecheck + test + 생성 문서·문서 참조 검증) — 커밋 전 필수.
+<code>npm run e2e</code>는 Playwright가 wrangler를 직접 띄우므로 별도 서버 기동이 필요 없다.</li>
+</ul>
+<h2 id="readme-주요-변경"><a class="anchor" href="#readme-주요-변경" aria-hidden="true">#</a>주요 변경</h2>
+<p>세부 이력은 커밋 히스토리를 본다. 여기에는 서비스의 성격이 바뀐 지점만 남긴다.</p>
+<p><strong>버전</strong>은 프로덕션에 실제로 나간 단위다 — <code>main</code>에 병합된 시점이 아니라 <code>deploy</code>로 승격된
+시점에 붙으므로, 한 릴리스가 여러 행을 묶기도 한다. 전문은 <a href="../../releases">릴리스 노트</a>에 있다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>버전</th>
+<th>시기</th>
+<th>무엇이 달라졌나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="../../releases/tag/v0.1.0">v0.1.0</a></td>
+<td>2026-07-03</td>
+<td><strong>v1 첫 배포</strong> — 구글시트를 DB로 쓰는 정적 웹앱 + 파이썬 라벨 생성기. QR을 대문자 경로형 URL로 인코딩해 25×25 유지</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v0.2.0">v0.2.0</a></td>
+<td>2026-07-07</td>
+<td><strong>v2 제로베이스 재설계·교체</strong> — Cloudflare D1 + Pages Functions로 재구축. 인증을 유저코드+4자리 암호로, 라벨 렌더러를 단일화하고 jsQR 브라우저 검증 도입</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.0.0">v1.0.0</a></td>
+<td>2026-07-08</td>
+<td><strong>개인 서비스로서의 기본기</strong> — 오프라인 복구키, 라벨 3사이즈, 로스터리 로고 서버 저장, CSV 백업·복원, PBKDF2 해시, SSRF 가드, 단위 테스트 + CI, <code>deploy</code> 브랜치 승격 방식</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.0.0">v1.0.0</a></td>
+<td>2026-07-09~10</td>
+<td><strong>라벨·카드 표시 체계 확립</strong> — 표시 우선순위(부제목 &gt; 스펙 &gt; 노트)와 자동 드롭 규칙, 감열 인쇄 가독성 대응, 덱을 월렛 카드 인터랙션으로 재구현, 보관(숨기기) 기능</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.1.0">v1.1.0</a></td>
+<td>2026-07-12~13</td>
+<td><strong>실서비스 전환 (Phase 0~4)</strong> — 모노레포 + TypeScript + Hono + Drizzle 이식, 세션 토큰 인증과 D1 rate limit, 랩을 React로 재작성해 <code>/admin</code> 교체, 로고를 R2로 이전, 구조화 로깅, D1 자동 백업, Playwright e2e를 배포 게이트로</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.2.0">v1.2.0</a></td>
+<td>2026-07-19</td>
+<td><strong>원두 식별자 체계</strong> — 헤드라인을 국가 + 최세부 장소로 조합하고, 시그니쳐·블렌드명을 위한 <code>coffee_name</code> 필드 신설</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.2.0">v1.2.0</a></td>
+<td>2026-07-24</td>
+<td><strong>R2 요금 백스톱</strong> — 로고 저장에 서비스 전역 물리 상한을 걸어 무료 티어 초과 과금을 코드 레벨에서 차단</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.2.0">v1.2.0</a></td>
+<td>2026-07-29~30</td>
+<td><strong>문서 체계 정리</strong> — 저장소 구조를 코드에서 생성(<a href="#structure">STRUCTURE.md</a>)하고 문서 참조를 자동 검증. v1 잔재를 걷어내고 <code>v2/</code> 디렉터리를 루트로 평탄화</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.3.0">v1.3.0</a></td>
+<td>2026-08-16</td>
+<td><strong>MPA 전환</strong> — 정적 페이지와 번들의 경계를 없애 조회·덱·랩이 한 빌드에서 나오게 하고, 헤드라인·세션 같은 공유 로직을 <code>packages/</code>로 내렸다</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.3.0">v1.3.0</a></td>
+<td>2026-08-24</td>
+<td><strong>디자인 리뉴얼과 서비스 목표 재정의</strong> — 목표를 입력·QR·유지관리 셋으로 좁히고 디자인 시스템(<a href="#design">DESIGN.md</a>)을 세웠다. 라벨과 분리된 단독 QR 내보내기와, 본인 키 없이도 되는 AI 자동 채우기(서비스 키 서버 대행 + 계정·전역 한도)</td>
+</tr>
+<tr>
+<td><a href="../../releases/tag/v1.3.0">v1.3.0</a></td>
+<td>2026-08-26</td>
+<td><strong>데모를 계정에서 콘텐츠로</strong> — 공개 <code>DEMO</code> 계정을 걷어내고, D1도 세션도 타지 않는 정적 데모 덱 <code>/demo</code>로 옮겼다</td>
+</tr>
+</tbody></table>
+</div><h2 id="readme-로드맵-남은-작업"><a class="anchor" href="#readme-로드맵-남은-작업" aria-hidden="true">#</a>로드맵 / 남은 작업</h2>
+<p>남은 작업·백로그는 README가 아니라 <strong>GitHub Issues</strong>에서 관리한다.</p>
+<h3 id="readme-열린-이슈-전체-보기"><a class="anchor" href="#readme-열린-이슈-전체-보기" aria-hidden="true">#</a>👉 <a href="../../issues">열린 이슈 전체 보기</a></h3>
+<p><strong>번호를 여기 나열하지 않는다.</strong> 예전엔 11개를 손으로 적어뒀는데 그중 7개가 닫힌 뒤에도 그대로
+남아 있었다 — 목록의 절반 이상이 거짓이 되고서야 발견했다. <code>check:docs</code>는 경로만 검증하고 이슈가
+살아 있는지는 보지 않으므로, 이 종류의 낡음은 기계가 잡아주지 못한다. 그래서 목록 대신 링크만 둔다.</p>
+<p>저장소 안에 짝이 되는 파일이 있어 여기 적어둘 값이 있는 것만 예외로 남긴다:</p>
+<ul>
+<li>🎨 <a href="../../issues/32">#32 디자인 리뉴얼</a> — 전 Phase 완료. 디자인 시스템의 단일 소스는 <a href="#design">DESIGN.md</a></li>
+</ul>
+</article>
 
-<section>
-  <h2>02 · 흐름 1</h2>
-  <h3>가입 — 초대코드와 4자리 암호만으로 계정이 생긴다</h3>
-  <p class="lede">
-    이 서비스는 여러 로스터리에서 원두를 사 모으는 "원두 호더" 개인용이다. 그래서 가입에 로스터리명이
-    필요 없다 — 초대코드와 내가 쓸 숫자 4자리 암호만 정하면 서버가 유저코드를 발급한다.
-    암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준)이고, 유저코드+암호만 기억하면 어느 기기에서든 로그인된다.
-  </p>
-  <div class="flow">
-    <div class="step"><div class="circle">1</div><strong>초대코드 + 암호</strong><span>운영자가 공유한 코드, 내가 정한 숫자 4자리</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong><code>POST /api/signup</code></strong><span>Functions가 초대코드·암호 형식 검증</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">3</div><strong>유저코드 발급</strong><span>무작위 4자리, 암호는 해시로만 저장</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong>브라우저 저장</strong><span>세션 토큰을 브라우저에 저장, 재방문 시 자동 로그인</span></div>
-  </div>
-</section>
+<article id="claude">
+<div class="doc-head"><h1>CLAUDE.md</h1><span class="badge">AI</span><a class="source" href="CLAUDE.md">원본 CLAUDE.md ↗</a><p class="blurb">작업 원칙과 절대 바꾸면 안 되는 것, 걸려 넘어지기 쉬운 함정. 에이전트가 매 세션 읽는다.</p></div>
+<p>커피 원두 소분 라벨링(QR) &amp; 조회 서비스. Cloudflare Pages + Functions + D1 + R2, 운영비 0원.
+실서비스 전환은 2026-07-13에 끝났다. 패스키(WebAuthn)는 검토 끝에 도입하지 않기로 했다(#24, 2026-08-06) —
+PIN + 세션 토큰 + D1 rate limit 조합을 유지한다.</p>
+<p><strong>이 문서는 원칙과 함정만 다룬다.</strong> 디렉터리·파일 배치와 API 라우트는 생성되는
+<a href="#structure">STRUCTURE.md</a>, 사용법·운영 절차는 <a href="#readme">README.md</a>에 있고
+여기에 옮겨 적지 않는다 (아래 &quot;문서 관리 원칙&quot;).</p>
+<h2 id="claude-작업-방식"><a class="anchor" href="#claude-작업-방식" aria-hidden="true">#</a>작업 방식</h2>
+<ul>
+<li><strong>불확실하면 진행하지 말고 물어라</strong> — 요구사항 해석이 여러 갈래로 갈리거나 전제가 불확실하면
+가정하고 진행하지 않는다. 무엇이 불확실한지 구체적으로 짚어 질문한다. 자명한 작업(오타 수정,
+단순 리네임 등)까지 매번 확인받으라는 뜻은 아니다 — 판단은 여전히 필요하다.</li>
+<li><strong>목표를 검증 가능하게 정의하고, 검증까지 끝내야 완료다</strong> — &quot;버그 고침&quot;이 아니라 &quot;재현 테스트
+작성 → 통과시키기&quot;, &quot;기능 추가&quot;가 아니라 &quot;관련 케이스 테스트 작성 → 통과 확인&quot;으로 접근한다.
+여러 단계짜리 작업은 시작 전에 <code>1. [작업] → 검증: [방법]</code> 형태로 짧게 계획을 밝힌다. 이 저장소는
+검증 수단이 이미 갖춰져 있다 — <code>npm test</code>(Vitest 유닛 + workerd 통합), <code>npm run e2e</code>
+(Playwright), <code>npm run check</code>(커밋 전 게이트)를 실제로 돌려 확인하고, &quot;됐다&quot;는 주장이 아니라
+결과로 보여준다.</li>
+<li><strong>작업 시작 전에 <code>git fetch</code>하고 원격 기준으로 브랜치를 딴다</strong> — 로컬 <code>main</code>이 며칠 뒤처진
+줄 모르고 낡은 사실 위에서 판단한 사고가 실제로 있었다.</li>
+</ul>
+<h2 id="claude-명령어"><a class="anchor" href="#claude-명령어" aria-hidden="true">#</a>명령어</h2>
+<pre><code class="language-bash">npm ci                 # 의존성 설치 (루트, npm workspaces)
+npm test               # Vitest 전체 (unit: node 환경 / workers: workerd+D1 통합)
+npm run lint           # Biome 체크
+npm run lint:fix       # Biome 자동 수정
+npm run typecheck      # tsc (워크스페이스 + functions + e2e)
+npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
+npm run gen:html       # HOW_IT_WORKS.html 재생성 (문서 넷을 사람용 한 페이지로 렌더)
+npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
+npm run check          # lint + typecheck + test + 생성 문서·문서 참조 검증 — 커밋 전 필수
+npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
+npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler 설정)를 건드렸다면 이걸로
 
-<section>
-  <h2>03 · 흐름 2</h2>
-  <h3>원두 등록 — 붙여넣기로 초안을 만들고, 확인만 하고, KEY를 받는다</h3>
-  <p class="lede">
-    17개 칸을 손으로 채우는 대신 상품 페이지 링크(또는 페이지 내용)를 붙여넣어 초안을 만든다.
-    인식은 3단 사다리다 — 본인 AI 키가 있으면 브라우저에서 Google로 직접, 없으면 서비스 키로 서버가
-    대신(하루 한도), 그것도 안 되면 규칙 기반 파서. 어느 단계에서 멈추든 채우기는 동작한다.
-    이후 사용자는 우선순위 순서로 한 번에 한 단계씩 확인하고(건너뛰기 가능), 등록 버튼을 눌렀을 때
-    비로소 서버가 KEY를 채번한다 — 같은 연도·같은 유저코드 안에서 원자적으로 다음 번호를 배정하므로
-    두 사람이 동시에 등록해도 번호가 겹치지 않는다.
-  </p>
-  <div class="flow">
-    <div class="step"><div class="circle">1</div><strong>링크·본문 붙여넣기</strong><span>링크면 <code>/api/fetch</code>가 페이지를 대신 받아온다</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong>AI 인식</strong><span>본인 키 → 서비스 키(<code>/api/extract</code>) → 규칙 기반 순으로 폴백</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">3</div><strong>순차 확인</strong><span>필수부터 한 단계씩. AI가 채운 칸엔 "확인" 표시</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong><code>POST /api/beans</code></strong><span>서버가 KEY 채번 (유저코드·연도 내 최대값+1)</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">5</div><strong>QR 발급 + 검증</strong><span>확정 KEY로 QR을 만들고 203dpi 래스터화 후 jsQR로 실제 디코드</span></div>
-  </div>
-  <p class="lede" style="margin-top:16px">
-    QR은 KEY를 담으므로 <b>등록 전에는 내보내지 않는다</b> — 확정 전 QR을 인쇄하면 존재하지 않는 곳을
-    가리키게 된다. 라벨 도안은 원하는 사람만 들어가는 별도 화면이다(양식과 프린터가 제각각이라 선택 기능).
-  </p>
-  <p class="lede" style="margin-top:16px">
-    등록 후에는 "내 원두 목록"에서 언제든 수정(<code style="font-family:var(--mono)">PUT</code>)·삭제(<code style="font-family:var(--mono)">DELETE</code>)할 수 있다 —
-    KEY 앞 4자리가 내 유저코드인 원두만 건드릴 수 있다.
-  </p>
-</section>
+# 로컬 개발 서버 (저장소 루트에서)
+npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기화 (1회)
+npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
+npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
+npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
+  --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
+# --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
+</code></pre>
+<p>시드 계정은 <code>TEST</code> / <code>0000</code> 하나뿐이고 <strong>로컬·e2e 전용</strong>이다. 데모는 계정이 아니라 정적 페이지
+(<code>/demo</code>)라 로그인이 필요 없다 — 아래 &quot;데모는 DB가 아니라 콘텐츠다&quot; 항목 참고.</p>
+<h2 id="claude-절대-바꾸지-말-것"><a class="anchor" href="#claude-절대-바꾸지-말-것" aria-hidden="true">#</a>절대 바꾸지 말 것</h2>
+<ul>
+<li><strong>QR 호환</strong>: KEY 체계(<code>{유저코드4}{연도2}-{순번3}</code>)와 <code>bnhd.pages.dev</code> 도메인은 인쇄된
+라벨과 묶여 있다 — 절대 변경 금지. 커스텀 도메인·Workers 이전을 보류한 이유도 이것이다.</li>
+<li><strong>API 계약 불변</strong>: 기존 엔드포인트의 요청/응답 형태를 바꾸지 않는다 — 라이브 프론트가 그대로
+동작해야 한다. <code>packages/api/test/app.test.ts</code>가 <strong>계약 문서</strong>이므로 상태 코드나 메시지를
+바꾸는 변경은 그 자체로 계약 파괴다. 필요하면 먼저 계획 문서에 기록한다.</li>
+<li>루트 package.json에는 <code>&quot;type&quot;</code>을 선언하지 않는다 — 각 패키지가 자신의 package.json에
+type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루트에 type을 올리려면
+전체 check + e2e로 검증한 뒤에만.)</li>
+</ul>
+<h2 id="claude-걸려-넘어지기-쉬운-것"><a class="anchor" href="#claude-걸려-넘어지기-쉬운-것" aria-hidden="true">#</a>걸려 넘어지기 쉬운 것</h2>
+<ul>
+<li><strong>헤드라인 조합 규칙은 <code>@bnhd/schema/headline</code> 한 곳뿐</strong>(조회·덱·라벨이 함께 import). 두 가지가
+얽혀 있으니 주의: (1) 반드시 <strong>서브패스</strong> <code>@bnhd/schema/headline</code>로 가져온다 — 인덱스
+<code>@bnhd/schema</code>를 import하면 zod가 딸려와 조회·덱 번들이 부푼다(이 격리가 서브패스로 나눈 이유다).
+(2) 이 함수는 <strong>대문자화를 하지 않는다</strong>. 예전에는 호출부(조회·덱의 CSS <code>text-transform</code>, 라벨의
+<code>.toUpperCase()</code>)가 각자 대문자를 걸었는데, <strong>지금은 헤드라인에 아무도 걸지 않는다</strong> — 대문자는
+같은 이름을 7% 넓게 만들어(383px vs 355px) 카드·라벨 모두에서 잘림을 앞당기고, <code>Yirgacheffe</code>·
+<code>La Cabaña</code> 같은 고유명사의 결을 뭉갠다. 로스터리·KEY는 마이크로 캡스(DESIGN.md §4)라 그대로
+대문자다. 다시 대문자를 걸려면 <strong>세 곳(덱 CSS·조회 CSS·라벨 SVG)을 함께</strong> 손대야 하고, 공유
+함수에 넣으면 화면이 이중으로 처리된다.</li>
+<li><strong><code>setState(updater)</code> 안에서 바깥 변수를 채우고 곧바로 읽지 말 것.</strong> React는 대기 중인 업데이트가
+없을 때만 updater를 즉시 실행한다(eager state) — 직전에 다른 상태 변경이 있으면 렌더까지 미뤄진다.
+그래서 &quot;updater 안에서 결과를 모으고 호출 직후 그 값으로 성공을 판정&quot;하면 <strong>되다 안 되다</strong> 한다.
+자동 채우기가 정확히 이걸로 깨져서(인식에 성공하고도 &quot;이미 다 입력돼 있습니다&quot;) 지금은 다음 상태를
+<strong>updater 바깥에서 순수하게 계산</strong>한 뒤 넘긴다 — <code>Workspace.fillParsed</code> 참고. 최신 폼은 렌더마다
+갱신하는 <code>formRef</code>로 읽는다.</li>
+<li><strong><code>db/seed.sql</code>은 로컬 픽스처다 — 원격 D1에 실행하지 말 것.</strong> <code>TEST</code>의 암호가 저장소에 적혀
+있어, 원격에 넣으면 누구나 로그인하는 계정이 라이브에 생긴다. <strong>서비스에 특별 취급되는 계정은
+없다</strong> — 예전엔 공개 데모 계정을 두고 서버가 쓰기를 막았지만, 그 구조는 계정을 관리할 방법까지
+함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다.</li>
+<li><strong>데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.</strong> 덱(<code>/demo</code>)도 카드(<code>/DEMO…</code>)도
+<code>apps/web/src/demo-beans.json</code> 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
+조회 페이지가 <code>DEMO</code> 접두 KEY를 API 대신 이 JSON으로 답한다(<code>apps/web/src/viewer.ts</code>) —
+유저코드 알파벳에 <code>O</code>가 없어 <strong><code>DEMO</code>는 실계정에 발급될 수 없으므로</strong> 그 분기는 영구히 안전하다.
+이 격리가 요점이다. 데모가 D1을 타는 순간 &quot;라이브와 저장소 중 어느 쪽이 진짜냐&quot;가 생기고,
+동기화 스크립트와 어긋남 검사가 따라붙는다 — 실제로 그렇게 만들었다가 걷어냈다.
+<strong>그 JSON이 데모 콘텐츠가 사는 유일한 곳이다</strong> — 저작용 D1 계정도 내보내기 스크립트도 두지
+않는다. 한때 &quot;랩에서 꾸미고 떠 오기&quot;를 뒀다가 걷어냈는데, 같은 내용이 로컬 D1과 JSON 두 곳에
+살면서 JSON이 어떤 때는 원본이고 어떤 때는 사본이 됐기 때문이다(게다가 CI는 남의 로컬 D1을
+볼 수 없어 어긋남을 검사할 수도 없다). 손으로 쓰는 대신 폼이 봐 주던 검증은
+<code>apps/web/src/demo-beans.test.ts</code>가 맡는다 — 필수 항목·KEY 형식·접두·중복·필드명 오타.
+<code>e2e/smoke.spec.ts</code>가 <code>/api/**</code>를 끊고도 데모가 뜨는지 확인해 이 격리를 지킨다.</li>
+<li><strong>덱 카드 마크업·스타일은 한 벌뿐이다</strong> — <code>apps/web/src/lib/wallet-card.ts</code>(마크업)와
+<code>apps/web/public/deck.css</code>(스타일)를 <code>/deck</code>과 <code>/demo</code>가 함께 쓴다. 한쪽만 고치면 데모와 실제
+덱이 달라 보인다. 클래스 이름이 그 둘 사이의 계약이다.</li>
+<li><strong>랩 개발 서버는 8790</strong>: <code>npm run dev -w @bnhd/lab</code>의 Vite 프록시가 8790을 본다
+(<code>apps/lab/vite.config.ts</code>). 위 wrangler 명령을 그대로 쓰면 8788에 떠서 <code>/api</code>가 죽으므로
+랩을 붙일 때는 <code>--port 8790</code>을 준다. 8788은 e2e 전용 — Playwright가 직접 띄운다.</li>
+<li><strong>배포물은 전부 빌드 산출물</strong>: <code>dist/</code>는 gitignore이고 <code>npm run build</code>가 만든다 —
+<code>@bnhd/web</code>(조회·덱)이 먼저 <code>dist/</code>를 비우고 채운 뒤 <code>@bnhd/lab</code>이 <code>dist/lab</code>에 얹힌다.
+<strong>순서를 바꾸면 랩이 지워진다.</strong> wrangler는 <code>dist</code>만 서빙하므로 빌드 전에는 아무것도 안 뜬다.</li>
+<li><strong>필드 추가 = <code>packages/schema</code>의 BEAN_FIELDS 한 줄 + D1 마이그레이션 SQL.</strong>
+CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되므로 다른 곳은 손댈 필요가 없다.</li>
+<li>D1 스키마 변경은 <strong>새 <code>migrate_*.sql</code> 파일 추가</strong> (기존 파일 수정 금지). 같은 변경을
+<code>db/schema.sql</code>에도 반영한다 — 새 환경은 그 파일 하나로 생성되고, <code>CREATE TABLE IF NOT EXISTS</code>는
+이미 있는 테이블에 컬럼을 더해 주지 않으므로 둘 다 필요하다.
+<strong>원격에 적용이 끝난 마이그레이션 파일은 지운다</strong>(이력은 git에 남는다) — <code>db/</code>에 <code>migrate_*.sql</code>이
+보인다는 것이 곧 &quot;아직 원격에 안 넣었다&quot;는 신호가 되게 한다. 원격 D1에 미적용 마이그레이션이
+남아 조용히 깨진 전례가 있어, 남아 있는 파일 자체를 그 경보로 쓴다.</li>
+</ul>
+<!-- check-docs:ignore-start -->
+<ul>
+<li><strong><code>404.html</code>을 만들지 말 것.</strong> Pages는 매치되는 파일이 없는 경로에 <code>index.html</code>을 준다 —
+인쇄된 QR <code>/{KEY}</code>가 조회 페이지로 떨어지는 이유가 그것뿐이다. <code>404.html</code>이 있으면 그 폴백이
+꺼져 <strong>인쇄된 라벨이 전부 죽는다.</strong> <code>_redirects</code> 캐치올로는 되돌릴 수 없다(<code>/* /index.html 200</code>은
+무한 루프로 거부되고, 통과하는 <code>/* / 200</code>은 CSS·JS까지 삼킨다). 미등록 KEY 안내는 이미 조회
+페이지 안에 있으므로 별도 404 페이지는 위험할 뿐 아니라 중복이다. <code>e2e/routing.spec.ts</code>가 지킨다.</li>
+</ul>
+<!-- check-docs:ignore-end -->
+<ul>
+<li><code>main → deploy</code> 승격 PR은 반드시 <strong>Create a merge commit</strong> — Squash·Rebase는 규칙이 막는다.
+둘은 <code>main</code>의 커밋을 <code>deploy</code>의 조상으로 남기지 않아 다음 승격을 <code>add/add</code> 충돌로 막는다
+(v1.2.0 때 36건). 이유는 README &quot;운영&quot;의 브랜치 보호 규칙 항목에 있다.</li>
+<li><strong>새 파일은 <code>git add</code> 후에 <code>npm run gen:structure</code>를 돌린다</strong> — 생성기는 인덱스(커밋될 내용)만
+보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.</li>
+<li>커밋 전 <code>npm run check</code> 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 <code>npm run check:full</code>.</li>
+</ul>
+<h2 id="claude-문서-관리-원칙"><a class="anchor" href="#claude-문서-관리-원칙" aria-hidden="true">#</a>문서 관리 원칙</h2>
+<p>에이전트가 만드는 변경은 코드보다 문서를 먼저 낡게 만든다. 그래서 <strong>파생할 수 있는 건 손으로
+적지 않고</strong>, 손으로 적을 수밖에 없는 것만 남긴 뒤 그것이 코드와 어긋나면 기계가 잡게 한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>사실</th>
+<th>어디서 오는가</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>파일 배치, API 라우트, D1 테이블</td>
+<td><strong>생성</strong> — <code>npm run gen:structure</code> → <a href="#structure">STRUCTURE.md</a></td>
+</tr>
+<tr>
+<td>각 파일이 무엇인가</td>
+<td><strong>그 파일의 머리 주석</strong> — 생성기가 읽어 간다</td>
+</tr>
+<tr>
+<td>서비스 소개·사용법·로컬 개발</td>
+<td><a href="#readme">README.md</a></td>
+</tr>
+<tr>
+<td>배포·백업·마이그레이션 절차</td>
+<td><a href="#readme">README.md</a> &quot;운영&quot;</td>
+</tr>
+<tr>
+<td>변경 이력 (한 줄 요약)</td>
+<td><a href="#readme">README.md</a> &quot;주요 변경&quot;</td>
+</tr>
+<tr>
+<td>릴리스 노트 (전문)</td>
+<td>GitHub Releases — 태그가 버전의 단일 소스</td>
+</tr>
+<tr>
+<td>남은 작업·백로그</td>
+<td>GitHub Issues (README &quot;로드맵&quot;이 색인)</td>
+</tr>
+<tr>
+<td>설계 배경·아키텍처 근거</td>
+<td><a href="#readme">README.md</a> &quot;구조&quot;</td>
+</tr>
+<tr>
+<td>디자인 시스템 (색·타이포·컴포넌트·컬러 규칙)</td>
+<td><a href="#design">DESIGN.md</a> — 값의 단일 소스는 <code>apps/web/public/theme.css</code></td>
+</tr>
+<tr>
+<td>원칙·금지 사항·함정</td>
+<td>이 문서</td>
+</tr>
+<tr>
+<td>위 문서 전부를 사람이 한눈에 보는 페이지</td>
+<td><strong>생성</strong> — <code>npm run gen:html</code> → <a href="#top">HOW_IT_WORKS.html</a></td>
+</tr>
+</tbody></table>
+</div><ul>
+<li><strong>문서 파일을 늘리지 않는다.</strong> 새 <code>.md</code>를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수
+없는지 먼저 본다. 문서가 늘면 같은 사실이 여러 곳에 흩어지고, 그게 곧 낡는 원인이다.
+<code>STRUCTURE.md</code>와 <code>HOW_IT_WORKS.html</code>은 예외인데 — 둘 다 전부 생성물이라 사람이 유지할 게 없고,
+STRUCTURE.md는 README에서 덜어낸 것이지 새로 더한 게 아니다. HOW_IT_WORKS.html은 <code>.md</code> 넷(README·
+CLAUDE·DESIGN·STRUCTURE)을 사람이 읽기 좋게 한 페이지로 렌더한 것이라 <strong>손으로 고치지 않는다</strong> —
+문장을 바꾸려면 원본 <code>.md</code>를 고치고 다시 생성한다.</li>
+<li><strong>문서는 독자로 가른다.</strong> README는 사람이 읽는다(무엇인지·어떻게 쓰는지·어떻게 운영하는지),
+STRUCTURE.md는 코드 파악용, DESIGN.md는 디자인 시스템(색·타이포·컴포넌트 규칙), 이 문서는 원칙.
+한 파일이 여러 독자를 상대하기 시작하면 양쪽 모두에게 불친절해진다.</li>
+<li><strong>구조는 어느 문서에도 손으로 적지 않는다.</strong> 파일 목록은 저장소를 보면 알 수 있으므로
+옮겨 적으면 낡기만 한다. <code>gen-structure.mjs</code>가 <code>git ls-files</code>·<code>app.ts</code>·<code>schema.sql</code>에서
+직접 읽어 생성하고, <code>npm run check</code>가 재생성 결과와 커밋된 내용이 같은지 검사한다.</li>
+<li><strong>파일의 설명을 바꾸려면 그 파일의 머리 주석을 고친다.</strong> 설명이 코드 옆에 있으면 코드를
+고칠 때 같이 눈에 들어온다 — 이 규칙 덕에 세션 모듈의 낡은 주석이 실제로 잡혔다.
+새 파일에는 &quot;무엇이고 왜 있는지&quot; 한두 줄 주석을 단다. 안 달면 표에 <code>—</code>로 남는다.</li>
+<li><strong>이 문서에는 구조를 쓰지 않는다.</strong> 저장소를 봐도 알 수 없는 것만 쓴다 — 왜 그래야 하는지,
+무엇을 건드리면 깨지는지.</li>
+<li>생성되지 않는 구간(운영 절차, 이 문서)이 가리키는 경로는 <code>npm run check:docs</code>
+(<code>scripts/check-docs.mjs</code>)가 실존만 검사한다 — 내용의 옳고 그름은 판단하지 않는다.</li>
+<li>이력처럼 <strong>지워진 파일을 일부러 언급해야 하는 구간</strong>은 <code>check-docs:ignore-start</code> /
+<code>check-docs:ignore-end</code> HTML 주석으로 감싼다. 위의 &quot;404 페이지를 만들지 말 것&quot; 항목이 그 예다 —
+만들면 안 되는 파일이라 실존하지 않는 경로를 일부러 적고 있다.</li>
+<li><strong>버전은 코드에 적지 않는다.</strong> 루트 <code>package.json</code>은 <code>private</code>이라 <code>version</code>이 없고, 태그가
+단일 소스다. 버전이 붙는 시점은 <code>main</code> 병합이 아니라 <strong><code>deploy</code> 승격</strong>이다 — 절차는
+README &quot;운영&quot;의 &quot;프로덕션 승격 절차&quot;·&quot;릴리스&quot;.</li>
+</ul>
+</article>
 
-<section>
-  <h2>04 · 흐름 3</h2>
-  <h3>QR 스캔 → 조회 — 데이터베이스를 직접 읽어 렌더링</h3>
-  <p class="lede">
-    라벨의 QR은 <code style="font-family:var(--mono)">https://bnhd.pages.dev/{KEY}</code> 를 가리킨다.
-    v1처럼 CSV를 통째로 내려받아 클라이언트에서 찾는 대신, 서버가 그 KEY 한 건만 조회해서 돌려준다.
-  </p>
-  <div class="flow">
-    <div class="step"><div class="circle">1</div><strong>QR 스캔</strong><span>폰 카메라가 라벨의 QR을 인식</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">2</div><strong>페이지 접속</strong><span>/{KEY} 경로로 이동</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">3</div><strong><code>GET /api/bean/{KEY}</code></strong><span>D1에서 해당 행 한 건만 조회</span></div>
-    <div class="flow-arrow">→</div>
-    <div class="step"><div class="circle">4</div><strong>카드 렌더링</strong><span>원산지·가공·로스팅일 표시, 빈 필드는 자동 숨김</span></div>
-  </div>
-</section>
+<article id="design">
+<div class="doc-head"><h1>DESIGN.md</h1><span class="badge">AI</span><a class="source" href="DESIGN.md">원본 DESIGN.md ↗</a><p class="blurb">디자인 시스템 — 색·타이포·컴포넌트 규칙과 그 근거. 값의 단일 소스는 theme.css.</p></div>
+<p>Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. <strong>토큰 값(색·서체·반경 등)의 단일 소스는
+코드</strong> — <a href="apps/web/public/theme.css">apps/web/public/theme.css</a>의 <code>:root</code>다. 이 문서는 그 값들이
+<strong>무엇을 위한 것이고 어떻게 조합하는지 — 규칙과 근거</strong>를 다룬다. 값을 바꾸려면 theme.css를,
+규칙을 바꾸려면 이 문서를 고친다. 값을 여기 옮겨 적으면 낡으므로 하지 않는다.</p>
+<blockquote>
+<p>설계 배경·아키텍처는 <a href="#readme">README.md</a> &quot;구조&quot;, 저장소 구조는 <a href="#structure">STRUCTURE.md</a>,
+작업 원칙·함정은 <a href="#claude">CLAUDE.md</a>. 이 문서들을 한 페이지로 렌더한 사람용 생성물이
+<a href="#top">HOW_IT_WORKS.html</a>이다.</p>
+</blockquote>
+<h2 id="design-1-아이덴티티-중립-크롬-커피가-부여하는-색"><a class="anchor" href="#design-1-아이덴티티-중립-크롬-커피가-부여하는-색" aria-hidden="true">#</a>1. 아이덴티티 — 중립 크롬, 커피가 부여하는 색</h2>
+<ul>
+<li>화면 골격(크롬)은 <strong>화이트·블랙 중립 + 포인트 컬러 하나(탠저린)</strong>. 은유는 모바일 <strong>보딩패스/월렛</strong>.</li>
+<li>개성·다양성은 크롬이 아니라 <strong>원두 자체</strong>에서 나온다 — 산지는 고정 시그니처 색, 향미는 무드 그라데이션(§3).</li>
+<li><strong>미니멀·문서형</strong>: 그라데이션·드롭섀도·장식은 최소화하고 여백과 타이포로 정돈한다. 절제된 문서형
+레이아웃(Ollama류)을 참고하되, 그들이 배제한 &quot;색&quot;을 우리는 <strong>커피에서 끌어온다</strong>는 점이 우리의 차이다.</li>
+<li>브랜드 accent(탠저린)는 한 화면에 드물게. <strong>원두 맥락이 있는 화면(상세)에서는 accent 자리를 그 원두의
+산지 색이 대신한다</strong> — 크롬은 물러나고 원두가 색을 갖는다.</li>
+</ul>
+<h3 id="design-quot-ai가-만든-것-같다-quot-를-부르는-것-그-대신-이슈-32의-핵심"><a class="anchor" href="#design-quot-ai가-만든-것-같다-quot-를-부르는-것-그-대신-이슈-32의-핵심" aria-hidden="true">#</a>&quot;AI가 만든 것 같다&quot;를 부르는 것 → 그 대신 (이슈 #32의 핵심)</h3>
+<p>생성형 템플릿 특유의 인상은 대개 <strong>장식으로 위계를 만들려는 시도</strong>에서 온다. 우리는 반대로 간다 —
+<strong>위계는 타이포와 여백이 만들고, 색은 의미가 있을 때만 쓴다.</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>부르는 것</th>
+<th>왜 문제인가</th>
+<th>그 대신</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>카드 상단 <strong>풀블리드 컬러 스트립/바</strong></td>
+<td>의미 없이 넓은 면적을 색으로 덮는 전형적 템플릿 장치</td>
+<td>색은 <strong>작고 의도적인 마크 하나</strong>(산지 스와치·닷)로</td>
+</tr>
+<tr>
+<td>액센트색 <strong>대문자+넓은 레터스페이싱 eyebrow</strong> 남발</td>
+<td>모든 줄이 &quot;강조&quot;라 아무것도 강조되지 않음</td>
+<td>중립색(<code>--sub</code>)·좁은 자간. 강조는 크기·굵기·여백으로</td>
+</tr>
+<tr>
+<td>액센트 <strong>배지·알약</strong>으로 정보 표시(D+N 등)</td>
+<td>포인트 컬러를 장식으로 소진</td>
+<td>헤어라인 알약 또는 그냥 텍스트</td>
+</tr>
+<tr>
+<td>나란히 놓인 <strong>여러 개의 액센트 링크·버튼</strong></td>
+<td>무엇이 주 동선인지 사라짐</td>
+<td>주 동선 하나만 강조, 보조는 중립 보더·밑줄</td>
+</tr>
+<tr>
+<td>어디나 <strong>큰 라운드 + 강한 그림자</strong></td>
+<td>몰개성한 &quot;카드 더미&quot;</td>
+<td>헤어라인 + 여백 우선, 그림자는 절제</td>
+</tr>
+</tbody></table>
+</div><p><strong>한 화면에서 accent가 등장하는 횟수를 센다.</strong> 진짜 동선(주 버튼·본문 링크·포커스)에만 남기고 나머지는 덜어낸다.</p>
+<h2 id="design-2-색-시스템"><a class="anchor" href="#design-2-색-시스템" aria-hidden="true">#</a>2. 색 시스템</h2>
+<p>값은 theme.css <code>:root</code>(+ 다크 오버라이드)에 있다. 여기서는 <strong>역할과 규칙</strong>만 다룬다.</p>
+<p><strong>중립 베이스</strong></p>
+<ul>
+<li><code>--bg</code> / <code>--surface</code> / <code>--surface-2</code> — 페이지 배경 · 카드 표면 · 보조 표면.</li>
+<li><code>--ink</code> — 본문·제목.</li>
+<li><code>--sub</code> — 보조 텍스트. <strong>가시성 기준</strong>: 라이트 모드에서 <code>--bg</code>·<code>--surface</code> 양쪽 위 본문 크기 대비
+<strong>WCAG AA(≥4.5:1)</strong> 를 지킨다. (이슈 #32의 핵심이 이 대비였다.)</li>
+<li><code>--line</code> — 1px 경계.</li>
+</ul>
+<p><strong>브랜드 · 강조</strong></p>
+<ul>
+<li><code>--accent</code>(탠저린) + <code>--accent-hover</code> / <code>--accent-ink</code> — 유일한 브랜드 색. CTA·링크·포커스. <strong>스코프</strong>:
+원두 맥락이 없는 크롬(랜딩·랩·덱 기본값). 원두 상세에서는 §3의 산지 색으로 로컬 대체된다.</li>
+<li><code>--accent-soft</code> / <code>--focus-ring</code> — accent에서 파생된 은은한 배경·포커스 링.</li>
+</ul>
+<p><strong>상태색</strong></p>
+<ul>
+<li><code>--ok</code> / <code>--bad</code> — 성공·오류 전용. 마케팅 배지가 아니다 — 남용하지 않는다.</li>
+</ul>
+<p><strong>파생(color-mix)</strong></p>
+<ul>
+<li><code>--fill-muted</code> · <code>--hover</code> 등은 <code>--sub</code>/<code>--accent</code>에서 유도되어 라이트·다크에 자동 적응한다. <strong>새 색을
+하드코딩하기 전에 기존 토큰·파생으로 표현되는지 먼저 본다.</strong></li>
+</ul>
+<p><strong>다크 모드</strong></p>
+<ul>
+<li><code>:root[data-theme=&quot;dark&quot;]</code> 오버라이드(OS 설정이 아니라 사용자의 선택 — 아래 &quot;테마&quot; 참고).
+<strong>라이트를 먼저 확정하고 다크는 대비를 맞춰 파생</strong>한다.</li>
+</ul>
+<h2 id="design-3-커피-컬러-국가-모노-향미-그라데이션-화면-전용"><a class="anchor" href="#design-3-커피-컬러-국가-모노-향미-그라데이션-화면-전용" aria-hidden="true">#</a>3. 커피 컬러 — 국가(모노) · 향미(그라데이션) — <em>화면 전용</em></h2>
+<p>이 문서가 커피 컬러 규칙의 <strong>단일 소스</strong>다. 엔진(코드)은
+<a href="apps/web/src/lib/coffee-color.ts">apps/web/src/lib/coffee-color.ts</a>가 이 규칙을 구현한다.</p>
+<p><strong>경계 원칙 (먼저 못 박는다)</strong></p>
+<ul>
+<li><strong>인쇄물은 색을 지원하지 않는다.</strong> 감열 인쇄는 흑백 또는 레드+블랙 2도(<code>#e8341c</code>, 기본 흑백) —
+<a href="packages/label">packages/label</a>의 인쇄 모델이다. 커피 컬러는 <strong>화면 전용</strong>이며, 라벨과 식별성은
+<strong>색이 없어도 성립</strong>해야 한다(색은 거들 뿐, 정보를 지지 않는다).</li>
+<li><strong>커피 컬러가 나타나는 곳은 원두 맥락 화면 — 상세(조회 카드)와 덱</strong>이다. 랩은 정돈 대상일 뿐 커피
+컬러를 얹지 않는다 — 랩은 만드는 곳이고, 색으로 원두를 구별할 일은 만들어진 뒤(조회·덱)에 생긴다.</li>
+</ul>
+<h3 id="design-국가-시그니처-모노컬러"><a class="anchor" href="#design-국가-시그니처-모노컬러" aria-hidden="true">#</a>국가 — 시그니처 모노컬러</h3>
+<ul>
+<li>산지(ORIGIN) 문자열 → <strong>결정론적 단색 하나</strong>. &quot;산지마다 늘 같은 색.&quot;</li>
+<li><strong>근거</strong>: DB에 색을 저장하지 않고 문자열에서 생성한다 → 새 산지가 와도 매핑표 유지가 필요 없다.</li>
+<li><strong>구현</strong>: <strong>OKLCH</strong> — hue만 산지마다 다르고 L·C는 테마 공통으로 고정해, 어떤 hue든 지각적 밝기·채도가
+고른 &quot;한 세트&quot; 팔레트가 나온다. 자주 쓰는 산지(에티오피아·콜롬비아·케냐·브라질·과테말라·코스타리카·
+인도네시아·파나마·르완다 등)는 <strong>큐레이션 hue</strong>(손으로 고른 색), 그 밖은 해시 폴백.</li>
+<li><strong>적용</strong>: 상세 카드 밴드의 **작은 스와치(10px 닷)**와 덱 피크 밴드의 <strong>산지 닷</strong> — 등장 자리는 이 둘뿐.
+<strong>풀블리드 상단 스트립은 쓰지 않는다</strong> — 위 anti-AI 표 참고. 색은 정보를 지지 않으므로(스와치가 없어도
+산지명이 헤드라인에 있다) 장식이 아니라 <strong>보조 식별 신호</strong>다.</li>
+</ul>
+<h3 id="design-향미-무드-그라데이션"><a class="anchor" href="#design-향미-무드-그라데이션" aria-hidden="true">#</a>향미 — 무드 그라데이션</h3>
+<ul>
+<li><p>테이스팅 노트(<code>TASTING_NOTE</code>, 콤마/<code>·</code> 구분 자유입력)를 분해 → <strong>향미 계열</strong>로 판정 → 검출된 계열 색을
+조합한 <code>linear-gradient</code>.</p>
+</li>
+<li><p><strong>향미 계열 → 무드색 방향</strong> (기준표, hue는 OKLCH):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>계열</th>
+<th>예시 키워드</th>
+<th>무드색</th>
+<th>hue</th>
+<th>C</th>
+<th>L</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><span class="swatch" style="background:oklch(.56 .17 15)"></span>베리·붉은과일</td>
+<td>berry, strawberry, cherry, grape, 청포도</td>
+<td>레드</td>
+<td>15</td>
+<td>.17</td>
+<td>.56</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.34 .08 40)"></span>초콜릿·카카오</td>
+<td>chocolate, cocoa</td>
+<td>딥 브라운</td>
+<td>40</td>
+<td>.08</td>
+<td>.34</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.74 .16 58)"></span>핵과</td>
+<td>peach, apricot, nectarine</td>
+<td>살구빛 주황</td>
+<td>58</td>
+<td>.16</td>
+<td>.74</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.56 .09 70)"></span>넛티·캐러멜</td>
+<td>nutty, almond, caramel, brown sugar, honey</td>
+<td>탠</td>
+<td>70</td>
+<td>.09</td>
+<td>.56</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.72 .17 90)"></span>열대과일</td>
+<td>tropical, mango, pineapple, passion</td>
+<td>앰버·골드</td>
+<td>90</td>
+<td>.17</td>
+<td>.72</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.84 .17 115)"></span>시트러스</td>
+<td>citrus, lemon, orange, bergamot</td>
+<td>옐로</td>
+<td>115</td>
+<td>.17</td>
+<td>.84</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.68 .14 145)"></span>그린 과일</td>
+<td>apple, pear, melon</td>
+<td>연두</td>
+<td>145</td>
+<td>.14</td>
+<td>.68</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.52 .09 190)"></span>스파이스·허브·차</td>
+<td>spice, cinnamon, herbal, black tea, cedar</td>
+<td>틸</td>
+<td>190</td>
+<td>.09</td>
+<td>.52</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.74 .14 305)"></span>플로럴</td>
+<td>floral, jasmine, rose, lavender, orange blossom</td>
+<td>라일락</td>
+<td>305</td>
+<td>.14</td>
+<td>.74</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.40 .15 340)"></span>와이니·발효</td>
+<td>winey, boozy, fermented</td>
+<td>딥 퍼플레드</td>
+<td>340</td>
+<td>.15</td>
+<td>.40</td>
+</tr>
+<tr>
+<td><span class="swatch" style="background:oklch(.55 .05 60)"></span>(매칭 없음)</td>
+<td>—</td>
+<td>중립 커피 그라데이션(웜 브라운)</td>
+<td>60</td>
+<td>.05</td>
+<td>.55</td>
+</tr>
+</tbody></table>
+</div><p><strong>계열끼리 서로 밀어내는 것이 이 표의 요점이다.</strong> 처음에는 시트러스와 넛티가 같은 hue(70)를 썼고
+초콜릿·열대·스파이스까지 55<del>125의 좁은 노란 구간에 몰려 있어, 카드를 늘어놓으면 띠가 다 비슷한
+누런 워시로 보였다 — 색이 원두를 구별해 주지 못하면 이 장치는 장식일 뿐이다. 비어 있던 초록</del>보라
+구간으로 차·허브(틸)와 꽃(라일락)을 옮겨 간격을 벌렸고, hue가 가까울 수밖에 없는 따뜻한 과일·견과
+구간은 <strong>명도로 한 번 더 가른다</strong>(초콜릿은 어둡게, 넛티는 중간, 핵과·열대·시트러스는 밝게 층으로).</p>
+<p><strong>핵과를 그린 과일에서 떼어낸 이유</strong>: 한 계열(스톤·그린, hue 148)로 묶여 있던 시절 복숭아·살구가
+사과·배·멜론과 같은 순초록을 받았다. <code>Yellow Peach</code>를 고른 카드에 초록 워시가 깔리는 것은 무드가
+거들기는커녕 어긋나는 쪽이다. 주황 과일과 초록 과일은 다른 계열이다.</p>
+<p><strong>청포도는 그린이 아니라 베리다</strong>: 저장값 <code>White Grape</code>가 <code>grape</code>로 베리에 걸리므로, 한글 &quot;청포도&quot;만
+그린으로 보내면 같은 노트가 표기에 따라 다른 색을 받는다. 색이 표기를 따라가면 안 된다.</p>
+</li>
+<li><p><strong>조합 규칙</strong>: 검출된 계열의 대표색을 등장 순서대로 2~3색까지 그라데이션으로. 단일 계열이면 그 색의
+명도 두 단계로. 매칭이 없으면 중립 커피 그라데이션.</p>
+</li>
+<li><p><strong>제약</strong>: <strong>저채도·저알파</strong>로 얹어 본문 가시성(#32)을 해치지 않는다 — 텍스트 뒤 은은한 워시로,
+콘텐츠 대비를 항상 우선한다. 다만 알파가 지나치게 낮으면 벌려 둔 hue가 회색빛 한 겹으로 뭉개져
+구별이라는 목적 자체가 사라지므로, 계열이 읽히는 선(라이트 0.19 / 다크 0.26)까지는 올린다.</p>
+</li>
+<li><p><strong>적용</strong>: 그라데이션은 <strong>구조적 자리</strong>에만 얹는다 — 상세 카드의 아이덴티티 밴드(§7)와 덱 카드의
+피크 밴드(§7). 본문·스텁 영역에는 얹지 않는다.</p>
+</li>
+</ul>
+<h3 id="design-로스팅-레벨-원두-색-견본"><a class="anchor" href="#design-로스팅-레벨-원두-색-견본" aria-hidden="true">#</a>로스팅 레벨 — 원두 색 견본</h3>
+<ul>
+<li>애그트론 6단계(<code>#120 울트라라이트</code> … <code>#45 다크</code>)에 <strong>실제 분쇄 원두 색에 가까운 단색</strong>을 하나씩 준다.
+국가·향미와 달리 이 색은 무드가 아니라 <strong>사실</strong>이다 — 그래서 생성하지 않고 손으로 고정한 표다.</li>
+<li><strong>구현</strong>: OKLCH, 밝기가 애그트론 순서를 그대로 따른다(숫자가 클수록 밝다). 값의 단일 소스는
+<a href="packages/schema/src/roast.ts">packages/schema/src/roast.ts</a> — 등록 폼·조회 카드·AI 프롬프트가 함께 쓴다.</li>
+<li><strong>적용</strong>: 등록 폼의 로스팅 레벨 추천 칩(<code>.chip-swatch</code>)과 조회 카드 티켓 행의 <code>ROAST</code> 값 앞
+(<code>.roast-swatch</code>) — 9~10px 닷. 랩에 커피 컬러를 얹지 않는다는 위 원칙의 <strong>예외</strong>인데, 이것은 원두를
+구별하는 색이 아니라 <strong>고르는 값 자체의 모습</strong>이기 때문이다(숫자 목록을 훑는 대신 색으로 고른다).</li>
+<li>밝은 쪽 스와치는 흰 배경에, 어두운 쪽은 검은 배경에 묻힌다 — 양쪽 테마에서 중간 회색 테두리
+한 겹으로 윤곽을 지킨다.</li>
+</ul>
+<blockquote>
+<p>구현 노트: 국가·향미 엔진 모두 <a href="apps/web/src/lib/coffee-color.ts">apps/web/src/lib/coffee-color.ts</a>
+(<code>originSignature</code> · <code>flavorGradient</code> · <code>matchFlavorFamilies</code>), 로스팅 레벨은
+<a href="packages/schema/src/roast.ts">packages/schema/src/roast.ts</a>. 규칙의 단일 소스는 이 문서 —
+계열표를 바꾸면 코드도 함께 고친다. 반대로 <strong>향미 어휘</strong>(<code>@bnhd/schema/flavor</code>)에 노트를 더할 때는
+계열 정규식에 걸리는지 <code>apps/web/src/lib/flavor-coverage.test.ts</code>가 전수로 검사한다 — 같은 파일이
+계열끼리 충분히 떨어져 있는지도 지킨다(위 표의 &quot;서로 밀어낸다&quot;가 코드에서 유지되는 근거).
+검사 조항은 둘이다: <strong>hue는 최소 12도 차</strong>, 그리고 <strong>25도보다 가까우면 명도가 최소 0.15 차</strong>.
+&quot;같은 hue만 금지&quot;이던 시절에는 20도 이웃이 통과하면서도 눈에는 한 색이라 문제가 남았다.</p>
+</blockquote>
+<h2 id="design-4-타이포그래피"><a class="anchor" href="#design-4-타이포그래피" aria-hidden="true">#</a>4. 타이포그래피</h2>
+<ul>
+<li><code>--display</code>(<strong>Space Grotesk</strong>) — 워드마크·헤드라인(산지명)·히어로. 700.</li>
+<li><code>--sans</code>(<strong>Pretendard Variable</strong>, 한글 우선) — 본문·버튼·대부분의 UI.</li>
+<li><code>--mono</code>(SF Mono 계열) — KEY·코드·날짜·스펙 라벨(<code>dt</code>).</li>
+<li><strong>크기 감각</strong>: 헤드라인 <code>clamp(28–36px)</code>, 본문 14px, 보조 11.5–13px, 마이크로 10–11px(대문자+레터스페이싱).</li>
+<li><strong>대문자는 마이크로에만.</strong> 헤드라인(산지명)은 저장된 대소문자 그대로 쓴다 — 대문자로 강제하면 같은
+이름이 7% 넓어져 카드·라벨에서 잘림이 앞당겨지고, 고유명사의 결이 사라진다. 로스터리·KEY·스펙 라벨
+처럼 <strong>작고 짧은 것만</strong> 대문자+레터스페이싱으로 세운다.
+본문 라인하이트 1.55.</li>
+<li><strong>원칙</strong>: 디스플레이 서체는 산지명·브랜드에만. 본문 이하는 시스템 한글 서체 그대로 둔다. 과한 웨이트·
+이탤릭은 지양(테이스팅 노트만 이탤릭 허용).</li>
+</ul>
+<h3 id="design-줄바꿈-한국어는-어절-단위로"><a class="anchor" href="#design-줄바꿈-한국어는-어절-단위로" aria-hidden="true">#</a>줄바꿈 — 한국어는 어절 단위로</h3>
+<p>브라우저 기본값(<code>word-break: normal</code>)은 <strong>한글을 글자 단위로 끊는다.</strong> 그래서 &quot;커뮤니티&quot;가
+&quot;커 / 뮤니티&quot;로 갈라지고 읽는 리듬이 깨진다. theme.css의 <code>body</code>에 전역으로 못 박는다:</p>
+<pre><code class="language-css">word-break: keep-all;      /* 어절 단위로만 끊는다 */
+overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등) 그때만 강제로 */
+</code></pre>
+<p><code>overflow-wrap</code>을 짝으로 두는 이유는 <code>keep-all</code>만 쓰면 긴 URL 하나가 칸을 넘쳐 레이아웃을
+밀어내기 때문이다. 반대로 <strong>일부러 잘게 끊어야 하는 곳</strong>(URL 표시, 복구키)은 그 자리에서
+<code>word-break: break-all</code>로 되돌린다 — 거기서는 읽는 리듬보다 넘치지 않는 것이 중요하다.</p>
+<p><strong>의미가 한 덩어리인 것은 붙여 둔다.</strong> 라벨과 값(<code>ALTITUDE 2100m</code>)이 서로 다른 줄로 갈리면
+둘의 관계가 끊긴다 — 쌍을 <code>white-space: nowrap</code>으로 묶고, 줄바꿈은 항목과 항목 사이에서만
+일어나게 한다(조회 카드의 <code>.spec-pair</code>).</p>
+<h2 id="design-5-여백-레이아웃"><a class="anchor" href="#design-5-여백-레이아웃" aria-hidden="true">#</a>5. 여백 · 레이아웃</h2>
+<ul>
+<li><strong>여백 스케일</strong>(theme.css <code>--sp-1</code>…<code>--sp-7</code> = 4·8·12·16·24·32·48px, 신설). 컴포넌트 간격은 이 스케일에서
+고른다. 기존 인라인 px 잔재는 점진 이관(한 번에 치환하지 않는다).</li>
+<li><strong>컨테이너</strong>: 상세·조회는 최대 430px, 랩(<a href="apps/lab">apps/lab</a>)은 최대 640px — 둘 다 <strong>모바일 우선 단일 컬럼</strong>이다.
+랩도 2컬럼을 버렸다: 한 화면에 한 맥락만 두면 열을 나눌 이유가 없다(§7).</li>
+<li><strong>카드 리듬</strong>: <code>.card</code>(<code>--radius</code> · 1px 라인 · 그림자). 섹션은 여백으로 가르고 장식 구분선은 지양.</li>
+<li><strong>세로 위치</strong>: 주 콘텐츠 카드는 <strong>세로 40% 지점</strong>에 둔다 — 위에 붙으면 아래 여백만 남아 허전하고,
+정확히 가운데(50%)보다는 살짝 위가 시선에 안정적이다. 구현은 위:아래 <strong>2:3 스페이서</strong>(<code>::before</code>/<code>::after</code>)로
+남는 공간을 나눈다. <code>justify-content: center</code>를 쓰지 않는 이유는, 콘텐츠가 화면보다 길어질 때
+스페이서는 0으로 줄어 그냥 아래로 자라지만 center는 <strong>위가 잘리기</strong> 때문이다.
+(남는 공간을 나누는 방식이라 카드가 길수록 중심이 조금 내려간다 — 화면마다 41~45%. 의도된 범위다.)
+<strong>덱은 예외</strong> — 카드가 쌓이는 목록이라 상단 정렬이 자연스럽고, 카드가 늘면 여백은 알아서 사라진다.</li>
+</ul>
+<h2 id="design-6-반경-입체-모션"><a class="anchor" href="#design-6-반경-입체-모션" aria-hidden="true">#</a>6. 반경 · 입체 · 모션</h2>
+<ul>
+<li><strong>반경</strong>: <code>--radius</code> 10px(카드) / <code>--radius-sm</code> 7px(버튼·인풋) / <code>--radius-pill</code> 999px(알약·닷·배지).
+구 16/9px에서 줄였다 — 과한 둥글기는 몰개성한 &quot;둥글둥글 카드&quot; 인상(anti-AI §1)을 만든다.
+임의 반경은 쓰지 않는다 — 인라인 값 대신 반드시 토큰으로.</li>
+<li><strong>입체</strong>: <strong>그림자만</strong>으로 띄운다(<code>--shadow</code>/<code>--shadow-hover</code>). 배경 그라데이션·과한 보더로 띄우지 않는다.
+(예외: §3 향미 그라데이션 — 상세 밴드·덱 피크 밴드 한정, 저알파. 덱은 밴드 아래 12px을 본문 색으로
+빠르게 풀어 띠가 덧댄 것처럼 잘려 보이지 않게 한다.)</li>
+<li><strong>모션</strong>: <code>--t</code>(0.15s ease) 공통. 색·보더·배경 전이에만. 장식 애니메이션은 지양.</li>
+</ul>
+<h2 id="design-7-컴포넌트-패턴"><a class="anchor" href="#design-7-컴포넌트-패턴" aria-hidden="true">#</a>7. 컴포넌트 패턴</h2>
+<ul>
+<li><strong>버튼</strong>: 기본(중립 보더) · <code>.primary</code>(ink 배경, hover 시 accent) · <code>.danger</code>. 반경 <code>--radius-sm</code>.</li>
+<li><strong>인풋</strong>: 1px <code>--line</code>, 포커스 시 accent 보더 + focus-ring.</li>
+<li><strong>칩(<code>ul.chips</code>)</strong>: 알약, 1px <code>--ink</code> 보더 — 테이스팅 노트 등. (향미 색은 §3 후속에서 얹을 수 있으나 기본은 중립.)</li>
+<li><strong>보딩패스 카드(<code>.pass</code>)</strong> — 상세·조회의 핵심 컴포넌트. 항공권의 3단 구조를 그대로 쓴다:
+① <strong>아이덴티티 밴드</strong>(<code>.pass-band</code>) — 향미 그라데이션 배경 + 산지 스와치 + 로스터리 + 헤드라인 + 서브라인,
+② <strong>본문</strong> — 노트 칩 + <strong>티켓 정보 행</strong>(<code>.ticket-row</code>: RSTD/PKGD/NET/ROAST PT를 mono 컬럼으로 — 게이트/좌석
+자리) + 부가 스펙 한 줄(<code>.specline</code>), ③ 절취선(<code>.perf</code>) → <strong>스텁</strong> — KEY(티켓 번호)·<code>D+N</code>·원본 링크·메모.
+브랜드는 카드 밖 페이지 푸터가 맡는다. 렌더는 <a href="apps/web/src/viewer.ts">apps/web/src/viewer.ts</a>.</li>
+<li><strong>월렛 카드(덱)</strong> — <strong>피크 밴드</strong>(<code>.w-band</code>)가 1급 설계 단위: 카드 높이를 고정하고 스택시 보이는 상단
+띠에 향미 그라데이션 + 산지 닷 + 헤드라인 + 경과일 + 로스터리·KEY를 모두 싣는다. 본문(노트·날짜)은
+카드를 뽑았을 때만. 렌더는 <a href="apps/web/src/deck.ts">apps/web/src/deck.ts</a>.</li>
+<li><strong>랩(화면 전환)</strong> — 단일 컬럼(최대 640px)이되 <strong>한 번에 한 화면만</strong> 보인다: 입력 / QR 발급 /
+라벨 도안 / 목록이 서로를 가리지 않는다(브라우저 뒤로가기가 이전 화면으로 돌아간다).
+여러 카드가 한 페이지에 공존하면 &quot;지금 무엇을 하는 중인지&quot;가 흐려지기 때문이다.
+서비스가 책임지는 산출물이 &quot;라벨 도안&quot;이 아니라 <strong>인쇄되는 QR과 그 QR이 도착하는 상세 페이지</strong>라서
+화면 순서가 이렇게 정해진다:
+① <strong>입력</strong> — <a href="apps/lab/src/components/IntakeCard.tsx">IntakeCard</a>의 <strong>입력 칸 하나</strong>에서 시작한다.
+링크를 넣으면 그 페이지를 가져와 읽고, 페이지 내용을 붙여넣으면 그 본문을 읽는다 — 사용자에겐 둘 다
+&quot;정보가 있는 것을 붙여넣는&quot; 같은 행동이라 칸을 나누지 않는다. 링크라면 <strong>가져오기 전에</strong> 같은 상품
+페이지로 등록한 원두가 있는지 먼저 확인해 헛된 요청을 막는다.
+이어 <a href="apps/lab/src/components/ReviewStepper.tsx">ReviewStepper</a>로 넘긴다. 스텝은 등록 필수 순서(로스터리·산지 →
+가공·품종 → 날짜 → 표현 → 상세)로 <strong>한 번에 하나만 열리고</strong>, 각 스텝은 <strong>건너뛸 수 있다</strong>.
+칸마다 추천 칩을 붙여 타이핑을 줄이고(로스팅일은 D+N을 함께 보여준다), AI가 채운 칸에는 &quot;확인&quot; 표시를 남긴다.
+② <strong>QR 발급</strong> — <a href="apps/lab/src/components/QrCard.tsx">QrCard</a>. 등록으로 KEY가 확정된 뒤에만 QR을 내보낸다
+(확정 전 QR은 없는 곳을 가리킨다). 인쇄 크기는 203dpi 도트의 정수배로만 제시하고, 화면에는 dpi·디코더
+대신 <strong>결과만</strong>(<code>✓ 인쇄해도 스캔됩니다</code>) 말한다. 버튼은 목적별로 묶는다 — 주소(복사) / 인쇄물(크기·이미지).
+③ <strong>유지관리</strong> — 목록·수정·삭제·CSV 백업. 덱 카드에서도 &quot;정보 수정&quot;으로 이 화면의 편집 상태에 바로 들어온다.
+<strong>라벨 도안은 별도 화면</strong>(<a href="apps/lab/src/components/LabelPanel.tsx">LabelPanel</a>)으로 내린다 — QR 화면에서 &quot;라벨 도안까지 만들기&quot;를 고를 때만 들어간다.
+쓰는 사람마다 원하는 양식이 다르고 프린터 호환도 보장할 수 없기 때문이다. 기능은 그대로 남긴다.
+스타일은 theme.css 토큰 + <a href="apps/web/public/lab.css">apps/web/public/lab.css</a>.</li>
+<li><strong>복사 버튼</strong> — 복사 결과는 <strong>버튼 자신이 말한다</strong>(1.5초 <code>✓ 복사완료</code>). 멀리 떨어진 상태줄에만 띄우면
+성공했는지 몰라 같은 버튼을 여러 번 누르게 된다. 구현은 <code>CopyButton</code>(<a href="apps/lab/src/components/FormBits.tsx">FormBits</a>).</li>
+<li><strong>설정 서랍</strong> — 테마·AI 키처럼 <strong>지금 할 일과 무관한 것</strong>은 우측 상단의 작은 버튼 뒤로 치운다
+(<a href="apps/lab/src/components/SettingsMenu.tsx">SettingsMenu</a>). 본 화면에 늘 펼쳐 두면 주 동선이 흐려진다.</li>
+</ul>
+<h3 id="design-필요할-때만-보여준다-점진적-노출"><a class="anchor" href="#design-필요할-때만-보여준다-점진적-노출" aria-hidden="true">#</a>필요할 때만 보여준다 (점진적 노출)</h3>
+<p>우회로·예외 수단을 평소에 펼쳐 두면 그것만으로 화면이 무거워지고, 무엇이 주 동선인지 사라진다.
+그래서 <strong>평소엔 없다가 필요해진 순간 나타나게</strong> 한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>무엇</th>
+<th>언제 나타나는가</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>추천 칩의 뒷부분</td>
+<td><code>+ N개 더</code>를 누를 때 — 평소엔 자주 쓰는 것만</td>
+</tr>
+<tr>
+<td>라벨 도안</td>
+<td>QR 화면에서 &quot;라벨 도안까지 만들기&quot;를 고를 때</td>
+</tr>
+<tr>
+<td>AI 키·테마</td>
+<td>설정 서랍을 열 때</td>
+</tr>
+<tr>
+<td>QR 내보내기</td>
+<td>등록으로 KEY가 확정된 뒤 — 그전 QR은 없는 곳을 가리킨다</td>
+</tr>
+</tbody></table>
+</div><p>더 나은 해법이 있으면 &quot;나타나게 하는&quot; 것보다 <strong>아예 없애는</strong> 쪽이 낫다. 인테이크의 텍스트 붙여넣기가
+그랬다 — 처음엔 링크가 실패한 뒤에만 열리는 우회로였는데, 링크와 본문을 <strong>한 칸에서 받게</strong> 하니
+분기 자체가 사라졌다(입력이 링크처럼 생겼으면 페이지를 가져오고, 아니면 그 본문을 읽는다).</p>
+<p>짝이 되는 규칙: <strong>실패 안내는 그 실패를 해결할 UI 바로 옆에 둔다.</strong> 버튼을 눌렀는데 저 멀리 화면
+위쪽에 메시지가 뜨면 사용자는 &quot;아무 일도 안 일어났다&quot;고 읽고 같은 버튼을 다시 누른다.</p>
+<h3 id="design-테마"><a class="anchor" href="#design-테마" aria-hidden="true">#</a>테마</h3>
+<p><strong>기본은 라이트 고정</strong>이다 — OS 다크 설정을 따라가지 않는다. 다크는 설정에서 켜는 선택지이며
+<code>:root[data-theme=&quot;dark&quot;]</code>로만 적용된다(theme.css). 각 HTML의 head에 있는 인라인 스크립트가
+저장값을 첫 페인트 전에 붙여 깜빡임을 막는다 — 블로킹이어야 해서 세 진입점에 같은 사본을 둔다.</p>
+<h2 id="design-8-해야-할-것-하지-말-것"><a class="anchor" href="#design-8-해야-할-것-하지-말-것" aria-hidden="true">#</a>8. 해야 할 것 · 하지 말 것</h2>
+<p><strong>Do</strong></p>
+<ul>
+<li>크롬은 중립으로, 색은 원두(산지·향미)에서.</li>
+<li>값은 theme.css 토큰으로. 새 하드코딩 전에 기존 토큰·파생으로 되는지 확인.</li>
+<li>반경은 3단계, 입체는 그림자, 포인트 컬러는 화면당 드물게.</li>
+<li>헤드라인 조합은 <a href="packages/schema/src/headline.ts">packages/schema/src/headline.ts</a>를 단일 소스로
+(카드·라벨이 같은 제목을 쓴다).</li>
+<li>커피 컬러는 <strong>라벨엔 색이 없다는 전제</strong>로 설계 — 색이 없어도 읽히게.</li>
+</ul>
+<p><strong>Don&#39;t</strong></p>
+<ul>
+<li><strong>카드 상단 풀블리드 컬러 스트립·바를 만들기</strong> (산지 색은 작은 스와치로).</li>
+<li><strong>accent를 장식으로 쓰기</strong> — eyebrow·배지·알약·나란한 링크 여러 개. accent는 진짜 동선에만.</li>
+<li>크롬에 새 브랜드색·그라데이션·드롭섀도를 남발.</li>
+<li>라벨에 화면 색(산지·향미)을 가정.</li>
+<li>텍스트 대비를 해치는 배경(향미 그라데이션도 저알파 유지).</li>
+<li>theme.css 밖에 색·반경 하드코딩(불가피하면 이유를 주석으로).</li>
+<li>카드 반경(10)·컨트롤 반경(7)·알약(999)을 서로 바꿔 쓰기.</li>
+</ul>
+</article>
 
-<section>
-  <h2>05 · 설계 근거</h2>
-  <h3>v1에서 막혔던 지점과 v2의 해법</h3>
-  <table>
-    <tr><th>v1의 마찰</th><th>원인</th><th>v2의 해법</th></tr>
-    <tr><td class="old">"웹에 게시" 단계에서 진행이 멈춤</td><td class="old">구글시트를 DB로 사용</td><td class="new">D1 — 게시라는 개념 자체가 없음</td></tr>
-    <tr><td class="old">사용자마다 Apps Script를 직접 배포</td><td class="old">시트에 쓰려면 인증 필요</td><td class="new">가입 즉시 토큰 발급, 서버가 대신 씀</td></tr>
-    <tr><td class="old">레지스트리 시트를 운영자가 수동 관리</td><td class="old">유저코드 ↔ 시트 매핑 필요</td><td class="new">users 테이블 — 가입이 곧 등록</td></tr>
-    <tr><td class="old">라벨 렌더러가 Python·JS로 이원화</td><td class="old">미리보기와 인쇄 파이프라인 분리</td><td class="new">단일 라벨 모듈(packages/label)을 미리보기·인쇄가 공유</td></tr>
-    <tr><td class="old">QR 검증이 데스크톱 파이썬 전용</td><td class="old">zxing-cpp 의존</td><td class="new">jsQR로 브라우저 안에서 자동 검증</td></tr>
-    <tr><td class="old">KEY 채번을 클라이언트가 추측</td><td class="old">CSV를 읽어 max+1 계산</td><td class="new">서버가 등록 시점에 원자적으로 배정</td></tr>
-  </table>
-</section>
-
-<section>
-  <h2>06 · 보안 모델</h2>
-  <h3>무료 범위 안에서 최소한으로 충분하게</h3>
-  <ul class="plain">
-    <li><b>가입</b>: 초대코드(운영자가 공유) + 숫자 4자리 암호만으로 계정 생성. 초대코드는 Cloudflare secret으로 관리 — 저장소에 없고 언제든 교체 가능.</li>
-    <li><b>암호</b>: 탈취돼도 무방한 편의용 — 무단 등록·수정을 막는 수준. 서버는 PBKDF2(유저코드:암호) 해시만 저장.</li>
-    <li><b>복구키</b>: 가입 시 1회 표시되는 고엔트로피 키. 유저코드·암호를 모두 잊었을 때의 유일한 복구 수단이며 사용하면 회전된다.</li>
-    <li><b>무차별 대입</b>: 4자리 암호 특성상 D1 기반 rate limit으로 차단 — 유저코드당 10회/10분, IP당 30회/10분 초과 시 429.</li>
-    <li><b>쓰기</b>: 등록·수정·삭제·백업에 세션 토큰(<code style="font-family:var(--mono)">POST /api/login</code>으로 발급, 90일 만료)이 필요 — <code style="font-family:var(--mono)">Authorization: Bearer</code> 헤더로 전송한다. 브라우저는 암호가 아니라 토큰만 저장한다(레거시 <code style="font-family:var(--mono)">유저코드:암호</code> 헤더도 이행기 동안 동작).</li>
-    <li><b>읽기</b>: 완전 공개 — QR 스캔이 목적이므로 조회에는 인증이 없다.</li>
-    <li><b>소유권</b>: 수정·삭제는 KEY 앞 4자리 = 내 유저코드인 원두만 가능.</li>
-    <li><b>공개 계정을 두지 않는다</b>: 로그인 없이 둘러보는 화면은 정적 데모 덱(<code>/demo</code>)이 맡는다. 예전엔 자격증명을 공개한 데모 계정을 두고 서버가 쓰기를 막았는데, 그러면 그 계정을 관리할 방법까지 함께 사라진다 — 구경거리를 계정이 아니라 페이지로 떼어내 양쪽을 다 얻었다.</li>
-    <li><b>AI 인식 대행</b>: 서비스 키는 Cloudflare secret으로만 존재하며 브라우저로 내려가지 않는다. 계정별·전역 하루 한도로 남용을 막고, 한도를 넘기면 규칙 기반 인식으로 내려간다.</li>
-    <li><b>데이터 회복</b>: CSV 백업을 언제든 내려받고, 같은 파일로 복원(같은 KEY 덮어쓰기) — 실수·악의적 변조를 백업 시점으로 되돌린다.</li>
-    <li><b>오남용 대응</b>: 운영자가 D1에서 해당 사용자 행을 삭제하면 즉시 차단.</li>
-  </ul>
-</section>
-
-<section>
-  <h2>07 · 비용 구조 (100명 기준)</h2>
-  <table>
-    <tr><th>리소스</th><th>무료 한도</th><th>예상 사용량</th></tr>
-    <tr><td>Pages 정적 요청</td><td>무제한</td><td>—</td></tr>
-    <tr><td>Pages Functions</td><td>100,000 요청/일</td><td>스캔·등록 수백 건/일</td></tr>
-    <tr><td>D1 읽기</td><td>5,000,000/일</td><td>스캔당 1회</td></tr>
-    <tr><td>D1 쓰기</td><td>100,000/일</td><td>등록당 1~2회</td></tr>
-    <tr><td>D1 저장 용량</td><td>5 GB</td><td>원두 1만 건 ≈ 5 MB</td></tr>
-  </table>
-</section>
-
-<section>
-  <h2>08 · 관련 파일</h2>
-  <div class="filelist">
-    <div><b>apps/web/</b> — 조회·덱·데모 MPA: apps/web/index.html · apps/web/deck.html · apps/web/demo.html. 덱 카드는 apps/web/src/lib/wallet-card.ts + apps/web/public/deck.css를 덱·데모가 공유하고, 데모 내용은 apps/web/src/demo-beans.json. 공용 토큰 apps/web/public/theme.css</div>
-    <div><b>apps/lab/</b> — 랩(스튜디오): 가입·입력·미리보기·등록·백업·복원·로고. React → /lab으로 빌드</div>
-    <div><b>packages/label/</b> — 라벨 SVG 렌더러 + QR 검증, 3개 사이즈(40×20·50×30·50×60)</div>
-    <div><b>packages/autofill/</b> — 붙여넣은 텍스트에서 원두 정보 추출 (휴리스틱)</div>
-    <div><b>packages/schema/</b> — 원두 필드·헤드라인 조합 규칙의 단일 소스</div>
-    <div><b>packages/api/</b> — Hono API (signup · login · beans · bean/{KEY} · export.csv · import · logos · fetch). functions/api/[[path]].ts가 마운트</div>
-    <div><b>packages/session/</b> — 세션 저장·이행 (조회·덱·랩 공유)</div>
-    <div><b>db/schema.sql · db/seed.sql</b> — D1 테이블 정의, 로컬·e2e 픽스처</div>
-    <div><b>DESIGN.md</b> — 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙). STRUCTURE.md — 저장소 구조(생성물), README.md — 사용법·운영</div>
-  </div>
-</section>
-
+<article id="structure">
+<div class="doc-head"><h1>STRUCTURE.md</h1><span class="badge">AI · 사람 · 생성물</span><a class="source" href="STRUCTURE.md">원본 STRUCTURE.md ↗</a><p class="blurb">파일 배치·API 라우트·D1 테이블. 저장소에서 생성되며 설명은 각 파일의 머리 주석에서 온다.</p></div>
+<blockquote>
+<p><strong>이 파일은 생성된다 — 손으로 고치지 말 것.</strong> <code>npm run gen:structure</code>가 저장소에서 직접
+읽어 만든다. 파일 목록은 <code>git ls-files</code>, 각 항목의 설명은 그 파일의 머리 주석, API 라우트는
+<code>packages/api/src/app.ts</code>, D1 테이블은 <code>db/schema.sql</code>에서 온다. 설명을 바꾸려면 해당
+파일의 머리 주석을 고치고 다시 생성한다.</p>
+<p>원칙·함정은 <a href="#claude">CLAUDE.md</a>, 사용법·운영 절차는 <a href="#readme">README.md</a>.</p>
+</blockquote>
+<p><strong>정적 페이지</strong> — 빌드 없이 브라우저가 그대로 받는 파일. Cloudflare Pages가 서빙한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dist/lab/</code></td>
+<td>랩(등록·QR 발급 화면) — apps/lab 빌드 산출물. gitignore이며 npm run build가 만든다.</td>
+</tr>
+</tbody></table>
+</div><p><strong>서버</strong> — Pages Functions 진입점. 실제 라우팅은 @bnhd/api가 맡는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>functions/api/[[path]].ts</code></td>
+<td>Cloudflare Pages Functions 어댑터 — 라우팅·로직은 @bnhd/api(Hono, packages/api)로 이전됐다.</td>
+</tr>
+</tbody></table>
+</div><p><strong>워크스페이스</strong> — npm workspaces. 로직의 단일 소스는 전부 여기에 있다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>apps/lab/</code><br><code>@bnhd/lab</code></td>
+<td>랩(등록·관리 화면)의 React 진입점 — base /lab/으로 빌드되어 dist/lab에 올라간다.</td>
+</tr>
+<tr>
+<td><code>apps/web/</code><br><code>@bnhd/web</code></td>
+<td>조회·덱·데모 정적 앱 — 인쇄된 QR이 도착하는 곳.</td>
+</tr>
+<tr>
+<td><code>packages/api/</code><br><code>@bnhd/api</code></td>
+<td>Bean-Hoarder v2 API — Hono 앱 (Cloudflare Pages Functions에 마운트).</td>
+</tr>
+<tr>
+<td><code>packages/autofill/</code><br><code>@bnhd/autofill</code></td>
+<td>붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서.</td>
+</tr>
+<tr>
+<td><code>packages/label/</code><br><code>@bnhd/label</code></td>
+<td>라벨 렌더러 단일 모듈 (@bnhd/label) 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거).</td>
+</tr>
+<tr>
+<td><code>packages/schema/</code><br><code>@bnhd/schema</code></td>
+<td>Bean-Hoarder 도메인 스키마 — 원두 필드의 단일 소스(single source of truth).</td>
+</tr>
+<tr>
+<td><code>packages/session/</code><br><code>@bnhd/session</code></td>
+<td>세션 저장·이행 — 조회·덱(@bnhd/web)과 랩(@bnhd/lab)이 공유하는 단일 소스.</td>
+</tr>
+</tbody></table>
+</div><p><strong>D1 스키마</strong> — 새 환경은 schema.sql 하나로 만들고, 기존 DB에는 migrate_*.sql을 순서대로 적용한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>db/schema.sql</code></td>
+<td>D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다.</td>
+</tr>
+<tr>
+<td><code>db/seed.sql</code></td>
+<td>로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건.</td>
+</tr>
+</tbody></table>
+</div><p><strong>테스트</strong> — 단위 테스트는 각 패키지 안에 두고, 사용자 동선은 e2e가 실제 서버를 띄워 검증한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>e2e/routing.spec.ts</code></td>
+<td>배포 산출물의 라우팅 계약 — 인쇄된 라벨의 QR이 향하는 경로가 살아 있는지 검증한다.</td>
+</tr>
+<tr>
+<td><code>e2e/smoke.spec.ts</code></td>
+<td>스모크 e2e — 서비스의 핵심 동선이 실제 브라우저에서 끝까지 동작하는지 확인한다.</td>
+</tr>
+</tbody></table>
+</div><p><strong>저장소 유지보수</strong> — 문서를 코드에서 파생시키고, 어긋나면 잡아내는 스크립트.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>scripts/check-docs.mjs</code></td>
+<td>문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다.</td>
+</tr>
+<tr>
+<td><code>scripts/gen-how-it-works.mjs</code></td>
+<td>사람이 읽는 문서 페이지(HOW_IT_WORKS.html)를 저장소의 .md 네 개에서 생성한다.</td>
+</tr>
+<tr>
+<td><code>scripts/gen-structure.mjs</code></td>
+<td>저장소 구조 문서를 코드에서 파생해 생성한다.</td>
+</tr>
+</tbody></table>
+</div><p><strong>API 라우트</strong> — 모두 <code>/api</code> 접두. 표시가 없으면 인증 없이 열려 있다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드</th>
+<th>경로</th>
+<th>인증</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><span class="method post">POST</span></td>
+<td><code>/signup</code></td>
+<td><span class="auth open">공개</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/login</code></td>
+<td><span class="auth open">공개</span></td>
+</tr>
+<tr>
+<td><span class="method delete">DELETE</span></td>
+<td><code>/session</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/recover</code></td>
+<td><span class="auth open">공개</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/bean/:key</code></td>
+<td><span class="auth open">공개</span></td>
+</tr>
+<tr>
+<td><span class="method put">PUT</span></td>
+<td><code>/bean/:key</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method delete">DELETE</span></td>
+<td><code>/bean/:key</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method patch">PATCH</span></td>
+<td><code>/bean/:key/archive</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/beans</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/beans</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/export.csv</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/import</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/logos</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method put">PUT</span></td>
+<td><code>/logos</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method delete">DELETE</span></td>
+<td><code>/logos</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/fetch</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/extract</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+</tbody></table>
+</div><p><strong>D1 테이블</strong> (<code>bnhd-v2</code>)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>테이블</th>
+<th>컬럼</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>users</code></td>
+<td><code>usercode</code>, <code>pass_hash</code>, <code>recovery_hash</code>, <code>created_at</code></td>
+</tr>
+<tr>
+<td><code>beans</code></td>
+<td><code>key</code>, <code>usercode</code>, <code>roastery</code>, <code>origin</code>, <code>region</code>, <code>producer</code>, <code>lot</code>, <code>washing_station</code>, <code>variety</code>, <code>process</code>, <code>altitude</code>, <code>harvest</code>, <code>roast_date</code>, <code>package_date</code>, <code>net_weight</code>, <code>agtron</code>, <code>tasting_note</code>, <code>memo</code>, <code>source_url</code>, <code>coffee_name</code>, <code>archived</code>, <code>created_at</code></td>
+</tr>
+<tr>
+<td><code>logos</code></td>
+<td><code>usercode</code>, <code>roastery</code>, <code>data_url</code>, <code>content_type</code>, <code>updated_at</code></td>
+</tr>
+<tr>
+<td><code>sessions</code></td>
+<td><code>token_hash</code>, <code>usercode</code>, <code>created_at</code>, <code>expires_at</code></td>
+</tr>
+<tr>
+<td><code>auth_attempts</code></td>
+<td><code>bucket</code>, <code>count</code>, <code>reset_at</code></td>
+</tr>
+<tr>
+<td><code>r2_usage</code></td>
+<td><code>id</code>, <code>month</code>, <code>write_count</code></td>
+</tr>
+<tr>
+<td><code>ai_usage</code></td>
+<td><code>bucket</code>, <code>count</code>, <code>reset_at</code></td>
+</tr>
+</tbody></table>
+</div></article>
 </main>
+</div>
 </body>
 </html>

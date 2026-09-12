@@ -24,7 +24,7 @@
 | 경로 | 역할 |
 |---|---|
 | `apps/lab/`<br>`@bnhd/lab` | 랩(등록·관리 화면)의 React 진입점 — base /lab/으로 빌드되어 dist/lab에 올라간다. |
-| `apps/web/`<br>`@bnhd/web` | — |
+| `apps/web/`<br>`@bnhd/web` | 조회·덱·데모 정적 앱 — 인쇄된 QR이 도착하는 곳. |
 | `packages/api/`<br>`@bnhd/api` | Bean-Hoarder v2 API — Hono 앱 (Cloudflare Pages Functions에 마운트). |
 | `packages/autofill/`<br>`@bnhd/autofill` | 붙여넣은 텍스트에서 원두 정보를 추출하는 휴리스틱 파서. |
 | `packages/label/`<br>`@bnhd/label` | 라벨 렌더러 단일 모듈 (@bnhd/label) 미리보기, PNG/SVG 다운로드, QR 검증이 모두 이 코드를 사용한다 (렌더러 이중화 제거). |
@@ -35,7 +35,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| `db/schema.sql` | — |
+| `db/schema.sql` | D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다. |
 | `db/seed.sql` | 로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건. |
 
 **테스트** — 단위 테스트는 각 패키지 안에 두고, 사용자 동선은 e2e가 실제 서버를 띄워 검증한다.
@@ -50,6 +50,7 @@
 | 경로 | 역할 |
 |---|---|
 | `scripts/check-docs.mjs` | 문서가 가리키는 저장소 경로와 npm 스크립트가 실제로 존재하는지 검증한다. |
+| `scripts/gen-how-it-works.mjs` | 사람이 읽는 문서 페이지(HOW_IT_WORKS.html)를 저장소의 .md 네 개에서 생성한다. |
 | `scripts/gen-structure.mjs` | 저장소 구조 문서를 코드에서 파생해 생성한다. |
 
 **API 라우트** — 모두 `/api` 접두. 표시가 없으면 인증 없이 열려 있다.
