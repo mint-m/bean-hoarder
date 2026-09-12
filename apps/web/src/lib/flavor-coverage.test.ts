@@ -99,3 +99,129 @@ test("어휘가 실제로 쓰는 계열에 이름이 겹치는 hue가 없다", (
   }
   expect([...used.entries()].filter(([, names]) => names.size > 1)).toEqual([]);
 });
+
+// ── 노트 단위 색 (#89) ─────────────────────────────────────────
+// 계열 한 색으로는 꽃 열 개가 전부 라일락이었다. 이 아래는 "노트마다 제 색"이 지켜지는지와,
+// 그 표가 어휘와 함께 움직이는지를 본다.
+import { FLAVOR_NOTE_COLORS, flavorStops, stopPositions } from "./coffee-color";
+
+const enSet = new Set(FLAVOR_NOTES.map((n) => n.en));
+
+test("노트 색 표의 모든 키가 어휘에 실존한다", () => {
+  // 어휘에서 노트를 지우면 색 표도 따라 죽어야 한다 — 죽은 키는 아무 카드도 쓰지 않는 색이다.
+  const dead = Object.keys(FLAVOR_NOTE_COLORS).filter((k) => !enSet.has(k));
+  expect(dead).toEqual([]);
+});
+
+test("계열 일반어는 표에 없다 — 계열 기본색이 곧 그 말의 색이다", () => {
+  for (const generic of [
+    "Floral",
+    "Citrus",
+    "Berry",
+    "Nutty",
+    "Spice",
+    "Tropical Fruit",
+    "Chocolate",
+    "Winey",
+  ]) {
+    expect(FLAVOR_NOTE_COLORS[generic]).toBeUndefined();
+  }
+});
+
+test("표의 모든 항목은 제 계열 기본색과 눈에 띄게 다르다 — 표는 다르게 보여야 하는 것만 든다", () => {
+  // 붉은 베리를 베리 레드로, 황도를 핵과 주황으로 적는 것은 표를 늘리기만 한다 — 그런 노트는 계열
+  // 기본색이 곧 제 색이다. 합치기 기준(hue 12·L .15)보다 가까우면 어차피 한 색으로 보인다.
+  const near: string[] = [];
+  for (const [en, m] of Object.entries(FLAVOR_NOTE_COLORS)) {
+    const f = matchFlavorFamilies(en)[0];
+    if (!f) throw new Error(`${en}: 계열 폴백이 없다`);
+    if (hueGap(m.hue, f.hue) < MIN_HUE_GAP && Math.abs(m.l - f.l) < MIN_L_GAP) near.push(`${en} ≈ ${f.name}`);
+  }
+  expect(near).toEqual([]);
+});
+
+const moodOf = (note: string) => flavorStops(note)[0]?.mood;
+const hueDist = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+
+test("이슈의 계기 — 꽃 노트들이 서로 다른 색이고, 라일락 한 색이 아니다", () => {
+  const lilac = FLAVOR_FAMILIES.find((f) => f.name === "floral");
+  if (!lilac) throw new Error("floral family missing");
+  const flowers = ["Rose", "Lavender", "Orange Blossom", "Jasmine", "Hibiscus"];
+  const moods = flowers.map((n) => {
+    const m = moodOf(n);
+    if (!m) throw new Error(`${n} has no color`);
+    return m;
+  });
+  // 라일락(계열 기본)과 같은 색인 것이 없다
+  for (const [i, m] of moods.entries()) {
+    expect(hueDist(m.hue, lilac.hue) >= 12 || Math.abs(m.l - lilac.l) >= 0.15, flowers[i]).toBe(true);
+  }
+  // 서로도 다르다 — 가까운 hue면 명도로 갈려야 한다
+  for (let i = 0; i < moods.length; i++) {
+    for (let j = i + 1; j < moods.length; j++) {
+      const a = moods[i];
+      const b = moods[j];
+      if (!a || !b) continue;
+      const distinct = hueDist(a.hue, b.hue) >= 12 || Math.abs(a.l - b.l) >= 0.15;
+      expect(distinct, `${flowers[i]} ↔ ${flowers[j]}`).toBe(true);
+    }
+  }
+  // 이슈가 짚은 방향: Rose는 레드 쪽, Orange Blossom은 크림·옐로 쪽, Lavender는 퍼플 쪽
+  expect(hueDist(moods[0]?.hue ?? 0, 15)).toBeLessThan(25);
+  expect(hueDist(moods[2]?.hue ?? 0, 75)).toBeLessThan(25);
+  expect(hueDist(moods[1]?.hue ?? 0, 290)).toBeLessThan(25);
+  // 일반어 Floral은 여전히 계열 기본색
+  expect(moodOf("Floral")).toMatchObject({ hue: lilac.hue });
+});
+
+test("표에 없는 노트와 어휘 밖 자유입력은 계열 색으로 폴백한다", () => {
+  const citrus = FLAVOR_FAMILIES.find((f) => f.name === "citrus");
+  expect(moodOf("Lemon")).toMatchObject({ hue: citrus?.hue }); // 표에 없다 — 레몬은 곧 옐로
+  expect(moodOf("Sicilian lemon peel")).toMatchObject({ hue: citrus?.hue }); // 자유입력
+  expect(flavorStops("Umami")).toEqual([]); // 어디에도 안 걸리면 빈 배열 — 호출부가 중립을 깐다
+  expect(flavorStops("")).toEqual([]);
+});
+
+test("표기 차이로 색이 갈리지 않는다", () => {
+  expect(moodOf("orange blossom")).toEqual(moodOf("Orange Blossom"));
+  expect(moodOf("ORANGE  BLOSSOM")).toEqual(moodOf("Orange Blossom"));
+});
+
+test("같은 색이 여럿이면 하나로 모여 가중치가 오른다", () => {
+  const stops = flavorStops("Jasmine, Rose, Lavender, Chocolate");
+  // 네 토큰이 네 색 — 꽃끼리도 이제 다른 색이라 합쳐지지 않는다
+  expect(stops.map((s) => s.weight)).toEqual([1, 1, 1, 1]);
+  // 같은 hue 이웃은 하나로 — Yuzu(96)·Pineapple(계열 앰버 90)·Banana(98)는 한 노란빛이다
+  const yellow = flavorStops("Yuzu, Pineapple, Banana, Chocolate");
+  expect(yellow.map((s) => [s.note, s.weight])).toEqual([
+    ["Yuzu", 3],
+    ["Chocolate", 1],
+  ]);
+  // 흰빛은 hue가 달라도 한 색 — Jasmine(95)과 Magnolia(345)
+  expect(flavorStops("Jasmine, Magnolia").map((s) => s.weight)).toEqual([2]);
+});
+
+test("stop 상한을 넘으면 가벼운 것부터 빠지고, 순서는 등장순을 지킨다", () => {
+  // 5색 → 4색. 무게가 다 1이면 뒤에 나온 것이 빠진다 — Blueberry는 둘이라 앞의 Lime이 먼저 빠진다
+  const stops = flavorStops("Rose, Cinnamon, Lavender, Blueberry, Lime, Blueberry");
+  expect(stops.map((s) => [s.note, s.weight])).toEqual([
+    ["Rose", 1],
+    ["Cinnamon", 1],
+    ["Lavender", 1],
+    ["Blueberry", 2],
+  ]);
+  // 무게가 다르면 가벼운 쪽이 앞에 있어도 빠진다 — Lavender·Blueberry(1)가 빠지고 Rose는 가장 앞이라 남는다
+  const heavy = flavorStops("Rose, Cinnamon, Cinnamon, Lavender, Blueberry, Lime, Lime", 3);
+  expect(heavy.map((s) => [s.note, s.weight])).toEqual([
+    ["Rose", 1],
+    ["Cinnamon", 2],
+    ["Lime", 2],
+  ]);
+});
+
+test("stop 위치는 가중치에 비례해 제 구간 가운데에 놓인다", () => {
+  expect(stopPositions([1, 1])).toEqual([25, 75]);
+  expect(stopPositions([3, 1])).toEqual([37.5, 87.5]);
+  expect(stopPositions([1, 1, 1])).toEqual([16.7, 50, 83.3]);
+  expect(stopPositions([1])).toEqual([50]);
+});

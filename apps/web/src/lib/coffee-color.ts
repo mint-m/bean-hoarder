@@ -2,7 +2,8 @@
 // 화면 전용이다 — 라벨 인쇄(흑백/2도)와 무관하며, 색이 없어도 정보는 성립해야 한다.
 // 산지: DB에 색을 저장하지 않는 결정론(구 origin-color.ts) 계승. 자주 쓰는 산지는 큐레이션 hue,
 // 그 외는 문자열 해시 폴백. HSL 대신 OKLCH — 어느 hue든 지각적 밝기·채도가 고르게 나온다.
-// 향미: 테이스팅 노트를 계열 키워드로 판정해 저알파 그라데이션 CSS를 만든다 — 본문 대비를
+// 향미: 테이스팅 노트를 토큰마다 색으로 옮겨 저알파 그라데이션 CSS를 만든다 — 어휘에 있는 노트는
+// 제 색(NOTE_COLORS), 어휘 밖 자유입력은 계열 키워드로 판정한 계열 색(FAMILIES). 본문 대비를
 // 해치지 않는 "무드"까지만 (#32 가시성 회귀 금지).
 
 // 기본은 라이트이고 다크는 사용자가 설정에서 켰을 때만이다 — OS 설정이 아니라 적용된 테마를 본다
@@ -53,11 +54,15 @@ export function originSignature(origin: string): string | null {
 // ── 향미 무드 그라데이션 ──
 // 계열 판정은 "노트 문자열 어딘가에 키워드가 있는가"로 충분하다 — 자유입력이라 정확 분류보다
 // 무드의 방향이 맞는 게 중요하고, 오판정해도 저알파라 해가 없다.
-export interface FlavorFamily {
-  name: string;
+/** 무드색 하나 — OKLCH. l은 라이트 모드 명도(다크는 +0.12). */
+export interface Mood {
   hue: number;
   c: number;
-  l: number; // 라이트 모드 명도 (다크는 +0.12)
+  l: number;
+}
+
+export interface FlavorFamily extends Mood {
+  name: string;
   re: RegExp;
 }
 
@@ -156,10 +161,113 @@ const FAMILIES: readonly FlavorFamily[] = [
   },
 ];
 
-const NEUTRAL: Omit<FlavorFamily, "name" | "re"> = { hue: 60, c: 0.05, l: 0.55 };
+const NEUTRAL: Mood = { hue: 60, c: 0.05, l: 0.55 };
 
-function moodColor(f: Omit<FlavorFamily, "name" | "re">, alpha: number, dark: boolean): string {
-  const l = Math.min(f.l + (dark ? 0.12 : 0), 0.85);
+// ── 노트 단위 색 ──
+// 계열 한 색으로는 꽃 열 개가 전부 라일락이었다(#89) — Rose는 레드, Lavender는 퍼플, Orange Blossom은
+// 크림인데 띠만 봐선 구별이 안 됐다. 어휘(@bnhd/schema/flavor)의 저장값(en)마다 실제 인상에 가까운
+// 색을 준다. **계열은 폴백이다** — 여기 없는 노트(계열 일반어 `Floral`·`Citrus`·`Berry`… 와 어휘 밖
+// 자유입력)만 계열 색을 받는다. 계열 기본색과 거의 같은 노트(Lemon≈citrus, Peach≈stonefruit)는 적지
+// 않는다 — 표는 "다르게 보여야 하는 것"만 든다.
+//
+// 흰 꽃·코코넛·바닐라는 "흰색"인데 저알파 워시로 흰색은 배경과 같다. 아주 밝은 크림(L .86~.88,
+// C .05~.08)으로 두어 아이보리 한 겹으로 읽히게 한다 — 더 밝히면 무매칭 중립(웜브라운)보다 덜 칠해진
+// 카드가 되고, 다크에서는 반대로 가장 밝은 회색으로 뜬다. 두 테마를 스크린샷으로 맞춘 값이다.
+//
+// 키는 어휘의 `en` 그대로 — `flavor-coverage.test.ts`가 모든 키가 어휘에 실존하는지 검사한다(어휘에서
+// 노트를 지우면 여기도 따라 죽어야 한다). 규칙의 단일 소스는 DESIGN.md §3 — 표를 고치면 그쪽도 고친다.
+const NOTE_COLORS: Readonly<Record<string, Mood>> = {
+  // 꽃 — 계열 기본은 라일락(305)
+  Jasmine: { hue: 95, c: 0.06, l: 0.87 }, // 화이트 — 라이트에서는 아이보리 한 겹
+  Rose: { hue: 5, c: 0.15, l: 0.68 }, // 핑크레드
+  Magnolia: { hue: 345, c: 0.06, l: 0.87 }, // 연한 핑크 화이트
+  Osmanthus: { hue: 75, c: 0.13, l: 0.8 }, // 금빛 살구
+  Lavender: { hue: 280, c: 0.13, l: 0.64 }, // 퍼플블루 — 계열 라일락(305)과 눈으로 갈릴 만큼 블루 쪽
+  Hibiscus: { hue: 352, c: 0.17, l: 0.5 }, // 딥 핑크레드 — Rose(L .68)와는 명도로 갈린다
+  Chamomile: { hue: 98, c: 0.11, l: 0.88 }, // 연한 옐로
+  Elderflower: { hue: 120, c: 0.06, l: 0.87 }, // 흰빛 그린
+  "Orange Blossom": { hue: 68, c: 0.09, l: 0.88 }, // 크림 오렌지
+  // 시트러스 — 계열 기본은 옐로(115)
+  Lime: { hue: 135, c: 0.15, l: 0.78 },
+  Orange: { hue: 60, c: 0.17, l: 0.74 },
+  "Orange Peel": { hue: 58, c: 0.16, l: 0.7 },
+  Mandarin: { hue: 55, c: 0.17, l: 0.74 },
+  Tangerine: { hue: 52, c: 0.18, l: 0.72 },
+  Grapefruit: { hue: 30, c: 0.14, l: 0.74 }, // 핑크오렌지
+  Bergamot: { hue: 128, c: 0.13, l: 0.8 }, // 옐로그린 — 껍질의 색, 레몬 옐로와 갈린다
+  Yuzu: { hue: 96, c: 0.16, l: 0.84 },
+  Lemongrass: { hue: 130, c: 0.1, l: 0.82 },
+  // 베리 — 계열 기본은 레드(15). 붉은 베리(Strawberry·Cherry·Cranberry…)는 그 기본색이 곧 제 색이다.
+  Blueberry: { hue: 275, c: 0.12, l: 0.48 }, // 블루바이올렛
+  Blackberry: { hue: 320, c: 0.1, l: 0.36 }, // 딥 퍼플
+  "Black Currant": { hue: 315, c: 0.11, l: 0.38 },
+  Cassis: { hue: 315, c: 0.11, l: 0.38 },
+  Plum: { hue: 325, c: 0.12, l: 0.48 },
+  Prune: { hue: 340, c: 0.07, l: 0.36 },
+  Grape: { hue: 300, c: 0.11, l: 0.52 },
+  "White Grape": { hue: 125, c: 0.1, l: 0.84 }, // 청포도 — 계열은 베리지만 색은 연두
+  "Concord Grape": { hue: 295, c: 0.13, l: 0.42 },
+  // 핵과·과수 — 핵과 기본은 살구빛 주황(58), 초록 과일 기본은 연두(145). 황도·살구·풋사과는 기본색 그대로.
+  "White Peach": { hue: 350, c: 0.08, l: 0.86 }, // 연한 핑크 화이트
+  "Red Apple": { hue: 22, c: 0.17, l: 0.62 },
+  Pear: { hue: 110, c: 0.1, l: 0.84 },
+  Melon: { hue: 130, c: 0.09, l: 0.86 },
+  Watermelon: { hue: 15, c: 0.16, l: 0.66 },
+  // 열대 — 계열 기본은 앰버(90)
+  Mango: { hue: 65, c: 0.18, l: 0.76 },
+  "Passion Fruit": { hue: 78, c: 0.17, l: 0.74 },
+  Papaya: { hue: 45, c: 0.16, l: 0.72 }, // 코랄 오렌지
+  Guava: { hue: 10, c: 0.13, l: 0.74 }, // 핑크
+  Lychee: { hue: 355, c: 0.07, l: 0.86 },
+  Banana: { hue: 98, c: 0.15, l: 0.88 },
+  Coconut: { hue: 85, c: 0.05, l: 0.88 }, // 화이트
+  // 초콜릿 — 계열 기본은 딥 브라운(40, L .34)이라 다크는 그대로, 밀크만 밝힌다
+  "Milk Chocolate": { hue: 50, c: 0.09, l: 0.5 }, // 기본(다크)보다 한 단계 밝다
+  // 견과·단맛 — 계열 기본은 탠(70, L .56)
+  Almond: { hue: 75, c: 0.07, l: 0.72 },
+  Walnut: { hue: 55, c: 0.06, l: 0.46 },
+  Pecan: { hue: 50, c: 0.09, l: 0.44 },
+  Toffee: { hue: 58, c: 0.12, l: 0.52 },
+  Butterscotch: { hue: 75, c: 0.14, l: 0.72 },
+  "Brown Sugar": { hue: 55, c: 0.09, l: 0.42 },
+  Molasses: { hue: 45, c: 0.06, l: 0.3 },
+  Honey: { hue: 82, c: 0.15, l: 0.76 }, // 골든
+  Vanilla: { hue: 88, c: 0.07, l: 0.88 }, // 크림
+  // 향신료·차 — 계열 기본은 틸(190). 실제 향신료는 대부분 갈색이라 계열색과 가장 멀다.
+  Cinnamon: { hue: 40, c: 0.12, l: 0.5 }, // 레드브라운
+  Clove: { hue: 45, c: 0.07, l: 0.36 },
+  Cardamom: { hue: 150, c: 0.06, l: 0.62 }, // 회녹색
+  Nutmeg: { hue: 60, c: 0.08, l: 0.5 },
+  Ginger: { hue: 85, c: 0.1, l: 0.76 },
+  "Black Pepper": { hue: 60, c: 0.02, l: 0.36 }, // 차콜
+  Herbal: { hue: 150, c: 0.1, l: 0.58 }, // 그린
+  "Black Tea": { hue: 40, c: 0.1, l: 0.44 },
+  "Green Tea": { hue: 145, c: 0.1, l: 0.66 },
+  "Earl Grey": { hue: 50, c: 0.08, l: 0.5 },
+  Tobacco: { hue: 55, c: 0.07, l: 0.34 },
+  Cedar: { hue: 45, c: 0.09, l: 0.48 },
+  // 발효·주류 — 계열 기본은 딥 퍼플레드(340, L .40)
+  "Red Wine": { hue: 15, c: 0.15, l: 0.38 },
+  "White Wine": { hue: 100, c: 0.08, l: 0.86 },
+  Rum: { hue: 60, c: 0.12, l: 0.48 },
+  Whiskey: { hue: 70, c: 0.14, l: 0.56 },
+  Brandy: { hue: 55, c: 0.13, l: 0.5 },
+};
+
+/** 노트 색 표 자체 — 키가 어휘에 실존하는지 검사하는 테스트가 읽는다. */
+export const FLAVOR_NOTE_COLORS: Readonly<Record<string, Mood>> = NOTE_COLORS;
+
+// 저장값은 어휘의 en으로 정규화돼 들어오지만(canonicalizeNotes) 대소문자·공백 차이까지 색이 갈리면
+// 안 된다 — 어휘 검색(@bnhd/schema/flavor의 norm)과 같은 규칙으로 키를 맞춘다.
+const normKey = (s: string): string => s.toLowerCase().replace(/\s+/g, "");
+const NOTE_BY_KEY: ReadonlyMap<string, Mood> = new Map(
+  Object.entries(NOTE_COLORS).map(([en, mood]) => [normKey(en), mood]),
+);
+
+function moodColor(f: Mood, alpha: number, dark: boolean): string {
+  // 다크는 어두운 표면 위에서 살리려 밝히되 .85에서 멈춘다. 라이트는 흰 꽃(L .9대)이 그대로 나가야
+  // 크림으로 읽힌다 — 단일 계열의 두 번째 단계(+0.14)만 .95에서 자른다.
+  const l = dark ? Math.min(f.l + 0.12, 0.85) : Math.min(f.l, 0.95);
   return `oklch(${l} ${f.c} ${f.hue} / ${alpha})`;
 }
 
@@ -182,9 +290,94 @@ export function matchFlavorFamilies(notes: string): FlavorFamily[] {
     .map((x) => x.f);
 }
 
+/** 그라데이션의 색 하나 — 무드와, 그 색으로 판정된 토큰 수(가중치). */
+export interface FlavorStop {
+  mood: Mood;
+  /** 이 색으로 모인 토큰 수 — 띠에서 차지하는 면적이 이에 비례한다 */
+  weight: number;
+  /** 첫 토큰 원문 — 테스트·디버깅용 */
+  note: string;
+}
+
+// 두 색을 하나로 합칠 기준. 계열 간 거리 검사(flavor-coverage.test.ts)의 "hue 12도"와 같은 눈금이다 —
+// 그보다 가까우면 저알파 워시에서는 한 색이라, 따로 두면 `Lemon, Yuzu, Lime`가 노란 줄무늬 셋이 된다.
+// 흰빛(C가 아주 낮은 색)은 hue가 의미가 없으므로 명도만 본다 — Jasmine(95)·Magnolia(345)는 둘 다 흰 꽃이다.
+const MERGE_HUE = 12;
+const MERGE_L = 0.15;
+const ACHROMATIC_C = 0.08;
+
+function hueGap(a: number, b: number): number {
+  const raw = Math.abs(a - b);
+  return Math.min(raw, 360 - raw);
+}
+
+function sameMood(a: Mood, b: Mood): boolean {
+  if (Math.abs(a.l - b.l) >= MERGE_L) return false;
+  if (a.c < ACHROMATIC_C && b.c < ACHROMATIC_C) return true;
+  return hueGap(a.hue, b.hue) < MERGE_HUE;
+}
+
+/** 토큰 하나의 색 — 어휘 노트면 제 색, 아니면 계열 폴백, 어디에도 안 걸리면 null. */
+function tokenMood(token: string): Mood | null {
+  const own = NOTE_BY_KEY.get(normKey(token));
+  if (own) return own;
+  const fam = matchFlavorFamilies(token)[0];
+  return fam ? { hue: fam.hue, c: fam.c, l: fam.l } : null;
+}
+
+/** 조회 카드가 칩을 쪼개는 것과 같은 구분자 — 색이 칩 단위로 매겨져야 둘이 맞는다. */
+const splitNotes = (raw: string): string[] =>
+  raw
+    .split(/[,·]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+/**
+ * 테이스팅 노트 → 그라데이션 색 목록. 순수 함수 — 테마를 읽지 않아 Node 테스트가 직접 검사한다.
+ *
+ * 토큰마다 색을 매기고(tokenMood), 눈으로 한 색인 것은 하나로 모아 가중치를 올린다(sameMood).
+ * 등장 순서를 지키되 `max`를 넘으면 **가중치가 낮은 것부터** 뺀다 — 많이 쓰인 계열이 살아남아야
+ * "비슷한 게 많으면 그쪽이 짙어진다"가 성립한다. 색을 하나도 못 매기면 빈 배열(호출부가 중립을 깐다).
+ */
+export function flavorStops(notes: string, max = 4): FlavorStop[] {
+  const groups: FlavorStop[] = [];
+  for (const token of splitNotes(notes || "")) {
+    const mood = tokenMood(token);
+    if (!mood) continue;
+    const near = groups.find((g) => sameMood(g.mood, mood));
+    if (near) near.weight += 1;
+    else groups.push({ mood, weight: 1, note: token });
+  }
+  if (groups.length <= max) return groups;
+  // 가벼운 것부터 떨어내되, 같은 무게면 뒤에 나온 것이 먼저 빠진다
+  const keep = new Set(
+    groups
+      .map((g, i) => ({ g, i }))
+      .sort((a, b) => b.g.weight - a.g.weight || a.i - b.i)
+      .slice(0, max)
+      .map((x) => x.g),
+  );
+  return groups.filter((g) => keep.has(g));
+}
+
+/**
+ * 가중치 → 각 색의 stop 위치(%). 색을 제 구간의 **가운데**에 놓는다 — 3:1이면 37.5%와 87.5%.
+ * 양 끝(0·100)에 놓으면 색이 둘일 때 가중치가 사라진다. 소수 첫째 자리까지.
+ */
+export function stopPositions(weights: readonly number[]): number[] {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  return weights.map((w) => {
+    const mid = ((acc + w / 2) / total) * 100;
+    acc += w;
+    return Math.round(mid * 10) / 10;
+  });
+}
+
 /**
  * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
- * 검출된 계열을 노트 등장 순서대로 최대 3색. 매칭 없으면 중립 웜브라운, 노트가 비면 null.
+ * 색은 노트 단위(flavorStops) — 같은 색이 여럿이면 그 색이 띠를 더 차지한다. 색이 하나면 같은 hue의
+ * 명도 두 단계, 매칭이 없으면 중립 웜브라운, 노트가 비면 null.
  * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
  */
 export function flavorGradient(notes: string): string | null {
@@ -192,16 +385,19 @@ export function flavorGradient(notes: string): string | null {
   if (!raw) return null;
   const dark = isDark();
   // 벌려 놓은 hue도 알파가 너무 낮으면 회색빛 한 겹으로 뭉개진다 — 계열이 읽히는 선까지만 올린다.
-  // 밴드 위에 헤드라인·로스터리가 얹히므로 더 올리지는 않는다(텍스트 대비가 먼저다).
+  // 밴드 위에 헤드라인·로스터리가 얹히므로 더 올리지는 않는다(텍스트 대비가 먼저다). 가중치도 알파가
+  // 아니라 면적으로 드러낸다 — 같은 이유다.
   const alpha = dark ? 0.26 : 0.19;
 
-  const hits = matchFlavorFamilies(raw);
+  const stops = flavorStops(raw);
 
-  const single = hits.length === 1 ? hits[0] : hits.length === 0 ? NEUTRAL : null;
-  const stops = single
-    ? // 단일 계열(또는 무매칭 → 중립 웜브라운) — 같은 hue의 명도 두 단계
+  const single = stops.length === 1 ? stops[0]?.mood : stops.length === 0 ? NEUTRAL : null;
+  const css = single
+    ? // 단일 색(또는 무매칭 → 중립 웜브라운) — 같은 hue의 명도 두 단계
       [moodColor(single, alpha, dark), moodColor({ ...single, l: single.l + 0.14 }, alpha * 0.7, dark)]
-    : // 뒤 계열을 너무 죽이면 두 계열짜리 노트가 단일 계열처럼 보인다 — 순서만 드러날 만큼만 뺀다
-      hits.map((f, i) => moodColor(f, alpha * (1 - i * 0.12), dark));
-  return `linear-gradient(135deg, ${stops.join(", ")})`;
+    : // 뒤 색을 너무 죽이면 두 색짜리 노트가 단일 색처럼 보인다 — 순서만 드러날 만큼만 뺀다
+      stopPositions(stops.map((s) => s.weight)).map(
+        (pos, i) => `${moodColor(stops[i]?.mood ?? NEUTRAL, alpha * (1 - i * 0.12), dark)} ${pos}%`,
+      );
+  return `linear-gradient(135deg, ${css.join(", ")})`;
 }
