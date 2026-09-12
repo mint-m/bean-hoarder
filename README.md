@@ -87,6 +87,9 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 - **의존성 갱신**: `.github/dependabot.yml`이 매주 월요일 `main`으로 PR을 연다(액션은 월 1회). 자동 병합은 켜지 않는다 — `main` 푸시가 프리뷰 배포를 트리거하므로 사람이 검사 결과를 보고 병합한다. Cloudflare 툴체인(`wrangler`·`miniflare`·`@cloudflare/*`)은 한 PR로 묶여 오고, `hono`·`drizzle-orm`·`zod` 같은 런타임 의존성은 API 계약에 닿으므로 개별 PR로 온다.
 - **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
+- **관리자**: `npx wrangler pages secret put ADMIN_USERCODES` — 관리자로 쓸 **본인 계정의 유저코드**를 콤마로 나열한다(예: `ABCD,EFGH`). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩에 **관리**가 뜨고(`/api/me`), 아니면 `/api/admin/*`은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.
+- **가입 모드**: 관리 화면에서 **초대코드 / 누구나 / 받지 않음** 셋 중 하나 — D1 `settings` 테이블의 `signup_mode`. 초대코드 값 자체는 여전히 위 secret이고, 여기서 바꾸는 것은 "지금 문이 열려 있는가"뿐이다. 행이 없으면 초대코드(종전 동작).
+- **향미 어휘 승격**: 관리 화면 "향미 승격 후보"가 어휘(`packages/schema/src/flavor.ts`)에 없는데 등록된 노트를 건수·사용자 수와 함께 보여 준다. **승격은 PR로** — 그 파일에 한 줄 + `apps/web/src/lib/coffee-color.ts`의 노트 색. 색 없이 노트만 더하면 `flavor-coverage.test.ts`가 막는다. 오타 후보(`Bergamott`)는 승격하지 않는다.
 - **AI 인식 키(선택)**: `npx wrangler pages secret put GEMINI_API_KEY` — 키를 넣지 않으면 AI 대행이 503으로 응답하고 클라이언트가 규칙 기반 인식으로 내려가므로 서비스는 그대로 동작한다. 하루 한도는 계정별 10회·전역 100회(`packages/api/src/lib/ai-quota.ts`) — 무료 등급을 넘겨 조용히 죽는 대신 코드가 먼저 막는다.
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
 - **R2 비용 백스톱**: 로고 저장(`PUT /api/logos`)에 서비스 전역 물리적 상한 내장(`packages/api/src/lib/budget.ts`) — 월간 R2 쓰기 10만 회·R2 저장 로고 2만 개 초과 시 503으로 저장 거부(무료 티어를 넘겨 과금되기 전에 차단). 삭제는 무과금이라 제한하지 않는다(한도에 걸려도 삭제로 공간 확보 가능). 코드 밖 안전망으로 **Cloudflare 대시보드 → R2/Billing 사용량 알림**을 별도로 설정할 것(대시보드 예산은 서비스를 멈추지 않는 알림뿐이라 코드 백스톱이 실제 상한).
@@ -124,9 +127,11 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
+# (ADMIN_USERCODES=TEST: 시드 계정을 관리자로 — 로컬에서 관리 화면을 보려면)
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
