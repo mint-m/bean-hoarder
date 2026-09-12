@@ -37,6 +37,7 @@ export const FLAVOR_NOTES: readonly FlavorNote[] = [
   { en: "Chamomile", ko: "캐모마일" },
   { en: "Elderflower", ko: "엘더플라워" },
   { en: "Orange Blossom", ko: "오렌지꽃" },
+  { en: "Acacia", ko: "아카시아" },
   // ── 시트러스 ──
   { en: "Citrus", ko: "시트러스" },
   { en: "Lemon", ko: "레몬" },
@@ -102,6 +103,7 @@ export const FLAVOR_NOTES: readonly FlavorNote[] = [
   { en: "Peanut", ko: "땅콩" },
   { en: "Walnut", ko: "호두" },
   { en: "Pecan", ko: "피칸" },
+  { en: "Macadamia", ko: "마카다미아" },
   { en: "Caramel", ko: "캐러멜", alias: ["카라멜"] },
   { en: "Toffee", ko: "토피" },
   { en: "Butterscotch", ko: "버터스카치" },
@@ -121,6 +123,7 @@ export const FLAVOR_NOTES: readonly FlavorNote[] = [
   { en: "Herbal", ko: "허브" },
   { en: "Black Tea", ko: "홍차" },
   { en: "Green Tea", ko: "녹차" },
+  { en: "White Tea", ko: "백차", alias: ["화이트티"] },
   { en: "Earl Grey", ko: "얼그레이" },
   { en: "Tobacco", ko: "담배" },
   { en: "Cedar", ko: "삼나무" },

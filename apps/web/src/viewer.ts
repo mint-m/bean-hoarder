@@ -199,7 +199,7 @@ function render(row: HeadlineRow, isPreview: boolean): void {
     swatch.style.background = swatchColor;
     swatch.title = g("ORIGIN");
   }
-  el("f-band").style.backgroundImage = flavorGradient(g("TASTING_NOTE")) || "";
+  el("f-band").style.backgroundImage = flavorGradient(g("TASTING_NOTE"), g("AGTRON")) || "";
 
   // 시그니쳐명일 땐 국가를 서브라인에 보존, 헤드라인이 이미 쓴 지역·생산자는 제외(중복 방지)
   const subParts: string[] = [];
