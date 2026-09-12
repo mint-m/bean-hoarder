@@ -165,6 +165,11 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
     같은 결이 많을수록 그 톤이 짙어진다. 악센트는 제 채도 그대로 — 갈색 몸통 위에 오렌지 포인트가 산다.
     **알파는 전 stop 동일**(라이트 .19 / 다크 .26) — 악센트를 물리지 않고, 텍스트 대비(#32)도 지킨다.
   - **상한 4 stop** — 넘으면 악센트를 면적 작은 것부터, 그래도 넘으면 메인 안에서 면적 작은 것부터 뺀다.
+  - **로스팅이 누른다** — `AGTRON`이 **미디움(#65)부터** 띠 전체의 명도를 빼고 채도를 곱한다:
+    Medium −.04/×.95 · Medium Dark −.09/×.85 · Dark −.14/×.75 (명도 바닥 .15). 미디움 이상부터 다크로
+    갈수록 향미에 로스팅 개성이 크게 개입하므로(과일이 눌리고 로스트가 앞선다) 띠도 그만큼 어둡고
+    차분해져야 인상이 맞는다. 라이트 세 단계는 손대지 않는다. 알파는 그대로 — 다크 모드에서는 표면에
+    가까워져 워시가 옅어지는 쪽으로 같은 "가라앉음"이 나온다.
   - **왜 두 가중치를 섞지 않는가** — 순서 가산이 톤 계산에도 들어가면 `Orange, Dark Chocolate, Brown Sugar`에서
     오렌지 1.5 vs 갈색 2가 2/3 규칙에 걸려 공동 메인이 된다. 원하는 것은 "톤은 갈색, 오렌지는 묻히지 않는
     포인트"다 — 톤은 개수로만 정하고 순서는 면적에서만 산다.
@@ -187,6 +192,7 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
 ### 로스팅 레벨 — 원두 색 견본
 - 애그트론 6단계(`#120 울트라라이트` … `#45 다크`)에 **실제 분쇄 원두 색에 가까운 단색**을 하나씩 준다.
   국가·향미와 달리 이 색은 무드가 아니라 **사실**이다 — 그래서 생성하지 않고 손으로 고정한 표다.
+  같은 축이 향미 그라데이션도 누른다(위 "로스팅이 누른다") — 스와치는 사실을, 그늘은 인상을 맡는다.
 - **구현**: OKLCH, 밝기가 애그트론 순서를 그대로 따른다(숫자가 클수록 밝다). 값의 단일 소스는
   [packages/schema/src/roast.ts](packages/schema/src/roast.ts) — 등록 폼·조회 카드·AI 프롬프트가 함께 쓴다.
 - **적용**: 등록 폼의 로스팅 레벨 추천 칩(`.chip-swatch`)과 조회 카드 티켓 행의 `ROAST` 값 앞
@@ -196,7 +202,7 @@ Bean-Hoarder의 시각 언어를 한곳에 모은 단일 기준이다. **토큰 
   한 겹으로 윤곽을 지킨다.
 
 > 구현 노트: 국가·향미 엔진 모두 [apps/web/src/lib/coffee-color.ts](apps/web/src/lib/coffee-color.ts)
-> (`originSignature` · `flavorGradient` · `flavorStops` · `boostedMood` · `matchFlavorFamilies`), 로스팅 레벨은
+> (`originSignature` · `flavorGradient` · `flavorStops` · `boostedMood` · `roastShade` · `matchFlavorFamilies`), 로스팅 레벨은
 > [packages/schema/src/roast.ts](packages/schema/src/roast.ts). 규칙의 단일 소스는 이 문서 —
 > 계열표·노트 색 표를 바꾸면 코드도 함께 고친다. 반대로 **향미 어휘**(`@bnhd/schema/flavor`)에 노트를
 > 더할 때는 계열 정규식에 걸리는지 `apps/web/src/lib/flavor-coverage.test.ts`가 전수로 검사한다 — 같은

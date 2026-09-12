@@ -44,7 +44,7 @@ export function walletCardHTML(b: HeadlineRow, { notes: notesEnabled, menu }: Wa
   // 스택 상태에서 보이는 유일한 영역이 밴드이므로, 여기가 카드의 "색 띠" 정체성을 전부 짊어진다.
   const color = originSignature(g("ORIGIN"));
   const dot = color ? `<span class="w-origin-dot" style="background:${color}"></span>` : "";
-  const grad = flavorGradient(g("TASTING_NOTE"));
+  const grad = flavorGradient(g("TASTING_NOTE"), g("AGTRON"));
   const bandStyle = grad ? ` style="background-image:${grad}"` : "";
   const archivedClass = b.ARCHIVED ? " archived" : "";
   return `<div class="wcard${archivedClass}" tabindex="0" role="link"

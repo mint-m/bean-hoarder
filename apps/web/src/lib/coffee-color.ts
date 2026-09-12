@@ -1,4 +1,6 @@
 // 커피 컬러 엔진 — 산지 시그니처 모노컬러 + 향미 무드 그라데이션 (DESIGN.md §3의 구현).
+// 로스팅 레벨은 향미 그라데이션의 명도·채도를 누른다 — 미디움부터 다크로 갈수록 향미에 로스팅의 개성이
+// 개입하므로(과일이 눌리고 로스트가 앞선다) 띠도 그만큼 어둡고 차분해져야 인상이 맞는다.
 // 화면 전용이다 — 라벨 인쇄(흑백/2도)와 무관하며, 색이 없어도 정보는 성립해야 한다.
 // 산지: DB에 색을 저장하지 않는 결정론(구 origin-color.ts) 계승. 자주 쓰는 산지는 큐레이션 hue,
 // 그 외는 문자열 해시 폴백. HSL 대신 OKLCH — 어느 hue든 지각적 밝기·채도가 고르게 나온다.
@@ -9,6 +11,8 @@
 
 // 기본은 라이트이고 다크는 사용자가 설정에서 켰을 때만이다 — OS 설정이 아니라 적용된 테마를 본다
 // (theme.css의 :root[data-theme="dark"]와 같은 기준이어야 색이 배경과 어긋나지 않는다).
+import { parseRoastLevel, type RoastLevel } from "@bnhd/schema/roast";
+
 function isDark(): boolean {
   return document.documentElement.dataset.theme === "dark";
 }
@@ -454,25 +458,58 @@ export function stopPositions(weights: readonly number[]): number[] {
   });
 }
 
+/** 로스팅이 향미 색을 누르는 정도 — 명도를 빼고(dl) 채도를 곱한다(cx). */
+export interface RoastShade {
+  dl: number;
+  cx: number;
+}
+const NO_SHADE: RoastShade = { dl: 0, cx: 1 };
+/**
+ * 애그트론 → 그늘. **미디움(#65)부터** 건다 — 그 위 세 단계는 향미가 로스트보다 앞서므로 손대지 않는다.
+ * 다크로 갈수록 향미에 로스팅 개성이 크게 개입하니 띠도 어둡고 차분해진다. 알파는 건드리지 않는다.
+ */
+const ROAST_SHADES: Readonly<Record<number, RoastShade>> = {
+  65: { dl: 0.04, cx: 0.95 }, // Medium — 살짝 가라앉는다
+  55: { dl: 0.09, cx: 0.85 }, // Medium Dark — 과일이 눌리기 시작
+  45: { dl: 0.14, cx: 0.75 }, // Dark — 로스트가 앞선다
+};
+/** 명도 바닥 — 그늘을 얹어도 색이 검정으로 죽지 않게 */
+const SHADE_L_MIN = 0.15;
+
+export function roastShade(level: RoastLevel | null): RoastShade {
+  return (level && ROAST_SHADES[level.agtron]) || NO_SHADE;
+}
+
+export function shadeMood(mood: Mood, shade: RoastShade): Mood {
+  if (shade === NO_SHADE) return mood;
+  return {
+    ...mood,
+    l: Math.max(Math.round((mood.l - shade.dl) * 1000) / 1000, SHADE_L_MIN),
+    c: Math.round(mood.c * shade.cx * 1000) / 1000,
+  };
+}
+
 /**
  * 테이스팅 노트 → 무드 그라데이션 CSS (linear-gradient 문자열).
  * 색은 노트 단위(flavorStops)이고, 톤은 개수·순서는 면적으로 드러난다(boostedMood·stopArea). 색이 하나면
  * 같은 hue의 명도 두 단계, 매칭이 없으면 중립 웜브라운, 노트가 비면 null.
+ * `roast`(AGTRON 저장값)가 미디움 이상이면 전체를 그만큼 어둡고 차분하게 누른다(roastShade).
  * 저알파라 어떤 배경 위에서도 텍스트 대비를 깨지 않는다.
  */
-export function flavorGradient(notes: string): string | null {
+export function flavorGradient(notes: string, roast = ""): string | null {
   const raw = (notes || "").trim();
   if (!raw) return null;
   const dark = isDark();
+  const shade = roastShade(parseRoastLevel(roast));
   // 벌려 놓은 hue도 알파가 너무 낮으면 회색빛 한 겹으로 뭉개진다 — 계열이 읽히는 선까지만 올린다.
   // 밴드 위에 헤드라인·로스터리가 얹히므로 더 올리지는 않는다(텍스트 대비가 먼저다). 톤도 알파가 아니라
   // 면적·채도로 드러낸다 — 같은 이유다. 모든 stop이 같은 알파라 악센트가 물리지 않는다.
   const alpha = dark ? 0.26 : 0.19;
 
   const stops = flavorStops(raw);
-  const moods = stops.map((s) => boostedMood(s.mood, s.role, s.groupCount));
+  const moods = stops.map((s) => shadeMood(boostedMood(s.mood, s.role, s.groupCount), shade));
 
-  const single = moods.length === 1 ? moods[0] : moods.length === 0 ? NEUTRAL : null;
+  const single = moods.length === 1 ? moods[0] : moods.length === 0 ? shadeMood(NEUTRAL, shade) : null;
   const css = single
     ? // 단일 색(또는 무매칭 → 중립 웜브라운) — 같은 hue의 명도 두 단계
       [moodColor(single, alpha, dark), moodColor({ ...single, l: single.l + 0.14 }, alpha * 0.7, dark)]

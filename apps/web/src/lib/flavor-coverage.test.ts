@@ -331,3 +331,40 @@ test("stop 위치는 가중치에 비례해 제 구간 가운데에 놓인다", 
   expect(stopPositions([1, 1, 1])).toEqual([16.7, 50, 83.3]);
   expect(stopPositions([1])).toEqual([50]);
 });
+
+// ── 로스팅 레벨 — 미디움부터 다크로 갈수록 띠가 어둡고 차분해진다 ────────
+import { parseRoastLevel } from "@bnhd/schema/roast";
+import { roastShade, shadeMood } from "./coffee-color";
+
+const firstL = (css: string | null) => Number(/oklch\(([\d.]+) /.exec(css ?? "")?.[1]);
+const firstC = (css: string | null) => Number(/oklch\([\d.]+ ([\d.]+) /.exec(css ?? "")?.[1]);
+
+test("로스팅 그늘은 미디움부터 걸리고 다크로 갈수록 깊어진다", () => {
+  const shade = (v: string) => roastShade(parseRoastLevel(v));
+  expect(shade("#120 (Ultra Light)")).toEqual({ dl: 0, cx: 1 });
+  expect(shade("#95 (Light)")).toEqual({ dl: 0, cx: 1 });
+  expect(shade("#75 (Medium Light)")).toEqual({ dl: 0, cx: 1 });
+  expect(shade("#65 (Medium)")).toEqual({ dl: 0.04, cx: 0.95 });
+  expect(shade("#55 (Medium Dark)")).toEqual({ dl: 0.09, cx: 0.85 });
+  expect(shade("#45 (Dark)")).toEqual({ dl: 0.14, cx: 0.75 });
+  expect(shade("")).toEqual({ dl: 0, cx: 1 }); // 값이 없으면 손대지 않는다
+  expect(shade("Full City")).toEqual({ dl: 0.14, cx: 0.75 }); // 표기가 달라도 parseRoastLevel이 붙여 준다
+});
+
+test("같은 노트도 로스팅이 어두우면 띠가 어둡고 채도가 낮다 — 라이트는 그대로", () => {
+  const notes = "Dark Chocolate, Brown Sugar, Orange";
+  const base = flavorGradient(notes);
+  expect(flavorGradient(notes, "#95 (Light)")).toBe(base);
+  const dark = flavorGradient(notes, "#45 (Dark)");
+  expect(firstL(dark)).toBeCloseTo(firstL(base) - 0.14, 3);
+  expect(firstC(dark)).toBeLessThan(firstC(base));
+  // 알파는 그대로 — 어둡게 하는 것은 명도·채도지 워시의 두께가 아니다
+  expect(dark).toContain("/ 0.19)");
+  // 무매칭 중립도 같이 눌린다
+  expect(firstL(flavorGradient("Umami", "#45 (Dark)"))).toBeCloseTo(0.55 - 0.14, 3);
+});
+
+test("그늘을 얹어도 명도는 바닥(.15) 아래로 내려가지 않는다", () => {
+  expect(shadeMood({ hue: 45, c: 0.06, l: 0.3 }, roastShade(parseRoastLevel("#45"))).l).toBe(0.16);
+  expect(shadeMood({ hue: 45, c: 0.06, l: 0.2 }, roastShade(parseRoastLevel("#45"))).l).toBe(0.15);
+});
