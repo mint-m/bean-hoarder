@@ -8,8 +8,12 @@ import { sha256hex } from "../src/lib/crypto";
 
 const INVITE = "TEST-INVITE";
 
-async function api(path: string, init?: RequestInit): Promise<Response> {
-  return app.fetch(new Request(`https://bnhd.pages.dev/api${path}`, init), env);
+async function api(
+  path: string,
+  init?: RequestInit,
+  envOverride: Partial<typeof env> = {},
+): Promise<Response> {
+  return app.fetch(new Request(`https://bnhd.pages.dev/api${path}`, init), { ...env, ...envOverride });
 }
 
 function jsonBody(obj: unknown): RequestInit {
@@ -674,4 +678,125 @@ test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리
   expect(await remainingAiCalls(db, uc, quota)).toBe(2);
   await releaseAiCall(db, uc);
   expect(await remainingAiCalls(db, uc, quota)).toBe(3);
+});
+
+// ── 내 계정 · 관리자 (#88 · #72) ─────────────────────────────
+
+test("GET /api/me: 인증 필요, 관리자 여부와 AI 한도를 준다 — 한도 숫자는 서버가 단일 소스다", async () => {
+  expect((await api("/me")).status).toBe(401);
+  const user = await signupUser();
+  const me = (await (await api("/me", { headers: user.auth })).json()) as {
+    ok: boolean;
+    usercode: string;
+    is_admin: boolean;
+    ai_quota: { limit: number; remaining: number };
+  };
+  expect(me).toMatchObject({ ok: true, usercode: user.usercode, is_admin: false });
+  expect(me.ai_quota.limit).toBeGreaterThan(0);
+  expect(me.ai_quota.remaining).toBe(me.ai_quota.limit);
+  // ADMIN_USERCODES에 있으면 관리자 — 대소문자·공백은 무시한다
+  const admin = (await (
+    await api("/me", { headers: user.auth }, { ADMIN_USERCODES: ` zzzz , ${user.usercode.toLowerCase()} ` })
+  ).json()) as { is_admin: boolean };
+  expect(admin.is_admin).toBe(true);
+});
+
+test("관리 엔드포인트: 관리자가 아니면 404 — 존재를 알리지 않는다. secret이 없어도 404", async () => {
+  const user = await signupUser();
+  for (const path of ["/admin/stats", "/admin/flavor-candidates", "/admin/settings"]) {
+    const res = await api(path, { headers: user.auth });
+    expect(res.status, path).toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("not found");
+    expect((await api(path, { headers: user.auth }, { ADMIN_USERCODES: "" })).status, path).toBe(404);
+  }
+  expect((await api("/admin/stats")).status).toBe(401); // 인증이 먼저다
+  const ok = await api("/admin/stats", { headers: user.auth }, { ADMIN_USERCODES: user.usercode });
+  expect(ok.status).toBe(200);
+});
+
+test("관리자 통계: 계정·원두·가입 추이·계정별 표를 읽는다", async () => {
+  const admin = await signupUser();
+  const other = await signupUser();
+  await addBean(admin.auth);
+  await addBean(other.auth);
+  await addBean(other.auth, { ARCHIVED: "1" });
+  const env2 = { ADMIN_USERCODES: admin.usercode };
+  const stats = (await (await api("/admin/stats", { headers: admin.auth }, env2)).json()) as {
+    ok: boolean;
+    users: number;
+    beans: { total: number; archived: number };
+    signups_by_month: { month: string; n: number }[];
+    accounts: { usercode: string; beans: number; last_bean: string | null }[];
+    logos: number;
+    ai_today: { global: number; accounts: number };
+  };
+  expect(stats.ok).toBe(true);
+  expect(stats.users).toBeGreaterThanOrEqual(2);
+  expect(stats.beans.total).toBeGreaterThanOrEqual(2);
+  expect(stats.signups_by_month[0]?.month).toMatch(/^\d{4}-\d{2}$/);
+  const row = stats.accounts.find((a) => a.usercode === other.usercode);
+  expect(row?.beans).toBeGreaterThanOrEqual(1);
+  expect(row?.last_bean).toBeTruthy();
+  // 다른 테스트의 AI 예약이 D1에 남아 있을 수 있어 값이 아니라 형태만 본다
+  expect(stats.ai_today.global).toBeGreaterThanOrEqual(0);
+  expect(stats.ai_today.accounts).toBeGreaterThanOrEqual(0);
+});
+
+test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, 건수·사용자 수와 함께 (#78)", async () => {
+  const admin = await signupUser();
+  const other = await signupUser();
+  await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamott, Yakult" });
+  await addBean(other.auth, { TASTING_NOTE: "bergamott, 자스민, Yakult" });
+  await addBean(other.auth, { TASTING_NOTE: "Bergamott" });
+  const res = await api(
+    "/admin/flavor-candidates",
+    { headers: admin.auth },
+    { ADMIN_USERCODES: admin.usercode },
+  );
+  const data = (await res.json()) as {
+    ok: boolean;
+    candidates: { note: string; count: number; users: number }[];
+  };
+  expect(data.ok).toBe(true);
+  // Jasmine·자스민은 어휘(영문·한글)라 빠진다. Bergamott 3건/2명이 Yakult 2건/2명보다 앞.
+  // 다른 테스트가 남긴 노트("=SUM(A1)" 등)가 섞일 수 있어 이 둘만 골라 본다.
+  const mine = data.candidates.filter((c) => ["Bergamott", "Yakult"].includes(c.note));
+  expect(mine).toEqual([
+    { note: "Bergamott", count: 3, users: 2 },
+    { note: "Yakult", count: 2, users: 2 },
+  ]);
+  expect(data.candidates.some((c) => /jasmine|자스민/i.test(c.note))).toBe(false);
+});
+
+test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 없이, closed는 403", async () => {
+  const admin = await signupUser();
+  const env2 = { ADMIN_USERCODES: admin.usercode };
+  const getMode = async () =>
+    ((await (await api("/admin/settings", { headers: admin.auth }, env2)).json()) as { signup_mode: string })
+      .signup_mode;
+  const setMode = (mode: unknown) =>
+    api(
+      "/admin/settings",
+      { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers: admin.auth },
+      env2,
+    );
+  expect(await getMode()).toBe("invite"); // 행이 없으면 invite
+
+  expect((await setMode("party")).status).toBe(400);
+  expect((await setMode("open")).status).toBe(200);
+  expect(await getMode()).toBe("open");
+  const noInvite = await api("/signup", jsonBody({ password: "1234" }));
+  expect(noInvite.status).toBe(200);
+  expect(((await noInvite.json()) as { ok: boolean }).ok).toBe(true);
+
+  expect((await setMode("closed")).status).toBe(200);
+  const closed = await api("/signup", jsonBody({ invite: INVITE, password: "1234" }));
+  expect(closed.status).toBe(403);
+  expect(((await closed.json()) as { error: string }).error).toBe("지금은 가입을 받지 않습니다.");
+
+  expect((await setMode("invite")).status).toBe(200);
+  const wrong = await api("/signup", jsonBody({ invite: "WRONG", password: "1234" }));
+  expect(wrong.status).toBe(403);
+  expect(((await wrong.json()) as { error: string }).error).toBe("초대코드가 올바르지 않습니다.");
+  expect((await api("/signup", jsonBody({ invite: INVITE, password: "1234" }))).status).toBe(200);
 });
