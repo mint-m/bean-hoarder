@@ -25,9 +25,16 @@ export async function isRateLimited(db: Db, bucket: string, limit: number): Prom
   return !!row && row.count >= limit;
 }
 
-/** 실패 1회 기록 — 윈도우가 지났으면 카운터를 리셋하며 시작 */
+/**
+ * 실패 1회 기록 — 윈도우가 지났으면 카운터를 리셋하며 시작.
+ *
+ * 그 전에 만료된 버킷을 기회적으로 지운다(#41). 버킷 키는 IP에서 파생돼 카디널리티가 무제한이라,
+ * 지우는 곳이 없으면 한 번 실패하고 다시 오지 않는 IP의 행이 영원히 남는다. 세션이 로그인 때마다
+ * 만료분을 지우는 것과 같은 장치 — 실패 경로에서만 도니 정상 로그인에는 비용이 없다.
+ */
 export async function recordFailure(db: Db, bucket: string): Promise<void> {
   const windowExpr = sql.raw(`datetime('now', '+${AUTH_WINDOW_SEC} seconds')`);
+  await db.run(sql`DELETE FROM auth_attempts WHERE reset_at <= datetime('now')`);
   await db.run(sql`
     INSERT INTO auth_attempts (bucket, count, reset_at) VALUES (${bucket}, 1, ${windowExpr})
     ON CONFLICT(bucket) DO UPDATE SET
