@@ -21,7 +21,7 @@
 //   POST   /api/fetch         상품 페이지 텍스트/로고 이미지 프록시 (로그인 사용자 전용)
 //   POST   /api/extract       AI 인식 대행 (서비스 키, 계정별·전역 하루 한도 — 본인 키가 있으면 브라우저 직접)
 //   GET    /api/me            내 계정 — 관리자 여부 + AI 한도/남은 횟수 (랩 문구가 이 값을 쓴다)
-//   GET    /api/admin/stats              관리자 — 계정·원두·가입 추이·로고/R2·AI 사용량
+//   GET    /api/admin/stats              관리자 — 대시보드(규모·최근 활동·한도 사용률·12개월 추이·분포)
 //   GET    /api/admin/flavor-candidates  관리자 — 어휘 밖 향미 노트 집계 (승격은 PR로)
 //   GET    /api/admin/settings           관리자 — 가입 모드
 //   PUT    /api/admin/settings           관리자 — 가입 모드 변경 { signup_mode }
