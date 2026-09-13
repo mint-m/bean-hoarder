@@ -714,32 +714,62 @@ test("관리 엔드포인트: 관리자가 아니면 404 — 존재를 알리지
   expect(ok.status).toBe(200);
 });
 
-test("관리자 통계: 계정·원두·가입 추이·계정별 표를 읽는다", async () => {
+test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포를 읽는다 — 계정별 세부는 없다", async () => {
   const admin = await signupUser();
   const other = await signupUser();
-  await addBean(admin.auth);
-  await addBean(other.auth);
+  await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamot", AGTRON: "#95 (Light)" });
+  await addBean(other.auth, { ORIGIN: "KENYA", AGTRON: "#65 (Medium)" });
   await addBean(other.auth, { ARCHIVED: "1" });
   const env2 = { ADMIN_USERCODES: admin.usercode };
   const stats = (await (await api("/admin/stats", { headers: admin.auth }, env2)).json()) as {
     ok: boolean;
-    users: number;
-    beans: { total: number; archived: number };
-    signups_by_month: { month: string; n: number }[];
-    accounts: { usercode: string; beans: number; last_bean: string | null }[];
-    logos: number;
-    ai_today: { global: number; accounts: number };
+    signup_mode: string;
+    recent_days: number;
+    users: { total: number; new_recent: number; active_recent: number };
+    beans: { total: number; archived: number; new_recent: number };
+    sessions: { active: number };
+    auth: { live_buckets: number };
+    logos: { count: number; r2_objects: number; r2_objects_cap: number };
+    r2: { month: string | null; writes: number; writes_cap: number };
+    ai: { today_global: number; global_cap: number; accounts_today: number; per_account_cap: number };
+    monthly: { month: string; signups: number; beans: number }[];
+    origins: { name: string; n: number }[];
+    roasteries: { name: string; n: number }[];
+    roast_levels: { level: string; n: number }[];
+    top_notes: { note: string; n: number }[];
+    beans_per_account: { bucket: string; n: number }[];
+    accounts?: unknown;
   };
   expect(stats.ok).toBe(true);
-  expect(stats.users).toBeGreaterThanOrEqual(2);
-  expect(stats.beans.total).toBeGreaterThanOrEqual(2);
-  expect(stats.signups_by_month[0]?.month).toMatch(/^\d{4}-\d{2}$/);
-  const row = stats.accounts.find((a) => a.usercode === other.usercode);
-  expect(row?.beans).toBeGreaterThanOrEqual(1);
-  expect(row?.last_bean).toBeTruthy();
-  // 다른 테스트의 AI 예약이 D1에 남아 있을 수 있어 값이 아니라 형태만 본다
-  expect(stats.ai_today.global).toBeGreaterThanOrEqual(0);
-  expect(stats.ai_today.accounts).toBeGreaterThanOrEqual(0);
+  expect(stats.signup_mode).toBe("invite");
+  expect(stats.users.total).toBeGreaterThanOrEqual(2);
+  expect(stats.users.new_recent).toBeGreaterThanOrEqual(2); // 방금 가입했다
+  expect(stats.users.active_recent).toBeGreaterThanOrEqual(2); // 방금 등록했다
+  expect(stats.beans.total).toBeGreaterThanOrEqual(3);
+  expect(stats.beans.new_recent).toBeGreaterThanOrEqual(3);
+  expect(stats.sessions.active).toBeGreaterThanOrEqual(2);
+  expect(stats.logos.r2_objects_cap).toBeGreaterThan(0);
+  expect(stats.r2.writes_cap).toBeGreaterThan(0);
+  expect(stats.ai.global_cap).toBeGreaterThan(0);
+  expect(stats.ai.per_account_cap).toBeGreaterThan(0);
+  // 12개월 축이 빈 달 없이 채워지고, 마지막 달이 이번 달이다
+  expect(stats.monthly).toHaveLength(12);
+  expect(stats.monthly.at(-1)?.month).toBe(new Date().toISOString().slice(0, 7));
+  expect(stats.monthly.at(-1)?.signups).toBeGreaterThanOrEqual(2);
+  expect(stats.origins.some((o) => o.name === "KENYA")).toBe(true);
+  expect(stats.roasteries[0]?.name).toBe("DANCHE");
+  expect(stats.roast_levels.map((r) => r.level).slice(0, 6)).toEqual([
+    "Ultra Light",
+    "Light",
+    "Medium Light",
+    "Medium",
+    "Medium Dark",
+    "Dark",
+  ]);
+  expect(stats.top_notes.find((t) => t.note === "Jasmine")?.n).toBeGreaterThanOrEqual(1);
+  expect(stats.beans_per_account.map((b) => b.bucket)).toEqual(["0", "1–5", "6–20", "21+"]);
+  // 계정별 표는 없다 — 대시보드는 멀리서 보는 숫자만이다
+  expect(stats.accounts).toBeUndefined();
 });
 
 test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, 건수·사용자 수와 함께 (#78)", async () => {

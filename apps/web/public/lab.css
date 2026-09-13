@@ -1141,7 +1141,7 @@ input.upper {
   }
 }
 
-/* ---- 관리자 화면(#88) — 크롬은 랩 것 그대로, 숫자판과 표만 더한다 ---- */
+/* ---- 관리자 화면(#88) — 크롬은 랩 것 그대로. 멀리서 보는 숫자판·막대만 더한다 ---- */
 .admin {
   justify-content: flex-start;
 }
@@ -1149,50 +1149,170 @@ input.upper {
 .admin::after {
   flex: 0;
 }
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-3);
-  margin: 0 0 var(--sp-3);
+/* 한 줄 선택지는 내용 너비만 — 카드 폭을 다 차지하면 오른쪽 빈 공간이 버튼처럼 보인다 */
+.admin .seg {
+  display: inline-flex;
 }
-.stat-grid dt {
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.tile {
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.tile-label {
   font-size: 11.5px;
   color: var(--sub);
 }
-.stat-grid dd {
-  margin: 2px 0 0;
-  font-size: 20px;
+.tile-n {
+  margin-top: 2px;
+  font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
-.stat-grid dd small {
-  font-size: 11.5px;
+.tile-n small {
+  font-size: 12px;
   font-weight: 500;
   color: var(--sub);
 }
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-  margin-top: var(--sp-3);
-}
-.admin-table th,
-.admin-table td {
-  text-align: left;
-  padding: 6px 4px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-.admin-table th {
-  font-size: 11px;
-  font-weight: 600;
+.tile-sub {
+  margin-top: 4px;
+  font-size: 11.5px;
   color: var(--sub);
+  line-height: 1.45;
 }
-.admin-table .num {
-  text-align: right;
+/* 한도 사용률 — 80%부터 포인트 컬러로 경고. 그 전엔 잉크색 한 줄이면 충분하다 */
+.meter {
+  margin-top: var(--sp-2);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 2px;
+}
+.meter > span.hot {
+  background: var(--accent);
+}
+
+/* 12개월 막대 — 가입은 잉크, 등록은 연하게. 라이브러리 없이 높이만 */
+.months {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+}
+.month-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 72px;
+}
+.month-bars span {
+  display: block;
+  width: 6px;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+}
+.month-bars .b-signup {
+  background: var(--ink);
+}
+.month-bars .b-bean {
+  background: var(--sub);
+  opacity: 0.45;
+}
+.month-label {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--sub);
   font-variant-numeric: tabular-nums;
 }
-.admin-table code {
-  font-weight: 700;
-  letter-spacing: 0.06em;
+
+/* 분포 — 이름 · 비율 막대 · 개수. 제일 큰 것이 100% */
+.dists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-5);
+}
+.dist {
+  min-width: 0;
+}
+.dist-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sub);
+  margin-bottom: 6px;
+}
+.dist-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+.dist-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dist-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.dist-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  opacity: 0.7;
+  border-radius: 3px;
+}
+.dist-n {
+  text-align: right;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 승격 후보 — 알약 + 건수. 표 대신 훑어보는 목록 */
+.tags {
+  list-style: none;
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tags li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.tags li b {
+  font-size: 11px;
+  color: var(--sub);
+}
+@media (max-width: 420px) {
+  .dists {
+    grid-template-columns: 1fr;
+  }
 }
