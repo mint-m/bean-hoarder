@@ -117,8 +117,10 @@ export default function AdminView({
   onBack: () => void;
   onSessionExpired: () => void;
 }) {
-  const [mode, setMode] = useState<SignupMode | null>(null);
+  const [mode, setMode] = useState<SignupMode | null>(null); // 서버에 저장된 값
+  const [draft, setDraft] = useState<SignupMode | null>(null); // 드롭다운에서 고른 값 — 적용을 눌러야 저장된다
   const [modeMsg, setModeMsg] = useState("");
+  const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState("");
@@ -147,6 +149,7 @@ export default function AdminView({
       }
       setStats(s.body);
       setMode(m.body.signup_mode);
+      setDraft(m.body.signup_mode);
       setCandidates(c.body.candidates);
     })();
     return () => {
@@ -154,19 +157,23 @@ export default function AdminView({
     };
   }, [call]);
 
-  async function changeMode(next: SignupMode) {
-    if (next === mode) return;
+  // 가입 문을 여닫는 일은 클릭 한 번으로 일어나면 안 된다 — 드롭다운으로 고르고 "적용"을 따로 누른다.
+  async function applyMode() {
+    if (!draft || draft === mode || saving) return;
+    setSaving(true);
     setModeMsg("저장 중…");
     const res = await call<{ signup_mode: SignupMode }>("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ signup_mode: next }),
+      body: JSON.stringify({ signup_mode: draft }),
     });
+    setSaving(false);
     if (res.body?.ok) {
       setMode(res.body.signup_mode);
-      setModeMsg(`가입 모드: ${MODE_LABEL[res.body.signup_mode]}`);
+      setModeMsg(`적용됨 — 가입 모드: ${MODE_LABEL[res.body.signup_mode]}`);
     } else setModeMsg(res.body?.error || "저장하지 못했습니다.");
   }
+  const dirty = draft !== null && draft !== mode;
 
   const candidateText = (candidates ?? []).map((c) => `${c.note}\t${c.count}건\t${c.users}명`).join("\n");
   const days = stats?.recent_days ?? 30;
@@ -185,21 +192,36 @@ export default function AdminView({
         <h2>
           가입 <span className="h2-aux">초대코드 값은 secret에 있다 — 여기서는 문만 여닫는다</span>
         </h2>
-        <div className="seg">
-          {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              className={mode === m ? "on" : ""}
-              disabled={mode === null}
-              onClick={() => changeMode(m)}
+        <div className="mode-row">
+          <label className="field mode-field">
+            <span className="field-head">
+              <span className="field-name">가입 모드{mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}</span>
+            </span>
+            <select
+              value={draft ?? ""}
+              disabled={mode === null || saving}
+              onChange={(e) => {
+                setDraft(e.target.value as SignupMode);
+                setModeMsg("");
+              }}
             >
-              {MODE_LABEL[m]}
-            </button>
-          ))}
+              {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
+                <option key={m} value={m}>
+                  {MODE_LABEL[m]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="primary" disabled={!dirty || saving} onClick={applyMode}>
+            적용
+          </button>
         </div>
-        <p className="hint">{mode ? MODE_HINT[mode] : "불러오는 중…"}</p>
+        <p className="hint">{draft ? MODE_HINT[draft] : "불러오는 중…"}</p>
+        {dirty && !modeMsg && (
+          <p className="hint">
+            아직 저장되지 않았다 — <b>적용</b>을 눌러야 바뀐다.
+          </p>
+        )}
         {modeMsg && <p className="hint">{modeMsg}</p>}
       </section>
 
