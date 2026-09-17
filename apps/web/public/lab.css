@@ -1149,9 +1149,29 @@ input.upper {
 .admin::after {
   flex: 0;
 }
-/* 한 줄 선택지는 내용 너비만 — 카드 폭을 다 차지하면 오른쪽 빈 공간이 버튼처럼 보인다 */
-.admin .seg {
-  display: inline-flex;
+/* 가입 모드 — 고르는 것과 적용하는 것을 떼어 둔다. 문을 여닫는 일이 클릭 한 번이면 너무 쉽다 */
+.mode-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+.mode-field {
+  flex: 0 1 220px;
+  margin-bottom: 0;
+}
+/* theme.css의 입력 칸 규칙에 select는 없다(랩에 이 하나뿐) — 같은 결로 맞춘다 */
+.mode-field select {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.mode-row button {
+  margin-bottom: 1px;
 }
 .tiles {
   display: grid;
