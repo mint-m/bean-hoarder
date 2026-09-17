@@ -76,6 +76,7 @@
 | POST | `/fetch` | 필요 |
 | POST | `/extract` | 필요 |
 | GET | `/me` | 필요 |
+| POST | `/admin/unlock` | 필요 |
 | GET | `/admin/stats` | 필요 |
 | GET | `/admin/flavor-candidates` | 필요 |
 | GET | `/admin/settings` | 필요 |

@@ -682,6 +682,16 @@ test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리
 
 // ── 내 계정 · 관리자 (#88 · #72) ─────────────────────────────
 
+const ADMIN_KEY = "test-admin-key";
+/** 관리자 환경 + 잠금 해제 — 관리 라우트를 부르는 테스트가 공유한다 */
+async function unlockAs(user: SignupResult) {
+  const env2 = { ADMIN_USERCODES: user.usercode, ADMIN_KEY };
+  const res = await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth }, env2);
+  const data = (await res.json()) as { ok: boolean; token: string };
+  expect(data.ok).toBe(true);
+  return { env2, headers: { ...user.auth, "X-Admin-Token": data.token } };
+}
+
 test("GET /api/me: 인증 필요, 관리자 여부와 AI 한도를 준다 — 한도 숫자는 서버가 단일 소스다", async () => {
   expect((await api("/me")).status).toBe(401);
   const user = await signupUser();
@@ -710,8 +720,54 @@ test("관리 엔드포인트: 관리자가 아니면 404 — 존재를 알리지
     expect((await api(path, { headers: user.auth }, { ADMIN_USERCODES: "" })).status, path).toBe(404);
   }
   expect((await api("/admin/stats")).status).toBe(401); // 인증이 먼저다
-  const ok = await api("/admin/stats", { headers: user.auth }, { ADMIN_USERCODES: user.usercode });
-  expect(ok.status).toBe(200);
+  // 관리자여도 잠금을 풀기 전엔 403 + locked — 401이면 랩이 세션 만료로 오해한다
+  const locked = await api(
+    "/admin/stats",
+    { headers: user.auth },
+    { ADMIN_USERCODES: user.usercode, ADMIN_KEY },
+  );
+  expect(locked.status).toBe(403);
+  expect((await locked.json()) as { locked?: boolean }).toMatchObject({ locked: true });
+  const { env2, headers } = await unlockAs(user);
+  expect((await api("/admin/stats", { headers }, env2)).status).toBe(200);
+});
+
+test("관리 잠금 해제: 틀린 키는 403, 5회면 429, ADMIN_KEY가 없으면 잠긴 채, 남의 토큰·만료 토큰은 안 통한다", async () => {
+  const { signAdminToken } = await import("../src/lib/admin");
+  const user = await signupUser();
+  const other = await signupUser();
+  const env2 = { ADMIN_USERCODES: `${user.usercode},${other.usercode}`, ADMIN_KEY };
+  const unlock = (key: unknown, who = user) =>
+    api("/admin/unlock", { ...jsonBody({ key }), headers: who.auth }, env2);
+  expect((await unlock("nope")).status).toBe(403);
+  expect(((await (await unlock("nope")).json()) as { error: string }).error).toBe(
+    "관리 키가 올바르지 않습니다.",
+  );
+  // secret이 없으면 관리자여도 잠긴 채 — 키 없이 열리는 길은 없다
+  const unset = await api(
+    "/admin/unlock",
+    { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth },
+    { ADMIN_USERCODES: user.usercode, ADMIN_KEY: "" },
+  );
+  expect(unset.status).toBe(403);
+  // 유저코드당 5회 — 키가 짧아도 되는 근거
+  for (let i = 0; i < 3; i++) await unlock("nope");
+  expect((await unlock(ADMIN_KEY)).status).toBe(429); // 맞는 키여도 창이 닫혀 있다
+  // 다른 계정의 토큰으로는 못 연다 — 토큰이 유저코드를 품는다
+  const { headers: otherHeaders } = await unlockAs(other);
+  const borrowed = await api(
+    "/admin/stats",
+    { headers: { ...user.auth, "X-Admin-Token": otherHeaders["X-Admin-Token"] } },
+    env2,
+  );
+  expect(borrowed.status).toBe(403);
+  // 만료된 토큰
+  const expired = await signAdminToken(ADMIN_KEY, other.usercode, Math.floor(Date.now() / 1000) - 1);
+  expect(
+    (await api("/admin/stats", { headers: { ...other.auth, "X-Admin-Token": expired } }, env2)).status,
+  ).toBe(403);
+  // 산 토큰
+  expect((await api("/admin/stats", { headers: otherHeaders }, env2)).status).toBe(200);
 });
 
 test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포를 읽는다 — 계정별 세부는 없다", async () => {
@@ -720,8 +776,8 @@ test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포�
   await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamot", AGTRON: "#95 (Light)" });
   await addBean(other.auth, { ORIGIN: "KENYA", AGTRON: "#65 (Medium)" });
   await addBean(other.auth, { ARCHIVED: "1" });
-  const env2 = { ADMIN_USERCODES: admin.usercode };
-  const stats = (await (await api("/admin/stats", { headers: admin.auth }, env2)).json()) as {
+  const { env2, headers } = await unlockAs(admin);
+  const stats = (await (await api("/admin/stats", { headers }, env2)).json()) as {
     ok: boolean;
     signup_mode: string;
     recent_days: number;
@@ -778,11 +834,8 @@ test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, �
   await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamott, Yakult" });
   await addBean(other.auth, { TASTING_NOTE: "bergamott, 자스민, Yakult" });
   await addBean(other.auth, { TASTING_NOTE: "Bergamott" });
-  const res = await api(
-    "/admin/flavor-candidates",
-    { headers: admin.auth },
-    { ADMIN_USERCODES: admin.usercode },
-  );
+  const { env2, headers } = await unlockAs(admin);
+  const res = await api("/admin/flavor-candidates", { headers }, env2);
   const data = (await res.json()) as {
     ok: boolean;
     candidates: { note: string; count: number; users: number }[];
@@ -800,16 +853,11 @@ test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, �
 
 test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 없이, closed는 403", async () => {
   const admin = await signupUser();
-  const env2 = { ADMIN_USERCODES: admin.usercode };
+  const { env2, headers } = await unlockAs(admin);
   const getMode = async () =>
-    ((await (await api("/admin/settings", { headers: admin.auth }, env2)).json()) as { signup_mode: string })
-      .signup_mode;
+    ((await (await api("/admin/settings", { headers }, env2)).json()) as { signup_mode: string }).signup_mode;
   const setMode = (mode: unknown) =>
-    api(
-      "/admin/settings",
-      { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers: admin.auth },
-      env2,
-    );
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
   expect(await getMode()).toBe("invite"); // 행이 없으면 invite
 
   expect((await setMode("party")).status).toBe(400);
