@@ -8,8 +8,12 @@ import { sha256hex } from "../src/lib/crypto";
 
 const INVITE = "TEST-INVITE";
 
-async function api(path: string, init?: RequestInit): Promise<Response> {
-  return app.fetch(new Request(`https://bnhd.pages.dev/api${path}`, init), env);
+async function api(
+  path: string,
+  init?: RequestInit,
+  envOverride: Partial<typeof env> = {},
+): Promise<Response> {
+  return app.fetch(new Request(`https://bnhd.pages.dev/api${path}`, init), { ...env, ...envOverride });
 }
 
 function jsonBody(obj: unknown): RequestInit {
@@ -583,65 +587,294 @@ test("AI 대행: 400은 다음 후보로 넘어가지 않는다", async () => {
   }
 });
 
-test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
-  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+test("rate limit: 만료된 auth_attempts 버킷은 다음 실패 기록 때 지워진다 (#41)", async () => {
+  const { recordFailure } = await import("../src/lib/ratelimit");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(2, 100); // 계정 2회로 낮춰 경계를 바로 검증
-  try {
-    const db = createDb(env.DB);
-    const uc = `Q${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    expect(await remainingAiCalls(db, uc)).toBe(2);
+  const db = createDb(env.DB);
+  const stale = `ip:203.0.113.${Math.floor(Math.random() * 250)}`;
+  await recordFailure(db, stale);
+  await env.DB.prepare("UPDATE auth_attempts SET reset_at = datetime('now', '-1 second') WHERE bucket = ?")
+    .bind(stale)
+    .run();
+  // 다른 버킷의 실패가 기록되면서 만료된 행이 함께 사라진다
+  await recordFailure(db, `ip:198.51.100.${Math.floor(Math.random() * 250)}`);
+  const row = await env.DB.prepare("SELECT count(*) AS n FROM auth_attempts WHERE bucket = ?")
+    .bind(stale)
+    .first<{ n: number }>();
+  expect(row?.n).toBe(0);
+});
 
-    expect(await reserveAiCall(db, uc)).toBe(1); // 1회차 → 1회 남음
-    expect(await reserveAiCall(db, uc)).toBe(0); // 2회차 → 0회 남음
-    expect(await reserveAiCall(db, uc)).toBeNull(); // 3회차 → 한도 초과
-    expect(await remainingAiCalls(db, uc)).toBe(0);
-  } finally {
-    restore();
-  }
+test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const quota = { perAccount: 2, global: 100 }; // 계정 2회로 낮춰 경계를 바로 검증 — 인자라 다른 테스트와 안 섞인다
+  const db = createDb(env.DB);
+  const uc = `Q${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2);
+
+  expect(await reserveAiCall(db, uc, quota)).toBe(1); // 1회차 → 1회 남음
+  expect(await reserveAiCall(db, uc, quota)).toBe(0); // 2회차 → 0회 남음
+  expect(await reserveAiCall(db, uc, quota)).toBeNull(); // 3회차 → 한도 초과
+  expect(await remainingAiCalls(db, uc, quota)).toBe(0);
+
+  // 행은 계정당 하나 — 날짜별로 새 행이 생기지 않는다(#71)
+  const rows = await env.DB.prepare("SELECT count(*) AS n FROM ai_usage WHERE bucket LIKE ?")
+    .bind(`acct:${uc}%`)
+    .first<{ n: number }>();
+  expect(rows?.n).toBe(1);
+});
+
+test("AI 대행 할당량: reset_at이 지나면 카운터가 1부터 다시 센다 — 같은 행을 재사용한다", async () => {
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const quota = { perAccount: 2, global: 100 };
+  const db = createDb(env.DB);
+  const uc = `S${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await reserveAiCall(db, uc, quota)).toBe(1);
+  expect(await reserveAiCall(db, uc, quota)).toBe(0);
+  expect(await reserveAiCall(db, uc, quota)).toBeNull();
+  // 어제로 만료시킨다 — 실제로는 D1 시계가 자정을 넘기며 하는 일
+  await env.DB.prepare("UPDATE ai_usage SET reset_at = datetime('now', '-1 second') WHERE bucket = ?")
+    .bind(`acct:${uc}`)
+    .run();
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2); // 만료된 카운터는 없는 것으로 본다
+  expect(await reserveAiCall(db, uc, quota)).toBe(1); // 1부터 다시
+  const rows = await env.DB.prepare("SELECT count(*) AS n FROM ai_usage WHERE bucket = ?")
+    .bind(`acct:${uc}`)
+    .first<{ n: number }>();
+  expect(rows?.n).toBe(1);
 });
 
 test("AI 대행 할당량: 전역 한도는 계정이 달라도 함께 소진된다 (한 사람이 하루치를 독식하지 못하게)", async () => {
-  const { reserveAiCall, remainingAiCalls, setAiQuotaForTest } = await import("../src/lib/ai-quota");
+  const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(50, 2); // 전역 2회
-  try {
-    const db = createDb(env.DB);
-    // 전역 버킷은 날짜 단위 공유라 앞 테스트의 사용분이 남아 있을 수 있다 — 0으로 맞추고 시작
-    await env.DB.prepare("DELETE FROM ai_usage WHERE bucket LIKE 'global:%'").run();
-    const a = `G${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    const b = `H${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    expect(await reserveAiCall(db, a)).not.toBeNull();
-    expect(await reserveAiCall(db, b)).not.toBeNull();
-    expect(await reserveAiCall(db, b)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
+  const quota = { perAccount: 50, global: 2 }; // 전역 2회
+  const db = createDb(env.DB);
+  // 전역 버킷은 서비스 공유라 앞 테스트의 사용분이 남아 있을 수 있다 — 0으로 맞추고 시작
+  await env.DB.prepare("DELETE FROM ai_usage WHERE bucket = 'global'").run();
+  const a = `G${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const b = `H${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  expect(await reserveAiCall(db, a, quota)).not.toBeNull();
+  expect(await reserveAiCall(db, b, quota)).not.toBeNull();
+  expect(await reserveAiCall(db, b, quota)).toBeNull(); // 전역 소진 — 계정 한도는 아직 남았는데도 막힌다
 
-    // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
-    // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
-    // 소진하고 전역이 풀린 뒤에도 막힌다.
-    const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    const before = await remainingAiCalls(db, c);
-    expect(await reserveAiCall(db, c)).toBeNull();
-    expect(await reserveAiCall(db, c)).toBeNull();
-    expect(await remainingAiCalls(db, c)).toBe(before);
-  } finally {
-    restore();
-  }
+  // 전역에 막힌 요청은 그 사용자의 하루 몫을 깎지 않는다. 계정 버킷을 먼저 올린 뒤 전역을
+  // 검사하는 구조라, 되돌리지 않으면 AI를 한 번도 못 쓴 사람이 재시도만으로 자기 한도를
+  // 소진하고 전역이 풀린 뒤에도 막힌다.
+  const c = `I${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  const before = await remainingAiCalls(db, c, quota);
+  expect(await reserveAiCall(db, c, quota)).toBeNull();
+  expect(await reserveAiCall(db, c, quota)).toBeNull();
+  expect(await remainingAiCalls(db, c, quota)).toBe(before);
 });
 
 test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리 잘못으로 사용자 몫을 깎지 않는다)", async () => {
-  const { reserveAiCall, releaseAiCall, remainingAiCalls, setAiQuotaForTest } = await import(
-    "../src/lib/ai-quota"
-  );
+  const { reserveAiCall, releaseAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
-  const restore = setAiQuotaForTest(3, 100);
-  try {
-    const db = createDb(env.DB);
-    const uc = `R${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-    await reserveAiCall(db, uc);
-    expect(await remainingAiCalls(db, uc)).toBe(2);
-    await releaseAiCall(db, uc);
-    expect(await remainingAiCalls(db, uc)).toBe(3);
-  } finally {
-    restore();
+  const quota = { perAccount: 3, global: 100 };
+  const db = createDb(env.DB);
+  const uc = `R${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+  await reserveAiCall(db, uc, quota);
+  expect(await remainingAiCalls(db, uc, quota)).toBe(2);
+  await releaseAiCall(db, uc);
+  expect(await remainingAiCalls(db, uc, quota)).toBe(3);
+});
+
+// ── 내 계정 · 관리자 (#88 · #72) ─────────────────────────────
+
+const ADMIN_KEY = "test-admin-key";
+/** 관리자 환경 + 잠금 해제 — 관리 라우트를 부르는 테스트가 공유한다 */
+async function unlockAs(user: SignupResult) {
+  const env2 = { ADMIN_USERCODES: user.usercode, ADMIN_KEY };
+  const res = await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth }, env2);
+  const data = (await res.json()) as { ok: boolean; token: string };
+  expect(data.ok).toBe(true);
+  return { env2, headers: { ...user.auth, "X-Admin-Token": data.token } };
+}
+
+test("GET /api/me: 인증 필요, 관리자 여부와 AI 한도를 준다 — 한도 숫자는 서버가 단일 소스다", async () => {
+  expect((await api("/me")).status).toBe(401);
+  const user = await signupUser();
+  const me = (await (await api("/me", { headers: user.auth })).json()) as {
+    ok: boolean;
+    usercode: string;
+    is_admin: boolean;
+    ai_quota: { limit: number; remaining: number };
+  };
+  expect(me).toMatchObject({ ok: true, usercode: user.usercode, is_admin: false });
+  expect(me.ai_quota.limit).toBeGreaterThan(0);
+  expect(me.ai_quota.remaining).toBe(me.ai_quota.limit);
+  // ADMIN_USERCODES에 있으면 관리자 — 대소문자·공백은 무시한다
+  const admin = (await (
+    await api("/me", { headers: user.auth }, { ADMIN_USERCODES: ` zzzz , ${user.usercode.toLowerCase()} ` })
+  ).json()) as { is_admin: boolean };
+  expect(admin.is_admin).toBe(true);
+});
+
+test("관리 엔드포인트: 관리자가 아니면 404 — 존재를 알리지 않는다. secret이 없어도 404", async () => {
+  const user = await signupUser();
+  for (const path of ["/admin/stats", "/admin/flavor-candidates", "/admin/settings"]) {
+    const res = await api(path, { headers: user.auth });
+    expect(res.status, path).toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("not found");
+    expect((await api(path, { headers: user.auth }, { ADMIN_USERCODES: "" })).status, path).toBe(404);
   }
+  expect((await api("/admin/stats")).status).toBe(401); // 인증이 먼저다
+  // 관리자여도 잠금을 풀기 전엔 403 + locked — 401이면 랩이 세션 만료로 오해한다
+  const locked = await api(
+    "/admin/stats",
+    { headers: user.auth },
+    { ADMIN_USERCODES: user.usercode, ADMIN_KEY },
+  );
+  expect(locked.status).toBe(403);
+  expect((await locked.json()) as { locked?: boolean }).toMatchObject({ locked: true });
+  const { env2, headers } = await unlockAs(user);
+  expect((await api("/admin/stats", { headers }, env2)).status).toBe(200);
+});
+
+test("관리 잠금 해제: 틀린 키는 403, 5회면 429, ADMIN_KEY가 없으면 잠긴 채, 남의 토큰·만료 토큰은 안 통한다", async () => {
+  const { signAdminToken } = await import("../src/lib/admin");
+  const user = await signupUser();
+  const other = await signupUser();
+  const env2 = { ADMIN_USERCODES: `${user.usercode},${other.usercode}`, ADMIN_KEY };
+  const unlock = (key: unknown, who = user) =>
+    api("/admin/unlock", { ...jsonBody({ key }), headers: who.auth }, env2);
+  expect((await unlock("nope")).status).toBe(403);
+  expect(((await (await unlock("nope")).json()) as { error: string }).error).toBe(
+    "관리 키가 올바르지 않습니다.",
+  );
+  // secret이 없으면 관리자여도 잠긴 채 — 키 없이 열리는 길은 없다
+  const unset = await api(
+    "/admin/unlock",
+    { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth },
+    { ADMIN_USERCODES: user.usercode, ADMIN_KEY: "" },
+  );
+  expect(unset.status).toBe(403);
+  // 유저코드당 5회 — 키가 짧아도 되는 근거
+  for (let i = 0; i < 3; i++) await unlock("nope");
+  expect((await unlock(ADMIN_KEY)).status).toBe(429); // 맞는 키여도 창이 닫혀 있다
+  // 다른 계정의 토큰으로는 못 연다 — 토큰이 유저코드를 품는다
+  const { headers: otherHeaders } = await unlockAs(other);
+  const borrowed = await api(
+    "/admin/stats",
+    { headers: { ...user.auth, "X-Admin-Token": otherHeaders["X-Admin-Token"] } },
+    env2,
+  );
+  expect(borrowed.status).toBe(403);
+  // 만료된 토큰
+  const expired = await signAdminToken(ADMIN_KEY, other.usercode, Math.floor(Date.now() / 1000) - 1);
+  expect(
+    (await api("/admin/stats", { headers: { ...other.auth, "X-Admin-Token": expired } }, env2)).status,
+  ).toBe(403);
+  // 산 토큰
+  expect((await api("/admin/stats", { headers: otherHeaders }, env2)).status).toBe(200);
+});
+
+test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포를 읽는다 — 계정별 세부는 없다", async () => {
+  const admin = await signupUser();
+  const other = await signupUser();
+  await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamot", AGTRON: "#95 (Light)" });
+  await addBean(other.auth, { ORIGIN: "KENYA", AGTRON: "#65 (Medium)" });
+  await addBean(other.auth, { ARCHIVED: "1" });
+  const { env2, headers } = await unlockAs(admin);
+  const stats = (await (await api("/admin/stats", { headers }, env2)).json()) as {
+    ok: boolean;
+    signup_mode: string;
+    recent_days: number;
+    users: { total: number; new_recent: number; active_recent: number };
+    beans: { total: number; archived: number; new_recent: number };
+    sessions: { active: number };
+    auth: { live_buckets: number };
+    logos: { count: number; r2_objects: number; r2_objects_cap: number };
+    r2: { month: string | null; writes: number; writes_cap: number };
+    ai: { today_global: number; global_cap: number; accounts_today: number; per_account_cap: number };
+    monthly: { month: string; signups: number; beans: number }[];
+    origins: { name: string; n: number }[];
+    roasteries: { name: string; n: number }[];
+    roast_levels: { level: string; n: number }[];
+    top_notes: { note: string; n: number }[];
+    beans_per_account: { bucket: string; n: number }[];
+    accounts?: unknown;
+  };
+  expect(stats.ok).toBe(true);
+  expect(stats.signup_mode).toBe("invite");
+  expect(stats.users.total).toBeGreaterThanOrEqual(2);
+  expect(stats.users.new_recent).toBeGreaterThanOrEqual(2); // 방금 가입했다
+  expect(stats.users.active_recent).toBeGreaterThanOrEqual(2); // 방금 등록했다
+  expect(stats.beans.total).toBeGreaterThanOrEqual(3);
+  expect(stats.beans.new_recent).toBeGreaterThanOrEqual(3);
+  expect(stats.sessions.active).toBeGreaterThanOrEqual(2);
+  expect(stats.logos.r2_objects_cap).toBeGreaterThan(0);
+  expect(stats.r2.writes_cap).toBeGreaterThan(0);
+  expect(stats.ai.global_cap).toBeGreaterThan(0);
+  expect(stats.ai.per_account_cap).toBeGreaterThan(0);
+  // 12개월 축이 빈 달 없이 채워지고, 마지막 달이 이번 달이다
+  expect(stats.monthly).toHaveLength(12);
+  expect(stats.monthly.at(-1)?.month).toBe(new Date().toISOString().slice(0, 7));
+  expect(stats.monthly.at(-1)?.signups).toBeGreaterThanOrEqual(2);
+  expect(stats.origins.some((o) => o.name === "KENYA")).toBe(true);
+  expect(stats.roasteries[0]?.name).toBe("DANCHE");
+  expect(stats.roast_levels.map((r) => r.level).slice(0, 6)).toEqual([
+    "Ultra Light",
+    "Light",
+    "Medium Light",
+    "Medium",
+    "Medium Dark",
+    "Dark",
+  ]);
+  expect(stats.top_notes.find((t) => t.note === "Jasmine")?.n).toBeGreaterThanOrEqual(1);
+  expect(stats.beans_per_account.map((b) => b.bucket)).toEqual(["0", "1–5", "6–20", "21+"]);
+  // 계정별 표는 없다 — 대시보드는 멀리서 보는 숫자만이다
+  expect(stats.accounts).toBeUndefined();
+});
+
+test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, 건수·사용자 수와 함께 (#78)", async () => {
+  const admin = await signupUser();
+  const other = await signupUser();
+  await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamott, Yakult" });
+  await addBean(other.auth, { TASTING_NOTE: "bergamott, 자스민, Yakult" });
+  await addBean(other.auth, { TASTING_NOTE: "Bergamott" });
+  const { env2, headers } = await unlockAs(admin);
+  const res = await api("/admin/flavor-candidates", { headers }, env2);
+  const data = (await res.json()) as {
+    ok: boolean;
+    candidates: { note: string; count: number; users: number }[];
+  };
+  expect(data.ok).toBe(true);
+  // Jasmine·자스민은 어휘(영문·한글)라 빠진다. Bergamott 3건/2명이 Yakult 2건/2명보다 앞.
+  // 다른 테스트가 남긴 노트("=SUM(A1)" 등)가 섞일 수 있어 이 둘만 골라 본다.
+  const mine = data.candidates.filter((c) => ["Bergamott", "Yakult"].includes(c.note));
+  expect(mine).toEqual([
+    { note: "Bergamott", count: 3, users: 2 },
+    { note: "Yakult", count: 2, users: 2 },
+  ]);
+  expect(data.candidates.some((c) => /jasmine|자스민/i.test(c.note))).toBe(false);
+});
+
+test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 없이, closed는 403", async () => {
+  const admin = await signupUser();
+  const { env2, headers } = await unlockAs(admin);
+  const getMode = async () =>
+    ((await (await api("/admin/settings", { headers }, env2)).json()) as { signup_mode: string }).signup_mode;
+  const setMode = (mode: unknown) =>
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
+  expect(await getMode()).toBe("invite"); // 행이 없으면 invite
+
+  expect((await setMode("party")).status).toBe(400);
+  expect((await setMode("open")).status).toBe(200);
+  expect(await getMode()).toBe("open");
+  const noInvite = await api("/signup", jsonBody({ password: "1234" }));
+  expect(noInvite.status).toBe(200);
+  expect(((await noInvite.json()) as { ok: boolean }).ok).toBe(true);
+
+  expect((await setMode("closed")).status).toBe(200);
+  const closed = await api("/signup", jsonBody({ invite: INVITE, password: "1234" }));
+  expect(closed.status).toBe(403);
+  expect(((await closed.json()) as { error: string }).error).toBe("지금은 가입을 받지 않습니다.");
+
+  expect((await setMode("invite")).status).toBe(200);
+  const wrong = await api("/signup", jsonBody({ invite: "WRONG", password: "1234" }));
+  expect(wrong.status).toBe(403);
+  expect(((await wrong.json()) as { error: string }).error).toBe("초대코드가 올바르지 않습니다.");
+  expect((await api("/signup", jsonBody({ invite: INVITE, password: "1234" }))).status).toBe(200);
 });

@@ -1140,3 +1140,199 @@ input.upper {
     width: 120px;
   }
 }
+
+/* ---- 관리자 화면(#88) — 크롬은 랩 것 그대로. 멀리서 보는 숫자판·막대만 더한다 ---- */
+.admin {
+  justify-content: flex-start;
+}
+.admin::before,
+.admin::after {
+  flex: 0;
+}
+/* 가입 모드 — 고르는 것과 적용하는 것을 떼어 둔다. 문을 여닫는 일이 클릭 한 번이면 너무 쉽다 */
+.mode-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+.mode-field {
+  flex: 0 1 220px;
+  margin-bottom: 0;
+}
+/* theme.css의 입력 칸 규칙에 select는 없다(랩에 이 하나뿐) — 같은 결로 맞춘다 */
+.mode-field select {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.mode-row button {
+  margin-bottom: 1px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.tile {
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.tile-label {
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.tile-n {
+  margin-top: 2px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.tile-n small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sub);
+}
+.tile-sub {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--sub);
+  line-height: 1.45;
+}
+/* 한도 사용률 — 80%부터 포인트 컬러로 경고. 그 전엔 잉크색 한 줄이면 충분하다 */
+.meter {
+  margin-top: var(--sp-2);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 2px;
+}
+.meter > span.hot {
+  background: var(--accent);
+}
+
+/* 12개월 막대 — 가입은 잉크, 등록은 연하게. 라이브러리 없이 높이만 */
+.months {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+}
+.month-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 72px;
+}
+.month-bars span {
+  display: block;
+  width: 6px;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+}
+.month-bars .b-signup {
+  background: var(--ink);
+}
+.month-bars .b-bean {
+  background: var(--sub);
+  opacity: 0.45;
+}
+.month-label {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 분포 — 이름 · 비율 막대 · 개수. 제일 큰 것이 100% */
+.dists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-5);
+}
+.dist {
+  min-width: 0;
+}
+.dist-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sub);
+  margin-bottom: 6px;
+}
+.dist-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+.dist-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dist-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.dist-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  opacity: 0.7;
+  border-radius: 3px;
+}
+.dist-n {
+  text-align: right;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 승격 후보 — 알약 + 건수. 표 대신 훑어보는 목록 */
+.tags {
+  list-style: none;
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tags li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.tags li b {
+  font-size: 11px;
+  color: var(--sub);
+}
+@media (max-width: 420px) {
+  .dists {
+    grid-template-columns: 1fr;
+  }
+}

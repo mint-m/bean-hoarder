@@ -42,6 +42,7 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -81,7 +82,13 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **`db/seed.sql`은 로컬 픽스처다 — 원격 D1에 실행하지 말 것.** `TEST`의 암호가 저장소에 적혀
   있어, 원격에 넣으면 누구나 로그인하는 계정이 라이브에 생긴다. **서비스에 특별 취급되는 계정은
   없다** — 예전엔 공개 데모 계정을 두고 서버가 쓰기를 막았지만, 그 구조는 계정을 관리할 방법까지
-  함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다.
+  함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다. **관리자도 예외가
+  아니다** — DB에 role이 없고, secret `ADMIN_USERCODES`의 목록과 대조할 뿐이다(`packages/api/src/lib/admin.ts`).
+  관리자 판정을 DB로 옮기면 첫 관리자를 누가 지정하느냐는 부트스트랩 문제와 "특별한 행"이 함께 돌아온다.
+  관리 요청에는 계정과 별개로 secret `ADMIN_KEY`로 푼 1시간 토큰(`X-Admin-Token`)이 더 필요하다 — 계정
+  인증이 일부러 얕은 만큼(4자리 PIN) 그 계정 하나가 새도 관리까지는 못 가게. **관리 라우트를 더할 때는
+  `adminRequired` 뒤에 `adminUnlocked`도 건다.** 잠긴 상태는 401이 아니라 403+`locked` — 401은 랩이 세션
+  만료로 읽어 로그아웃시킨다.
 - **데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.** 덱(`/demo`)도 카드(`/DEMO…`)도
   `apps/web/src/demo-beans.json` 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
   조회 페이지가 `DEMO` 접두 KEY를 API 대신 이 JSON으로 답한다(`apps/web/src/viewer.ts`) —

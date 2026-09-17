@@ -274,6 +274,14 @@ merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 �
 </li>
 <li><p><strong>초대코드</strong>: Cloudflare <strong>secret</strong>으로 관리 — <code>npx wrangler pages secret put INVITE_CODE</code> (교체도 동일, 저장소에 커밋하지 않는다)</p>
 </li>
+<li><p><strong>관리자</strong>: <code>npx wrangler pages secret put ADMIN_USERCODES</code> — 관리자로 쓸 <strong>본인 계정의 유저코드</strong>를 콤마로 나열한다(예: <code>ABCD,EFGH</code>). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩에 <strong>관리</strong>가 뜨고(<code>/api/me</code>), 아니면 <code>/api/admin/*</code>은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.</p>
+</li>
+<li><p><strong>관리 키</strong>: <code>npx wrangler pages secret put ADMIN_KEY</code> — 관리 화면에 들어갈 때 계정과 별개로 묻는 <strong>두 번째 열쇠</strong>. 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 계정이 새도 관리까지 넘어가지 않게 한다. 맞으면 1시간짜리 관리 토큰이 발급되고(탭을 닫으면 사라진다), 틀리면 유저코드당 <strong>10분에 5회</strong>까지만 시도할 수 있다 — 그래서 키는 긴 무작위 문자열이 아니라 <strong>기억할 수 있는 8~12자</strong>면 된다(PIN과 다르게, 다른 곳에서 쓰지 않는 것으로). 비어 있으면 관리자여도 전부 잠긴다.</p>
+</li>
+<li><p><strong>가입 모드</strong>: 관리 화면에서 <strong>초대코드 / 누구나 / 받지 않음</strong> 셋 중 하나 — D1 <code>settings</code> 테이블의 <code>signup_mode</code>. 초대코드 값 자체는 여전히 위 secret이고, 여기서 바꾸는 것은 &quot;지금 문이 열려 있는가&quot;뿐이다. 행이 없으면 초대코드(종전 동작).</p>
+</li>
+<li><p><strong>향미 어휘 승격</strong>: 관리 화면 &quot;향미 승격 후보&quot;가 어휘(<code>packages/schema/src/flavor.ts</code>)에 없는데 등록된 노트를 건수·사용자 수와 함께 보여 준다. <strong>승격은 PR로</strong> — 그 파일에 한 줄 + <code>apps/web/src/lib/coffee-color.ts</code>의 노트 색. 색 없이 노트만 더하면 <code>flavor-coverage.test.ts</code>가 막는다. 오타 후보(<code>Bergamott</code>)는 승격하지 않는다.</p>
+</li>
 <li><p><strong>AI 인식 키(선택)</strong>: <code>npx wrangler pages secret put GEMINI_API_KEY</code> — 키를 넣지 않으면 AI 대행이 503으로 응답하고 클라이언트가 규칙 기반 인식으로 내려가므로 서비스는 그대로 동작한다. 하루 한도는 계정별 10회·전역 100회(<code>packages/api/src/lib/ai-quota.ts</code>) — 무료 등급을 넘겨 조용히 죽는 대신 코드가 먼저 막는다.</p>
 </li>
 <li><p><strong>무차별 대입 완화</strong>: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.</p>
@@ -316,9 +324,11 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
+# (ADMIN_USERCODES=TEST · ADMIN_KEY=test-key: 시드 계정을 관리자로, 관리 잠금은 test-key로 — 로컬에서 관리 화면을 보려면)
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 </code></pre>
 <ul>
@@ -451,6 +461,7 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -488,7 +499,13 @@ type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루�
 <li><strong><code>db/seed.sql</code>은 로컬 픽스처다 — 원격 D1에 실행하지 말 것.</strong> <code>TEST</code>의 암호가 저장소에 적혀
 있어, 원격에 넣으면 누구나 로그인하는 계정이 라이브에 생긴다. <strong>서비스에 특별 취급되는 계정은
 없다</strong> — 예전엔 공개 데모 계정을 두고 서버가 쓰기를 막았지만, 그 구조는 계정을 관리할 방법까지
-함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다.</li>
+함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다. <strong>관리자도 예외가
+아니다</strong> — DB에 role이 없고, secret <code>ADMIN_USERCODES</code>의 목록과 대조할 뿐이다(<code>packages/api/src/lib/admin.ts</code>).
+관리자 판정을 DB로 옮기면 첫 관리자를 누가 지정하느냐는 부트스트랩 문제와 &quot;특별한 행&quot;이 함께 돌아온다.
+관리 요청에는 계정과 별개로 secret <code>ADMIN_KEY</code>로 푼 1시간 토큰(<code>X-Admin-Token</code>)이 더 필요하다 — 계정
+인증이 일부러 얕은 만큼(4자리 PIN) 그 계정 하나가 새도 관리까지는 못 가게. <strong>관리 라우트를 더할 때는
+<code>adminRequired</code> 뒤에 <code>adminUnlocked</code>도 건다.</strong> 잠긴 상태는 401이 아니라 403+<code>locked</code> — 401은 랩이 세션
+만료로 읽어 로그아웃시킨다.</li>
 <li><strong>데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.</strong> 덱(<code>/demo</code>)도 카드(<code>/DEMO…</code>)도
 <code>apps/web/src/demo-beans.json</code> 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
 조회 페이지가 <code>DEMO</code> 접두 KEY를 API 대신 이 JSON으로 답한다(<code>apps/web/src/viewer.ts</code>) —
@@ -1231,6 +1248,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 </tr>
 </thead>
 <tbody><tr>
+<td><code>db/migrate_settings.sql</code></td>
+<td>서비스 설정 key/value (#88) — 첫 키는 signup_mode: invite</td>
+</tr>
+<tr>
 <td><code>db/schema.sql</code></td>
 <td>D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다.</td>
 </tr>
@@ -1371,6 +1392,36 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 <td><code>/extract</code></td>
 <td><span class="auth need">🔒 필요</span></td>
 </tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/me</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method post">POST</span></td>
+<td><code>/admin/unlock</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/stats</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/flavor-candidates</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method get">GET</span></td>
+<td><code>/admin/settings</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
+<tr>
+<td><span class="method put">PUT</span></td>
+<td><code>/admin/settings</code></td>
+<td><span class="auth need">🔒 필요</span></td>
+</tr>
 </tbody></table>
 </div><p><strong>D1 테이블</strong> (<code>bnhd-v2</code>)</p>
 <div class="table-wrap"><table>
@@ -1407,6 +1458,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 <tr>
 <td><code>ai_usage</code></td>
 <td><code>bucket</code>, <code>count</code>, <code>reset_at</code></td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td><code>key</code>, <code>value</code>, <code>updated_at</code></td>
 </tr>
 </tbody></table>
 </div></article>

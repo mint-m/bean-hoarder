@@ -85,3 +85,10 @@ export const logos = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.usercode, t.roastery] })],
 );
+
+// 서비스 설정 key/value — signup_mode 등. 관리자 페이지(#88)가 읽고 쓴다. 근거는 lib/settings.ts.
+export const settings = sqliteTable("settings", {
+  key: text().primaryKey(),
+  value: text().notNull(),
+  updated_at: text().notNull().default(sql`(datetime('now'))`),
+});
