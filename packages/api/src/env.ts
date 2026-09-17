@@ -12,6 +12,11 @@ export interface Env {
    */
   ADMIN_USERCODES?: string;
   /**
+   * 관리 잠금 해제 키 — Cloudflare secret (wrangler pages secret put ADMIN_KEY). 관리자 계정으로 로그인한
+   * 뒤 이 키로 1시간짜리 관리 토큰을 받는다(lib/admin.ts). 없으면 관리 기능이 전부 잠긴다.
+   */
+  ADMIN_KEY?: string;
+  /**
    * AI 인식 대행용 서비스 키 — Cloudflare secret (wrangler pages secret put GEMINI_API_KEY).
    * 본인 키를 넣지 않은 사용자에게 하루 몇 번 AI 인식을 제공한다(lib/ai-quota.ts).
    * 없어도 서비스는 정상 동작한다 — 클라이언트가 규칙 기반 파서로 폴백한다.

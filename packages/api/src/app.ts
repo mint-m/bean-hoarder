@@ -21,16 +21,17 @@
 //   POST   /api/fetch         상품 페이지 텍스트/로고 이미지 프록시 (로그인 사용자 전용)
 //   POST   /api/extract       AI 인식 대행 (서비스 키, 계정별·전역 하루 한도 — 본인 키가 있으면 브라우저 직접)
 //   GET    /api/me            내 계정 — 관리자 여부 + AI 한도/남은 횟수 (랩 문구가 이 값을 쓴다)
+//   POST   /api/admin/unlock             관리자 — ADMIN_KEY로 잠금 해제 → 1시간 관리 토큰 (X-Admin-Token)
 //   GET    /api/admin/stats              관리자 — 대시보드(규모·최근 활동·한도 사용률·12개월 추이·분포)
 //   GET    /api/admin/flavor-candidates  관리자 — 어휘 밖 향미 노트 집계 (승격은 PR로)
 //   GET    /api/admin/settings           관리자 — 가입 모드
 //   PUT    /api/admin/settings           관리자 — 가입 모드 변경 { signup_mode }
-// 환경변수: INVITE_CODE·ADMIN_USERCODES는 Cloudflare secret으로 관리 (wrangler pages secret put …)
+// 환경변수: INVITE_CODE·ADMIN_USERCODES·ADMIN_KEY는 Cloudflare secret으로 관리 (wrangler pages secret put …)
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { authenticate } from "./auth";
 import type { AppEnv } from "./env";
-import { adminRequired } from "./lib/admin";
+import { adminRequired, adminUnlocked, unlockAdmin } from "./lib/admin";
 import { json } from "./lib/http";
 import { getFlavorCandidates, getSettings, getStats, putSettings } from "./routes/admin";
 import { login, logout, recoverAccount, signup } from "./routes/auth";
@@ -79,10 +80,12 @@ app.post("/extract", authRequired, extractWithAi);
 
 app.get("/me", authRequired, getMe);
 // 관리자 — 목록(ADMIN_USERCODES secret)에 없으면 404. 존재 자체를 알리지 않는다(lib/admin.ts).
-app.get("/admin/stats", authRequired, adminRequired, getStats);
-app.get("/admin/flavor-candidates", authRequired, adminRequired, getFlavorCandidates);
-app.get("/admin/settings", authRequired, adminRequired, getSettings);
-app.put("/admin/settings", authRequired, adminRequired, putSettings);
+// 잠금 해제(ADMIN_KEY → 1시간 토큰)를 거쳐야 나머지가 열린다 — 얕은 계정 인증 위의 두 번째 열쇠.
+app.post("/admin/unlock", authRequired, adminRequired, unlockAdmin);
+app.get("/admin/stats", authRequired, adminRequired, adminUnlocked, getStats);
+app.get("/admin/flavor-candidates", authRequired, adminRequired, adminUnlocked, getFlavorCandidates);
+app.get("/admin/settings", authRequired, adminRequired, adminUnlocked, getSettings);
+app.put("/admin/settings", authRequired, adminRequired, adminUnlocked, putSettings);
 
 app.notFound(() => json({ ok: false, error: "not found" }, 404));
 // 5xx는 구조화 JSON으로 로깅 — wrangler pages deployment tail / 대시보드 Real-time Logs에서

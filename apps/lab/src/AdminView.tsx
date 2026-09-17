@@ -1,14 +1,35 @@
 // 관리자 화면(#88) — 가입 모드 · 대시보드 · 향미 승격 후보. 관리자(ADMIN_USERCODES)에게만 열린다.
 //
+// 들어오면 먼저 **관리 키**로 잠금을 푼다 — 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 위에 두 번째
+// 열쇠를 둔다. 받은 1시간 토큰은 sessionStorage에만 둔다(탭을 닫으면 사라진다). 서버가 `locked`로 답하면
+// 만료된 것이니 잠금 화면으로 돌아간다.
+//
 // 대시보드는 **멀리서 전체를 보는 숫자**다 — 규모, 최근 30일 움직임, 한도까지의 거리, 12개월 추이, 분포.
 // 계정별 표 같은 세부는 두지 않는다(운영자가 알아야 하는 것은 누가 무엇을 올렸는가가 아니다).
 // 크롬은 랩의 것을 그대로 쓰고, 차트는 라이브러리 없이 CSS 막대다 — 숫자 열두 개에 라이브러리는 과하다.
 // 향미 후보에는 "승격" 버튼이 없다: 어휘는 코드(@bnhd/schema/flavor)이고 색 커버리지 테스트가 색 없는
 // 승격을 막으므로, 후보를 보여 주고 PR에 붙여 넣을 목록을 복사하게 하는 데서 멈춘다(#78).
 import type { Account } from "@bnhd/session";
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { CopyButton } from "./components/FormBits";
 import { api } from "./lib/api";
+
+const ADMIN_TOKEN_KEY = "bh_admin_token";
+const readAdminToken = (): string => {
+  try {
+    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || "";
+  } catch (_e) {
+    return "";
+  }
+};
+const writeAdminToken = (t: string) => {
+  try {
+    if (t) sessionStorage.setItem(ADMIN_TOKEN_KEY, t);
+    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch (_e) {
+    /* 사생활 보호 모드 — 이 탭에서만 기억한다 */
+  }
+};
 
 type SignupMode = "invite" | "open" | "closed";
 const MODE_LABEL: Record<SignupMode, string> = { invite: "초대코드", open: "누구나", closed: "받지 않음" };
@@ -124,17 +145,52 @@ export default function AdminView({
   const [stats, setStats] = useState<Stats | null>(null);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState("");
+  const [adminToken, setAdminToken] = useState(readAdminToken);
+  const [keyInput, setKeyInput] = useState("");
+  const [unlockMsg, setUnlockMsg] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
 
   const call = useCallback(
     async <T = Record<string, unknown>>(path: string, opts: RequestInit = {}) => {
-      const res = await api<T>(path, account.token, opts);
+      const res = await api<T>(path, account.token, {
+        ...opts,
+        headers: {
+          ...(opts.headers as Record<string, string>),
+          ...(adminToken ? { "X-Admin-Token": adminToken } : {}),
+        },
+      });
       if (res.status === 401) onSessionExpired();
+      // 관리 토큰이 없거나 만료됐다 — 잠금 화면으로. 세션은 멀쩡하므로 로그아웃시키지 않는다
+      if (res.status === 403 && (res.body as { locked?: boolean } | null)?.locked) {
+        writeAdminToken("");
+        setAdminToken("");
+      }
       return res;
     },
-    [account.token, onSessionExpired],
+    [account.token, adminToken, onSessionExpired],
   );
 
+  async function unlock(e: FormEvent) {
+    e.preventDefault();
+    if (!keyInput || unlocking) return;
+    setUnlocking(true);
+    setUnlockMsg("");
+    const res = await api<{ token: string }>("/api/admin/unlock", account.token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: keyInput }),
+    });
+    setUnlocking(false);
+    setKeyInput("");
+    if (res.status === 401) return onSessionExpired();
+    if (res.body?.ok && res.body.token) {
+      writeAdminToken(res.body.token);
+      setAdminToken(res.body.token);
+    } else setUnlockMsg(res.body?.error || "잠금을 풀지 못했습니다.");
+  }
+
   useEffect(() => {
+    if (!adminToken) return;
     let alive = true;
     (async () => {
       const [s, m, c] = await Promise.all([
@@ -155,7 +211,7 @@ export default function AdminView({
     return () => {
       alive = false;
     };
-  }, [call]);
+  }, [call, adminToken]);
 
   // 가입 문을 여닫는 일은 클릭 한 번으로 일어나면 안 된다 — 드롭다운으로 고르고 "적용"을 따로 누른다.
   async function applyMode() {
@@ -177,6 +233,44 @@ export default function AdminView({
 
   const candidateText = (candidates ?? []).map((c) => `${c.note}\t${c.count}건\t${c.users}명`).join("\n");
   const days = stats?.recent_days ?? 30;
+
+  if (!adminToken) {
+    return (
+      <main className="flow admin">
+        <div className="stage-head">
+          <button type="button" className="stage-back" onClick={onBack}>
+            ← 등록으로
+          </button>
+        </div>
+        <form className="card" onSubmit={unlock}>
+          <h2>
+            관리 잠금 <span className="h2-aux">계정과 별개의 두 번째 열쇠</span>
+          </h2>
+          <label className="field">
+            <span className="field-head">
+              <span className="field-name">관리 키 (ADMIN_KEY)</span>
+            </span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              disabled={unlocking}
+            />
+          </label>
+          <div className="btnrow">
+            <button type="submit" className="primary" disabled={!keyInput || unlocking}>
+              {unlocking ? "확인 중…" : "잠금 풀기"}
+            </button>
+          </div>
+          {unlockMsg && <p className="error">{unlockMsg}</p>}
+          <p className="hint">
+            한 시간 뒤, 또는 이 탭을 닫으면 다시 잠긴다. 틀리면 10분에 5번까지만 시도할 수 있다.
+          </p>
+        </form>
+      </main>
+    );
+  }
 
   return (
     <main className="flow admin">

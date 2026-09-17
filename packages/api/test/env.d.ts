@@ -6,6 +6,7 @@ declare namespace Cloudflare {
     INVITE_CODE: string;
     /** 테스트는 바인딩에 두지 않고 요청마다 덮어써 넣는다(api()의 envOverride) */
     ADMIN_USERCODES?: string;
+    ADMIN_KEY?: string;
     TEST_SCHEMA_SQL: string;
   }
 }
