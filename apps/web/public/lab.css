@@ -1149,29 +1149,18 @@ input.upper {
 .admin::after {
   flex: 0;
 }
-/* 가입 모드 — 고르는 것과 적용하는 것을 떼어 둔다. 문을 여닫는 일이 클릭 한 번이면 너무 쉽다 */
+/* 가입 모드 — 고르는 것과 적용하는 것을 떼어 둔다. 문을 여닫는 일이 클릭 한 번이면 너무 쉽다.
+   네이티브 select는 이 서비스 어디에도 없다 — 선택지는 늘 알약(.chip)이나 세그먼트(.seg)로
+   손수 그린다. 고르는 동작(세그먼트)과 저장하는 동작(적용 버튼)을 갈라 "클릭 한 번 = 반영"을 막는다. */
 .mode-row {
   display: flex;
-  align-items: flex-end;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
 }
-.mode-field {
-  flex: 0 1 220px;
-  margin-bottom: 0;
-}
-/* theme.css의 입력 칸 규칙에 select는 없다(랩에 이 하나뿐) — 같은 결로 맞춘다 */
-.mode-field select {
-  width: 100%;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 14px;
-  background: var(--surface);
-  color: var(--ink);
-}
-.mode-row button {
-  margin-bottom: 1px;
+.mode-seg button {
+  padding: 6px 14px;
 }
 .tiles {
   display: grid;

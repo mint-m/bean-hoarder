@@ -286,26 +286,25 @@ export default function AdminView({
         <h2>
           가입 <span className="h2-aux">초대코드 값은 secret에 있다 — 여기서는 문만 여닫는다</span>
         </h2>
+        <p className="field-name">가입 모드{mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}</p>
         <div className="mode-row">
-          <label className="field mode-field">
-            <span className="field-head">
-              <span className="field-name">가입 모드{mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}</span>
-            </span>
-            <select
-              value={draft ?? ""}
-              disabled={mode === null || saving}
-              onChange={(e) => {
-                setDraft(e.target.value as SignupMode);
-                setModeMsg("");
-              }}
-            >
-              {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
-                <option key={m} value={m}>
-                  {MODE_LABEL[m]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="seg mode-seg">
+            {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={draft === m}
+                className={draft === m ? "on" : ""}
+                disabled={mode === null || saving}
+                onClick={() => {
+                  setDraft(m);
+                  setModeMsg("");
+                }}
+              >
+                {MODE_LABEL[m]}
+              </button>
+            ))}
+          </div>
           <button type="button" className="primary" disabled={!dirty || saving} onClick={applyMode}>
             적용
           </button>
