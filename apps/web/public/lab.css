@@ -1150,8 +1150,7 @@ input.upper {
   flex: 0;
 }
 /* 가입 모드 — 고르는 것과 적용하는 것을 떼어 둔다. 문을 여닫는 일이 클릭 한 번이면 너무 쉽다.
-   네이티브 select는 이 서비스 어디에도 없다 — 선택지는 늘 알약(.chip)이나 세그먼트(.seg)로
-   손수 그린다. 고르는 동작(세그먼트)과 저장하는 동작(적용 버튼)을 갈라 "클릭 한 번 = 반영"을 막는다. */
+   드롭다운으로 고르고 "적용"을 따로 눌러야 반영된다. */
 .mode-row {
   display: flex;
   align-items: center;
@@ -1159,8 +1158,48 @@ input.upper {
   flex-wrap: wrap;
   margin-top: var(--sp-1);
 }
-.mode-seg button {
-  padding: 6px 14px;
+.mode-select {
+  flex: 0 1 200px;
+}
+/* select는 이 서비스에서 여기 하나뿐이다 — 브라우저 기본 렌더링을 쓰지 않고 나머지 입력 칸
+   (theme.css의 input[type=text] 등)과 같은 결로 다시 그린다. 화살표는 이미지 대신 테두리
+   두 변으로 그려 --sub를 그대로 물려받는다 — 라이트·다크가 알아서 맞는다. */
+.select-wrap {
+  position: relative;
+}
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 45%;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--sub);
+  border-bottom: 1.5px solid var(--sub);
+  transform: translateY(-55%) rotate(45deg);
+  pointer-events: none;
+}
+.select-wrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 8px 30px 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.select-wrap select:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.select-wrap select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+  border-color: var(--accent);
 }
 .tiles {
   display: grid;
