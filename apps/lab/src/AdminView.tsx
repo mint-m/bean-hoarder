@@ -288,22 +288,21 @@ export default function AdminView({
         </h2>
         <p className="field-name">가입 모드{mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}</p>
         <div className="mode-row">
-          <div className="seg mode-seg">
-            {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={draft === m}
-                className={draft === m ? "on" : ""}
-                disabled={mode === null || saving}
-                onClick={() => {
-                  setDraft(m);
-                  setModeMsg("");
-                }}
-              >
-                {MODE_LABEL[m]}
-              </button>
-            ))}
+          <div className="select-wrap mode-select">
+            <select
+              value={draft ?? ""}
+              disabled={mode === null || saving}
+              onChange={(e) => {
+                setDraft(e.target.value as SignupMode);
+                setModeMsg("");
+              }}
+            >
+              {(Object.keys(MODE_LABEL) as SignupMode[]).map((m) => (
+                <option key={m} value={m}>
+                  {MODE_LABEL[m]}
+                </option>
+              ))}
+            </select>
           </div>
           <button type="button" className="primary" disabled={!dirty || saving} onClick={applyMode}>
             적용
