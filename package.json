@@ -31,7 +31,7 @@
     "@cloudflare/workers-types": "^5.20260910.1",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
-    "marked": "^18.0.12",
+    "marked": "^18.0.13",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.131.0"
