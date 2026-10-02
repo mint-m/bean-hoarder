@@ -98,7 +98,10 @@ export async function unlockAdmin(c: Context<AppEnv>): Promise<Response> {
   if (!key) return json({ ok: false, error: ADMIN_KEY_UNSET_ERROR }, 403);
   const db = createDb(c.env.DB);
   const ucBucket = `admin:${usercode}`;
-  const ipBucket = `ip:${clientIp(c.req.raw)}`;
+  // signup/recover(routes/auth.ts)와 같은 규칙 — 네임스페이스를 접두어로 분리한다. `ip:${ip}`를
+  // 그대로 썼다면 로그인 실패 버킷(auth.ts)과 같은 키를 공유해, 같은 IP의 로그인 실패가 관리
+  // 잠금 시도를 막거나 그 반대가 되는 교차 오염이 생긴다(#92 리뷰).
+  const ipBucket = `admin-ip:${clientIp(c.req.raw)}`;
   if (
     (await isRateLimited(db, ucBucket, ADMIN_KEY_BUCKET_LIMIT)) ||
     (await isRateLimited(db, ipBucket, IP_BUCKET_LIMIT))
