@@ -5,8 +5,13 @@
 //    부트스트랩 문제를 secret 하나로 끝내기 위해서다.
 // 2) **지금 열려 있는가**: 계정 인증은 접근성을 위해 일부러 얕다(4자리 PIN, 90일 세션). 그 계정 하나가
 //    새면 관리까지 넘어가면 안 되므로, 관리 요청에는 secret ADMIN_KEY로 잠금을 푼 **1시간짜리 관리 토큰**을
-//    따로 요구한다. 토큰은 HMAC 서명이라 테이블이 없고, 유저코드를 안에 품어 다른 계정의 세션으로는 못 쓴다.
-//    키는 운영자가 기억할 중간 길이라 엔트로피보다 **시도 횟수**로 막는다 — 유저코드당 5회/10분(ratelimit).
+//    따로 요구한다.
+//
+// 키와 서명을 **가른다**. ADMIN_KEY는 운영자가 기억할 중간 길이라 엔트로피가 아니라 **시도 횟수**로 막는다
+// (유저코드당 5회/10분). 그런데 그 키로 토큰을 서명하면, 토큰 하나가 새는 순간 rate limit을 거치지 않는
+// 오프라인 사전 공격의 재료가 된다 — 그래서 서명은 무작위 고엔트로피 secret ADMIN_TOKEN_SECRET으로 하고,
+// ADMIN_KEY는 잠금 해제 때 비교만 한다. 토큰은 그 세션(세션 토큰 해시)에 묶여 로그아웃하면 함께 죽고,
+// 만료는 발급 시점 + TTL을 넘을 수 없다(먼 미래 exp를 적은 토큰은 위조로 본다).
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createDb } from "../db";
@@ -21,6 +26,19 @@ export const ADMIN_KEY_BUCKET_LIMIT = 5;
 export const ADMIN_LOCKED_ERROR = "관리 키로 잠금을 풀어야 합니다.";
 export const ADMIN_KEY_ERROR = "관리 키가 올바르지 않습니다.";
 export const ADMIN_KEY_UNSET_ERROR = "ADMIN_KEY secret이 설정되지 않아 관리 기능이 잠겨 있습니다.";
+export const ADMIN_SECRET_UNSET_ERROR =
+  "ADMIN_TOKEN_SECRET secret이 없거나 너무 짧아(32자 미만) 관리 기능이 잠겨 있습니다.";
+export const ADMIN_SESSION_REQUIRED_ERROR = "관리 잠금은 세션 로그인으로만 풀 수 있습니다.";
+/** 서명 secret의 최소 길이 — 기억할 만한 값을 넣어 키 분리의 의미가 사라지는 것을 막는다 */
+export const ADMIN_TOKEN_SECRET_MIN = 32;
+/** 서버 간 시계 차이 허용 — 발급한 isolate와 검증하는 isolate가 다를 수 있다 */
+const CLOCK_SKEW_SEC = 60;
+
+/** 쓸 수 있는 서명 secret — 없거나 짧으면 null(관리 기능 전체가 잠긴다). */
+function tokenSecret(env: Env): string | null {
+  const s = env.ADMIN_TOKEN_SECRET ?? "";
+  return s.length >= ADMIN_TOKEN_SECRET_MIN ? s : null;
+}
 
 export function isAdmin(env: Env, usercode: string): boolean {
   const list = (env.ADMIN_USERCODES ?? "")
@@ -40,7 +58,8 @@ export const adminRequired = createMiddleware<AppEnv>(async (c, next) => {
 });
 
 // ── 관리 토큰 ──
-// 형식 bha_{만료 epoch초}.{유저코드}.{hmac hex}. 서명 키는 ADMIN_KEY — 키를 아는 사람은 이미 관리자다.
+// 형식 bha_{만료 epoch초}.{유저코드}.{hmac hex}. 서명 대상에는 세션 토큰 해시도 들어가지만 토큰에는
+// 싣지 않는다 — 서버가 인증 단계에서 이미 알고 있고, 클라이언트가 바꿔 끼울 수 없어야 한다.
 const TOKEN_RE = /^bha_(\d+)\.([A-Z0-9]{4})\.([0-9a-f]{64})$/;
 
 async function hmacHex(key: string, msg: string): Promise<string> {
@@ -63,19 +82,32 @@ function equalHex(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export async function signAdminToken(key: string, usercode: string, expSec: number): Promise<string> {
+export async function signAdminToken(
+  secret: string,
+  usercode: string,
+  sessionHash: string,
+  expSec: number,
+): Promise<string> {
   const uc = usercode.toUpperCase();
-  return `bha_${expSec}.${uc}.${await hmacHex(key, `${expSec}.${uc}`)}`;
+  return `bha_${expSec}.${uc}.${await hmacHex(secret, `${expSec}.${uc}.${sessionHash}`)}`;
 }
 
-/** 토큰이 이 키·이 계정의 것이고 아직 살아 있는가. */
-export async function verifyAdminToken(key: string, usercode: string, token: string): Promise<boolean> {
+/** 토큰이 이 secret·이 계정·이 세션의 것이고, 살아 있으며, 발급 가능한 범위의 만료를 갖는가. */
+export async function verifyAdminToken(
+  secret: string,
+  usercode: string,
+  sessionHash: string,
+  token: string,
+  nowMs = Date.now(),
+): Promise<boolean> {
   const m = TOKEN_RE.exec(token);
   if (!m?.[1] || !m[2] || !m[3]) return false;
   const exp = Number(m[1]);
-  if (!Number.isFinite(exp) || exp * 1000 <= Date.now()) return false;
+  const nowSec = Math.floor(nowMs / 1000);
+  if (!Number.isFinite(exp) || exp <= nowSec) return false;
+  if (exp > nowSec + ADMIN_TOKEN_TTL_SEC + CLOCK_SKEW_SEC) return false; // 서버가 내줄 수 없는 만료
   if (m[2] !== usercode.toUpperCase()) return false;
-  return equalHex(m[3], await hmacHex(key, `${exp}.${m[2]}`));
+  return equalHex(m[3], await hmacHex(secret, `${exp}.${m[2]}.${sessionHash}`));
 }
 
 /**
@@ -83,19 +115,33 @@ export async function verifyAdminToken(key: string, usercode: string, token: str
  * 세션 만료로 오해해 로그아웃시킨다. 비관리자는 앞 단계에서 이미 404라 여기서 존재가 새지 않는다.
  */
 export const adminUnlocked = createMiddleware<AppEnv>(async (c, next) => {
-  const key = c.env.ADMIN_KEY;
+  const secret = tokenSecret(c.env);
+  const user = c.get("user");
   const token = c.req.header("X-Admin-Token") ?? "";
-  if (!key || !token || !(await verifyAdminToken(key, c.get("user").usercode, token))) {
+  // 레거시 인증(유저코드:PIN)에는 세션이 없다 — 묶을 데가 없으니 관리로는 들어올 수 없다
+  if (
+    !c.env.ADMIN_KEY ||
+    !secret ||
+    !user.sessionTokenHash ||
+    !token ||
+    !(await verifyAdminToken(secret, user.usercode, user.sessionTokenHash, token))
+  ) {
     return json({ ok: false, error: ADMIN_LOCKED_ERROR, locked: true }, 403);
   }
   await next();
 });
 
-/** POST /api/admin/unlock { key } → { token, expires_at }. 실패는 유저코드·IP 버킷에 기록한다. */
+/**
+ * POST /api/admin/unlock { key } → { token, expires_at }. 실패는 유저코드·IP 버킷에 기록한다.
+ * ADMIN_KEY는 여기서 비교만 하고 서명에는 쓰지 않는다(머리 주석).
+ */
 export async function unlockAdmin(c: Context<AppEnv>): Promise<Response> {
-  const usercode = c.get("user").usercode;
+  const { usercode, sessionTokenHash } = c.get("user");
   const key = c.env.ADMIN_KEY;
   if (!key) return json({ ok: false, error: ADMIN_KEY_UNSET_ERROR }, 403);
+  const secret = tokenSecret(c.env);
+  if (!secret) return json({ ok: false, error: ADMIN_SECRET_UNSET_ERROR }, 403);
+  if (!sessionTokenHash) return json({ ok: false, error: ADMIN_SESSION_REQUIRED_ERROR }, 403);
   const db = createDb(c.env.DB);
   const ucBucket = `admin:${usercode}`;
   // signup/recover(routes/auth.ts)와 같은 규칙 — 네임스페이스를 접두어로 분리한다. `ip:${ip}`를
@@ -120,7 +166,7 @@ export async function unlockAdmin(c: Context<AppEnv>): Promise<Response> {
   const exp = Math.floor(Date.now() / 1000) + ADMIN_TOKEN_TTL_SEC;
   return json({
     ok: true,
-    token: await signAdminToken(key, usercode, exp),
+    token: await signAdminToken(secret, usercode, sessionTokenHash, exp),
     expires_at: new Date(exp * 1000).toISOString(),
   });
 }

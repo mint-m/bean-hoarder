@@ -8,6 +8,11 @@ import { schema } from "../db";
 export const AUTH_WINDOW_SEC = 600; // 10분
 export const PW_BUCKET_LIMIT = 10; // 유저코드당 실패 10회/10분
 export const IP_BUCKET_LIMIT = 30; // IP당 실패 30회/10분
+/**
+ * "누구나" 가입 모드의 IP당 **성공** 가입 한도(10분). 초대코드 모드에선 코드가 문턱이었지만 열린 모드엔
+ * 그 문턱이 없다 — 이게 없으면 스크립트 하나로 계정을 무제한 만들어 D1·PBKDF2 CPU·AI 전역 한도를 소진한다.
+ */
+export const OPEN_SIGNUP_LIMIT = 3;
 
 export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") || "unknown";

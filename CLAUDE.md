@@ -43,6 +43,7 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
+  --binding ADMIN_TOKEN_SECRET=local-dev-admin-token-secret-0123456789 \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -88,7 +89,10 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   관리 요청에는 계정과 별개로 secret `ADMIN_KEY`로 푼 1시간 토큰(`X-Admin-Token`)이 더 필요하다 — 계정
   인증이 일부러 얕은 만큼(4자리 PIN) 그 계정 하나가 새도 관리까지는 못 가게. **관리 라우트를 더할 때는
   `adminRequired` 뒤에 `adminUnlocked`도 건다.** 잠긴 상태는 401이 아니라 403+`locked` — 401은 랩이 세션
-  만료로 읽어 로그아웃시킨다.
+  만료로 읽어 로그아웃시킨다. **`ADMIN_KEY`로 토큰을 서명하지 말 것** — 키는 기억할 길이라 온라인 시도
+  횟수로만 막는데, 그 키로 서명한 토큰이 하나라도 새면 rate limit 없는 오프라인 추측의 재료가 된다. 서명은
+  무작위 32자 이상의 `ADMIN_TOKEN_SECRET`으로 하고, 토큰은 세션 토큰 해시에 묶는다(레거시 `유저코드:PIN`
+  인증으로는 관리에 들어올 수 없다).
 - **데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.** 덱(`/demo`)도 카드(`/DEMO…`)도
   `apps/web/src/demo-beans.json` 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
   조회 페이지가 `DEMO` 접두 KEY를 API 대신 이 JSON으로 답한다(`apps/web/src/viewer.ts`) —

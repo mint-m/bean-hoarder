@@ -276,7 +276,11 @@ merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 �
 </li>
 <li><p><strong>관리자</strong>: <code>npx wrangler pages secret put ADMIN_USERCODES</code> — 관리자로 쓸 <strong>본인 계정의 유저코드</strong>를 콤마로 나열한다(예: <code>ABCD,EFGH</code>). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩에 <strong>관리</strong>가 뜨고(<code>/api/me</code>), 아니면 <code>/api/admin/*</code>은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.</p>
 </li>
-<li><p><strong>관리 키</strong>: <code>npx wrangler pages secret put ADMIN_KEY</code> — 관리 화면에 들어갈 때 계정과 별개로 묻는 <strong>두 번째 열쇠</strong>. 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 계정이 새도 관리까지 넘어가지 않게 한다. 맞으면 1시간짜리 관리 토큰이 발급되고(탭을 닫으면 사라진다), 틀리면 유저코드당 <strong>10분에 5회</strong>까지만 시도할 수 있다 — 그래서 키는 긴 무작위 문자열이 아니라 <strong>기억할 수 있는 8~12자</strong>면 된다(PIN과 다르게, 다른 곳에서 쓰지 않는 것으로). 비어 있으면 관리자여도 전부 잠긴다.</p>
+<li><p><strong>관리 키</strong>: <code>npx wrangler pages secret put ADMIN_KEY</code> — 관리 화면에 들어갈 때 계정과 별개로 묻는 <strong>두 번째 열쇠</strong>. 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 계정이 새도 관리까지 넘어가지 않게 한다. 맞으면 그 로그인 세션에 묶인 1시간짜리 관리 토큰이 발급되고(로그아웃하거나 탭을 닫으면 사라진다), 틀리면 유저코드당 <strong>10분에 5회</strong>까지만 시도할 수 있다 — 그래서 키는 긴 무작위 문자열이 아니라 <strong>기억할 수 있는 8~12자</strong>면 된다(PIN과 다르게, 다른 곳에서 쓰지 않는 것으로). 비어 있으면 관리자여도 전부 잠긴다.</p>
+</li>
+<li><p><strong>관리 토큰 서명 secret</strong>: <code>openssl rand -hex 32 | npx wrangler pages secret put ADMIN_TOKEN_SECRET</code> — <strong>기억할 값이 아니라 무작위 32자 이상</strong>(짧으면 관리 기능이 잠긴다). 관리 키와 따로 두는 이유: 키는 짧아도 온라인 시도 횟수로 막히지만, 그 키로 토큰을 서명하면 토큰 하나가 새는 순간 rate limit 없이 오프라인으로 키를 추측할 수 있게 된다. 이 secret은 사람이 입력하지 않으므로 길어도 불편이 없다. 바꾸면 발급된 관리 토큰이 전부 무효가 된다(다시 잠금을 풀면 된다).</p>
+</li>
+<li><p><strong>가입 모드 &quot;누구나&quot;</strong>: 초대코드라는 문턱이 없는 대신 IP당 <strong>성공 가입 3회/10분</strong>으로 막는다(<code>OPEN_SIGNUP_LIMIT</code>, <code>packages/api/src/lib/ratelimit.ts</code>). 잠깐 문을 열 때만 쓰고 다시 닫는다.</p>
 </li>
 <li><p><strong>가입 모드</strong>: 관리 화면에서 <strong>초대코드 / 누구나 / 받지 않음</strong> 셋 중 하나 — D1 <code>settings</code> 테이블의 <code>signup_mode</code>. 초대코드 값 자체는 여전히 위 secret이고, 여기서 바꾸는 것은 &quot;지금 문이 열려 있는가&quot;뿐이다. 행이 없으면 초대코드(종전 동작).</p>
 </li>
@@ -325,10 +329,11 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + 
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
+  --binding ADMIN_TOKEN_SECRET=local-dev-admin-token-secret-0123456789 \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
-# (ADMIN_USERCODES=TEST · ADMIN_KEY=test-key: 시드 계정을 관리자로, 관리 잠금은 test-key로 — 로컬에서 관리 화면을 보려면)
+# (ADMIN_USERCODES=TEST · ADMIN_KEY=test-key · ADMIN_TOKEN_SECRET: 시드 계정을 관리자로, 관리 잠금은 test-key로 — 로컬에서 관리 화면을 보려면. 서명 secret은 로컬 전용 값)
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 </code></pre>
 <ul>
@@ -462,6 +467,7 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
   --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
+  --binding ADMIN_TOKEN_SECRET=local-dev-admin-token-secret-0123456789 \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -505,7 +511,10 @@ type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루�
 관리 요청에는 계정과 별개로 secret <code>ADMIN_KEY</code>로 푼 1시간 토큰(<code>X-Admin-Token</code>)이 더 필요하다 — 계정
 인증이 일부러 얕은 만큼(4자리 PIN) 그 계정 하나가 새도 관리까지는 못 가게. <strong>관리 라우트를 더할 때는
 <code>adminRequired</code> 뒤에 <code>adminUnlocked</code>도 건다.</strong> 잠긴 상태는 401이 아니라 403+<code>locked</code> — 401은 랩이 세션
-만료로 읽어 로그아웃시킨다.</li>
+만료로 읽어 로그아웃시킨다. <strong><code>ADMIN_KEY</code>로 토큰을 서명하지 말 것</strong> — 키는 기억할 길이라 온라인 시도
+횟수로만 막는데, 그 키로 서명한 토큰이 하나라도 새면 rate limit 없는 오프라인 추측의 재료가 된다. 서명은
+무작위 32자 이상의 <code>ADMIN_TOKEN_SECRET</code>으로 하고, 토큰은 세션 토큰 해시에 묶는다(레거시 <code>유저코드:PIN</code>
+인증으로는 관리에 들어올 수 없다).</li>
 <li><strong>데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.</strong> 덱(<code>/demo</code>)도 카드(<code>/DEMO…</code>)도
 <code>apps/web/src/demo-beans.json</code> 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
 조회 페이지가 <code>DEMO</code> 접두 KEY를 API 대신 이 JSON으로 답한다(<code>apps/web/src/viewer.ts</code>) —
