@@ -15,7 +15,14 @@ import {
   sha256hex,
 } from "../lib/crypto";
 import { json } from "../lib/http";
-import { clientIp, IP_BUCKET_LIMIT, isRateLimited, RATE_LIMIT_ERROR, recordFailure } from "../lib/ratelimit";
+import {
+  clientIp,
+  IP_BUCKET_LIMIT,
+  isRateLimited,
+  OPEN_SIGNUP_LIMIT,
+  RATE_LIMIT_ERROR,
+  recordFailure,
+} from "../lib/ratelimit";
 import { createSession, revokeSession } from "../lib/session";
 import { getSignupMode } from "../lib/settings";
 
@@ -36,6 +43,11 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
     await recordFailure(db, signupBucket);
     return json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403);
   }
+  // 열린 모드에서는 성공한 가입을 센다 — 초대코드라는 문턱이 없는 대신 IP당 속도로 막는다(ratelimit.ts).
+  const openBucket = `signup-ok:${clientIp(c.req.raw)}`;
+  if (mode === "open" && (await isRateLimited(db, openBucket, OPEN_SIGNUP_LIMIT))) {
+    return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
+  }
   const pin = body.password;
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
 
@@ -55,6 +67,8 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
     try {
       await db.insert(schema.users).values({ usercode, pass_hash: hash, recovery_hash: recoveryHash }).run();
       const session = await createSession(db, usercode);
+      // recordFailure는 고정 창 카운터를 +1 할 뿐이다 — 여기서는 실패가 아니라 "열린 모드 성공"을 센다
+      if (mode === "open") await recordFailure(db, openBucket);
       return json({
         ok: true,
         usercode,

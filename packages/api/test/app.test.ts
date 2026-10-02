@@ -23,17 +23,21 @@ function jsonBody(obj: unknown): RequestInit {
 interface SignupResult {
   usercode: string;
   recovery: string;
+  /** 레거시 인증(유저코드:PIN) — 대부분의 계약 테스트가 쓴다 */
   auth: { Authorization: string };
+  /** 세션 토큰 인증(bhs_…) — 랩이 실제로 쓰는 방식. 관리 잠금은 이것만 받는다 */
+  session: { Authorization: string };
 }
 
 async function signupUser(pin = "1234"): Promise<SignupResult> {
   const res = await api("/signup", jsonBody({ invite: INVITE, password: pin }));
-  const data = (await res.json()) as { ok: boolean; usercode: string; recovery_key: string };
+  const data = (await res.json()) as { ok: boolean; usercode: string; recovery_key: string; token: string };
   expect(data.ok).toBe(true);
   return {
     usercode: data.usercode,
     recovery: data.recovery_key,
     auth: { Authorization: `Bearer ${data.usercode}:${pin}` },
+    session: { Authorization: `Bearer ${data.token}` },
   };
 }
 
@@ -690,13 +694,17 @@ test("AI 대행 할당량: 호출이 실패하면 예약을 되돌린다 (우리
 // ── 내 계정 · 관리자 (#88 · #72) ─────────────────────────────
 
 const ADMIN_KEY = "test-admin-key";
-/** 관리자 환경 + 잠금 해제 — 관리 라우트를 부르는 테스트가 공유한다 */
+// 서명 secret은 키와 따로, 무작위 32자 이상이어야 한다(lib/admin.ts)
+const ADMIN_TOKEN_SECRET = "0123456789abcdef0123456789abcdef";
+/** 관리자 환경 — 관리 라우트를 부르는 테스트가 공유한다 */
+const adminEnv = (usercodes: string) => ({ ADMIN_USERCODES: usercodes, ADMIN_KEY, ADMIN_TOKEN_SECRET });
+/** 관리자 환경 + 잠금 해제(세션 로그인으로) */
 async function unlockAs(user: SignupResult) {
-  const env2 = { ADMIN_USERCODES: user.usercode, ADMIN_KEY };
-  const res = await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth }, env2);
+  const env2 = adminEnv(user.usercode);
+  const res = await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.session }, env2);
   const data = (await res.json()) as { ok: boolean; token: string };
   expect(data.ok).toBe(true);
-  return { env2, headers: { ...user.auth, "X-Admin-Token": data.token } };
+  return { env2, token: data.token, headers: { ...user.session, "X-Admin-Token": data.token } };
 }
 
 test("GET /api/me: 인증 필요, 관리자 여부와 AI 한도를 준다 — 한도 숫자는 서버가 단일 소스다", async () => {
@@ -728,60 +736,83 @@ test("관리 엔드포인트: 관리자가 아니면 404 — 존재를 알리지
   }
   expect((await api("/admin/stats")).status).toBe(401); // 인증이 먼저다
   // 관리자여도 잠금을 풀기 전엔 403 + locked — 401이면 랩이 세션 만료로 오해한다
-  const locked = await api(
-    "/admin/stats",
-    { headers: user.auth },
-    { ADMIN_USERCODES: user.usercode, ADMIN_KEY },
-  );
+  const locked = await api("/admin/stats", { headers: user.session }, adminEnv(user.usercode));
   expect(locked.status).toBe(403);
   expect((await locked.json()) as { locked?: boolean }).toMatchObject({ locked: true });
   const { env2, headers } = await unlockAs(user);
   expect((await api("/admin/stats", { headers }, env2)).status).toBe(200);
 });
 
-test("관리 잠금 해제: 틀린 키는 403, 5회면 429, ADMIN_KEY가 없으면 잠긴 채, 남의 토큰·만료 토큰은 안 통한다", async () => {
-  const { signAdminToken } = await import("../src/lib/admin");
+test("관리 잠금 해제: 틀린 키는 403, 5회면 429, secret이 없거나 짧으면 잠긴 채", async () => {
   const user = await signupUser();
-  const other = await signupUser();
-  const env2 = { ADMIN_USERCODES: `${user.usercode},${other.usercode}`, ADMIN_KEY };
-  const unlock = (key: unknown, who = user) =>
-    api("/admin/unlock", { ...jsonBody({ key }), headers: who.auth }, env2);
+  const env2 = adminEnv(user.usercode);
+  const unlock = (key: unknown) =>
+    api("/admin/unlock", { ...jsonBody({ key }), headers: user.session }, env2);
   expect((await unlock("nope")).status).toBe(403);
   expect(((await (await unlock("nope")).json()) as { error: string }).error).toBe(
     "관리 키가 올바르지 않습니다.",
   );
-  // secret이 없으면 관리자여도 잠긴 채 — 키 없이 열리는 길은 없다
-  const unset = await api(
-    "/admin/unlock",
-    { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth },
-    { ADMIN_USERCODES: user.usercode, ADMIN_KEY: "" },
-  );
-  expect(unset.status).toBe(403);
-  // 유저코드당 5회 — 키가 짧아도 되는 근거
+  // 키가 없으면, 또는 서명 secret이 없거나 짧으면 관리자여도 잠긴 채 — 열리는 길이 없다
+  const withEnv = (over: Record<string, string>) =>
+    api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.session }, { ...env2, ...over });
+  expect((await withEnv({ ADMIN_KEY: "" })).status).toBe(403);
+  const short = await withEnv({ ADMIN_TOKEN_SECRET: "short-memorable-secret" });
+  expect(short.status).toBe(403);
+  expect(((await short.json()) as { error: string }).error).toContain("ADMIN_TOKEN_SECRET");
+  // 유저코드당 5회 — 키가 짧아도 되는 근거(온라인 경로)
   for (let i = 0; i < 3; i++) await unlock("nope");
   expect((await unlock(ADMIN_KEY)).status).toBe(429); // 맞는 키여도 창이 닫혀 있다
-  // 다른 계정의 토큰으로는 못 연다 — 토큰이 유저코드를 품는다
-  const { headers: otherHeaders } = await unlockAs(other);
-  const borrowed = await api(
-    "/admin/stats",
-    { headers: { ...user.auth, "X-Admin-Token": otherHeaders["X-Admin-Token"] } },
-    env2,
+});
+
+test("관리 토큰: 세션에 묶이고, 레거시 인증으로는 못 풀고, 키로 서명한 토큰·먼 미래 만료는 위조로 본다", async () => {
+  const { signAdminToken } = await import("../src/lib/admin");
+  const user = await signupUser();
+  const other = await signupUser();
+  const env2 = adminEnv(`${user.usercode},${other.usercode}`);
+  const stats = (headers: Record<string, string>) => api("/admin/stats", { headers }, env2);
+
+  // 레거시 인증(유저코드:PIN)에는 세션이 없다 — 잠금을 풀 수도, 토큰을 쓸 수도 없다
+  const legacy = await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.auth }, env2);
+  expect(legacy.status).toBe(403);
+  expect(((await legacy.json()) as { error: string }).error).toBe(
+    "관리 잠금은 세션 로그인으로만 풀 수 있습니다.",
   );
-  expect(borrowed.status).toBe(403);
-  // 만료된 토큰
-  const expired = await signAdminToken(ADMIN_KEY, other.usercode, Math.floor(Date.now() / 1000) - 1);
-  expect(
-    (await api("/admin/stats", { headers: { ...other.auth, "X-Admin-Token": expired } }, env2)).status,
-  ).toBe(403);
-  // 산 토큰
-  expect((await api("/admin/stats", { headers: otherHeaders }, env2)).status).toBe(200);
+
+  const { token, headers } = await unlockAs(user);
+  expect((await stats(headers)).status).toBe(200);
+  expect((await stats({ ...user.auth, "X-Admin-Token": token })).status).toBe(403); // 같은 계정, 레거시 인증
+
+  // 같은 계정의 다른 세션(다른 기기)에서는 이 토큰이 통하지 않는다
+  const login = await api("/login", jsonBody({ usercode: user.usercode, password: "1234" }));
+  const second = { Authorization: `Bearer ${((await login.json()) as { token: string }).token}` };
+  expect((await stats({ ...second, "X-Admin-Token": token })).status).toBe(403);
+  // 다른 계정에도 통하지 않는다
+  expect((await stats({ ...other.session, "X-Admin-Token": token })).status).toBe(403);
+
+  // 로그아웃하면 그 세션에 묶인 토큰도 함께 죽는다(세션 자체가 사라져 인증 단계에서 401)
+  expect((await api("/session", { method: "DELETE", headers: user.session })).status).toBe(200);
+  expect((await stats(headers)).status).toBe(401);
+
+  // 위조 시도 — 세션 해시는 서버가 아는 값이라 여기서 직접 계산해 넣는다
+  const otherHash = await sha256hex(other.session.Authorization.slice("Bearer ".length));
+  const nowSec = Math.floor(Date.now() / 1000);
+  const forge = (secret: string, exp: number) =>
+    signAdminToken(secret, other.usercode, otherHash, exp).then((t) =>
+      stats({ ...other.session, "X-Admin-Token": t }),
+    );
+  expect((await forge(ADMIN_TOKEN_SECRET, nowSec + 60)).status).toBe(200); // 정상 범위 — 비교 기준
+  expect((await forge(ADMIN_TOKEN_SECRET, nowSec - 1)).status).toBe(403); // 만료
+  // 서명 secret을 알아도 서버가 내줄 수 없는 만료(먼 미래)는 받지 않는다
+  expect((await forge(ADMIN_TOKEN_SECRET, nowSec + 365 * 24 * 3600)).status).toBe(403);
+  // 예전 방식처럼 관리 키로 서명한 토큰은 통하지 않는다 — 키는 서명에 쓰이지 않는다
+  expect((await forge(ADMIN_KEY, nowSec + 60)).status).toBe(403);
 });
 
 test("관리 잠금 IP 버킷은 로그인 IP 버킷과 분리된 키를 쓴다 — 서로의 실패가 섞이지 않는다", async () => {
   // 고유 가짜 IP를 써서 이 테스트의 카운트가 다른 테스트의 "unknown" IP 실패와 섞이지 않게 한다.
   const ip = `203.0.113.${Math.floor(Math.random() * 250)}`;
   const user = await signupUser();
-  const env2 = { ADMIN_USERCODES: user.usercode, ADMIN_KEY };
+  const env2 = adminEnv(user.usercode);
   const row = (bucket: string) =>
     env.DB.prepare("SELECT count FROM auth_attempts WHERE bucket = ?")
       .bind(bucket)
@@ -796,7 +827,7 @@ test("관리 잠금 IP 버킷은 로그인 IP 버킷과 분리된 키를 쓴다 
 
   await api(
     "/admin/unlock",
-    { ...jsonBody({ key: "nope" }), headers: { ...user.auth, "CF-Connecting-IP": ip } },
+    { ...jsonBody({ key: "nope" }), headers: { ...user.session, "CF-Connecting-IP": ip } },
     env2,
   );
   // 같은 bucket 문자열을 썼다면(옛 버그) 로그인 실패 1회가 여기서 2로 늘어났을 것이다
@@ -911,4 +942,46 @@ test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 �
   expect(wrong.status).toBe(403);
   expect(((await wrong.json()) as { error: string }).error).toBe("초대코드가 올바르지 않습니다.");
   expect((await api("/signup", jsonBody({ invite: INVITE, password: "1234" }))).status).toBe(200);
+});
+
+test("가입 모드 open: 초대코드 문턱이 없는 대신 IP당 성공 가입을 센다 — 3회 뒤 429", async () => {
+  const admin = await signupUser();
+  const { env2, headers } = await unlockAs(admin);
+  const setMode = (mode: string) =>
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
+  // 다른 테스트의 "unknown" IP와 섞이지 않게 고유 IP로
+  const ip = `198.51.100.${Math.floor(Math.random() * 250)}`;
+  const signup = () =>
+    api("/signup", { ...jsonBody({ password: "1234" }), headers: { "CF-Connecting-IP": ip } });
+  expect((await setMode("open")).status).toBe(200);
+  try {
+    for (let i = 0; i < 3; i++) expect((await signup()).status).toBe(200);
+    const fourth = await signup();
+    expect(fourth.status).toBe(429);
+    expect(((await fourth.json()) as { error: string }).error).toBe(
+      "시도가 너무 많습니다. 잠시 후 다시 시도하세요.",
+    );
+    // 다른 IP는 영향 없다
+    const elsewhere = await api("/signup", {
+      ...jsonBody({ password: "1234" }),
+      headers: { "CF-Connecting-IP": `${ip}9` },
+    });
+    expect(elsewhere.status).toBe(200);
+  } finally {
+    await setMode("invite"); // 같은 파일의 다른 테스트가 공유하는 D1이다
+  }
+});
+
+test("가입은 settings 테이블이 아직 없는 DB에서도 invite로 동작한다 — 배포 순서가 틀려도 500이 되지 않게", async () => {
+  await env.DB.prepare("DROP TABLE settings").run();
+  try {
+    const wrong = await api("/signup", jsonBody({ invite: "WRONG", password: "1234" }));
+    expect(wrong.status).toBe(403);
+    expect(((await wrong.json()) as { error: string }).error).toBe("초대코드가 올바르지 않습니다.");
+    expect((await api("/signup", jsonBody({ invite: INVITE, password: "1234" }))).status).toBe(200);
+  } finally {
+    await env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))",
+    ).run();
+  }
 });

@@ -1,8 +1,8 @@
 // 관리자 화면(#88) — 가입 모드 · 대시보드 · 향미 승격 후보. 관리자(ADMIN_USERCODES)에게만 열린다.
 //
 // 들어오면 먼저 **관리 키**로 잠금을 푼다 — 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 위에 두 번째
-// 열쇠를 둔다. 받은 1시간 토큰은 sessionStorage에만 둔다(탭을 닫으면 사라진다). 서버가 `locked`로 답하면
-// 만료된 것이니 잠금 화면으로 돌아간다.
+// 열쇠를 둔다. 받은 1시간 토큰은 이 세션에 묶이고 sessionStorage에만 둔다(lib/admin-token.ts — 로그아웃이
+// 지운다). 서버가 `locked`로 답하면 만료된 것이니 잠금 화면으로 돌아간다.
 //
 // 대시보드는 **멀리서 전체를 보는 숫자**다 — 규모, 최근 30일 움직임, 한도까지의 거리, 12개월 추이, 분포.
 // 계정별 표 같은 세부는 두지 않는다(운영자가 알아야 하는 것은 누가 무엇을 올렸는가가 아니다).
@@ -12,24 +12,8 @@
 import type { Account } from "@bnhd/session";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { CopyButton } from "./components/FormBits";
+import { clearAdminToken, readAdminToken, writeAdminToken } from "./lib/admin-token";
 import { api } from "./lib/api";
-
-const ADMIN_TOKEN_KEY = "bh_admin_token";
-const readAdminToken = (): string => {
-  try {
-    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || "";
-  } catch (_e) {
-    return "";
-  }
-};
-const writeAdminToken = (t: string) => {
-  try {
-    if (t) sessionStorage.setItem(ADMIN_TOKEN_KEY, t);
-    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-  } catch (_e) {
-    /* 사생활 보호 모드 — 이 탭에서만 기억한다 */
-  }
-};
 
 type SignupMode = "invite" | "open" | "closed";
 const MODE_LABEL: Record<SignupMode, string> = { invite: "초대코드", open: "누구나", closed: "받지 않음" };
@@ -162,7 +146,7 @@ export default function AdminView({
       if (res.status === 401) onSessionExpired();
       // 관리 토큰이 없거나 만료됐다 — 잠금 화면으로. 세션은 멀쩡하므로 로그아웃시키지 않는다
       if (res.status === 403 && (res.body as { locked?: boolean } | null)?.locked) {
-        writeAdminToken("");
+        clearAdminToken();
         setAdminToken("");
       }
       return res;
@@ -203,6 +187,8 @@ export default function AdminView({
         setError(s.body?.error || m.body?.error || c.body?.error || "관리 정보를 불러오지 못했습니다.");
         return;
       }
+      // 잠금이 풀리기 전 실패(만료 → locked)가 남긴 문구를 지운다 — 다시 풀고 나서도 남아 있었다
+      setError("");
       setStats(s.body);
       setMode(m.body.signup_mode);
       setDraft(m.body.signup_mode);
@@ -265,7 +251,7 @@ export default function AdminView({
           </div>
           {unlockMsg && <p className="error">{unlockMsg}</p>}
           <p className="hint">
-            한 시간 뒤, 또는 이 탭을 닫으면 다시 잠긴다. 틀리면 10분에 5번까지만 시도할 수 있다.
+            한 시간 뒤, 로그아웃하거나 이 탭을 닫으면 다시 잠긴다. 틀리면 10분에 5번까지만 시도할 수 있다.
           </p>
         </form>
       </main>

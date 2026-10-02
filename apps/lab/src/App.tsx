@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import AdminView from "./AdminView";
 import AuthView from "./AuthView";
 import SettingsMenu, { type AiQuota } from "./components/SettingsMenu";
+import { clearAdminToken } from "./lib/admin-token";
 import { api } from "./lib/api";
 import Workspace from "./Workspace";
 
@@ -52,6 +53,7 @@ export default function App() {
   // refreshList/refreshLogos → useEffect가 끝없이 재실행된다.
   const handleSessionExpired = useCallback(() => {
     clearSession();
+    clearAdminToken(); // 관리 토큰도 함께 — 같은 탭에서 다시 로그인했을 때 키 없이 열리지 않게
     setAccount({ usercode: "", token: "" });
     setExpired(true);
   }, []);
@@ -72,6 +74,7 @@ export default function App() {
       /* 무시 */
     }
     clearSession();
+    clearAdminToken(); // 관리 토큰도 함께 — 같은 탭에서 다시 로그인했을 때 키 없이 열리지 않게
     setAccount({ usercode: "", token: "" });
     setExpired(false); // 스스로 나간 것이지 만료가 아니다
   }
