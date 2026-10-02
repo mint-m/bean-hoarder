@@ -604,6 +604,13 @@ test("rate limit: 만료된 auth_attempts 버킷은 다음 실패 기록 때 지
   expect(row?.n).toBe(0);
 });
 
+test("rate limit: auth_attempts.reset_at에 인덱스가 있다 — 위 청소가 풀스캔이 아니게 (#92 리뷰)", async () => {
+  const idx = await env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'auth_attempts' AND name = 'idx_auth_attempts_reset_at'",
+  ).first<{ name: string }>();
+  expect(idx?.name).toBe("idx_auth_attempts_reset_at");
+});
+
 test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 남은 횟수는 정확히 센다", async () => {
   const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
@@ -768,6 +775,33 @@ test("관리 잠금 해제: 틀린 키는 403, 5회면 429, ADMIN_KEY가 없으�
   ).toBe(403);
   // 산 토큰
   expect((await api("/admin/stats", { headers: otherHeaders }, env2)).status).toBe(200);
+});
+
+test("관리 잠금 IP 버킷은 로그인 IP 버킷과 분리된 키를 쓴다 — 서로의 실패가 섞이지 않는다", async () => {
+  // 고유 가짜 IP를 써서 이 테스트의 카운트가 다른 테스트의 "unknown" IP 실패와 섞이지 않게 한다.
+  const ip = `203.0.113.${Math.floor(Math.random() * 250)}`;
+  const user = await signupUser();
+  const env2 = { ADMIN_USERCODES: user.usercode, ADMIN_KEY };
+  const row = (bucket: string) =>
+    env.DB.prepare("SELECT count FROM auth_attempts WHERE bucket = ?")
+      .bind(bucket)
+      .first<{ count: number }>();
+
+  await api("/login", {
+    ...jsonBody({ usercode: "ZZZZ", password: "9999" }),
+    headers: { "CF-Connecting-IP": ip },
+  });
+  expect((await row(`ip:${ip}`))?.count).toBe(1);
+  expect(await row(`admin-ip:${ip}`)).toBeNull(); // 관리 잠금 쪽은 아직 손대지 않았다
+
+  await api(
+    "/admin/unlock",
+    { ...jsonBody({ key: "nope" }), headers: { ...user.auth, "CF-Connecting-IP": ip } },
+    env2,
+  );
+  // 같은 bucket 문자열을 썼다면(옛 버그) 로그인 실패 1회가 여기서 2로 늘어났을 것이다
+  expect((await row(`ip:${ip}`))?.count).toBe(1);
+  expect((await row(`admin-ip:${ip}`))?.count).toBe(1);
 });
 
 test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포를 읽는다 — 계정별 세부는 없다", async () => {

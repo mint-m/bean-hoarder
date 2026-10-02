@@ -1248,6 +1248,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 </tr>
 </thead>
 <tbody><tr>
+<td><code>db/migrate_auth_attempts_index.sql</code></td>
+<td>auth_attempts.reset_at에 인덱스를 추가한다(#92 리뷰에서 나온 결함).</td>
+</tr>
+<tr>
 <td><code>db/migrate_settings.sql</code></td>
 <td>서비스 설정 key/value (#88) — 첫 키는 signup_mode: invite</td>
 </tr>

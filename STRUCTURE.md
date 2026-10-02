@@ -35,6 +35,7 @@
 
 | 경로 | 역할 |
 |---|---|
+| `db/migrate_auth_attempts_index.sql` | auth_attempts.reset_at에 인덱스를 추가한다(#92 리뷰에서 나온 결함). |
 | `db/migrate_settings.sql` | 서비스 설정 key/value (#88) — 첫 키는 signup_mode: invite | open | closed. |
 | `db/schema.sql` | D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다. |
 | `db/seed.sql` | 로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건. |
