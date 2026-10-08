@@ -5,6 +5,12 @@
 import { useEffect, useRef, useState } from "react";
 
 const THEME_KEY = "bh_theme";
+
+/** 서버가 주는 AI 대행 한도(/api/me) — 문구가 이 값을 쓴다. 숫자를 손으로 적으면 한도를 바꿀 때 거짓말이 된다(#72). */
+export interface AiQuota {
+  limit: number;
+  remaining: number;
+}
 const GEMINI_KEY = "bh_gemini_key";
 
 /** 저장된 테마를 문서에 적용 (첫 페인트는 각 HTML의 인라인 스크립트가 이미 처리했다) */
@@ -22,7 +28,16 @@ function applyTheme(dark: boolean) {
   }
 }
 
-export default function SettingsMenu({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+export default function SettingsMenu({
+  open,
+  setOpen,
+  aiQuota,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  /** null이면 아직 모른다(로그인 전·응답 전) — 숫자 없이 말한다 */
+  aiQuota: AiQuota | null;
+}) {
   const [dark, setDark] = useState(() => document.documentElement.dataset.theme === "dark");
   const [key, setKey] = useState(() => localStorage.getItem(GEMINI_KEY) || "");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -120,8 +135,9 @@ export default function SettingsMenu({ open, setOpen }: { open: boolean; setOpen
               />
             </label>
             <p className="hint">
-              키가 없어도 <b>하루 10번</b>은 AI로 채워 드립니다. 키를 넣으면 <b>제한 없이</b> 쓸 수 있고, 키는
-              이 브라우저에만 저장돼 <b>내 키로 Google에 직접</b> 전송됩니다.{" "}
+              키가 없어도 {aiQuota ? <b>하루 {aiQuota.limit}번</b> : <b>하루 몇 번</b>}은 AI로 채워 드립니다
+              {aiQuota ? ` (오늘 ${aiQuota.remaining}번 남음)` : ""}. 키를 넣으면 <b>제한 없이</b> 쓸 수 있고,
+              키는 이 브라우저에만 저장돼 <b>내 키로 Google에 직접</b> 전송됩니다.{" "}
               <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">
                 무료 발급 ↗
               </a>

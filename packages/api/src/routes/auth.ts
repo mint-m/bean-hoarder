@@ -15,19 +15,42 @@ import {
   sha256hex,
 } from "../lib/crypto";
 import { json } from "../lib/http";
-import { clientIp, IP_BUCKET_LIMIT, isRateLimited, RATE_LIMIT_ERROR, recordFailure } from "../lib/ratelimit";
+import {
+  clientIp,
+  IP_BUCKET_LIMIT,
+  isRateLimited,
+  OPEN_SIGNUP_LIMIT,
+  RATE_LIMIT_ERROR,
+  recordFailure,
+} from "../lib/ratelimit";
 import { createSession, revokeSession } from "../lib/session";
+import { getSignupMode } from "../lib/settings";
+
+export const SIGNUP_CLOSED_ERROR = "지금은 가입을 받지 않습니다.";
 
 export async function signup(c: Context<AppEnv>): Promise<Response> {
   const body = signupBodySchema.parse(await c.req.json().catch(() => ({})));
   const db = createDb(c.env.DB);
   const signupBucket = `signup:${clientIp(c.req.raw)}`;
-  if (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE) {
+  // 가입 모드(관리자 설정, lib/settings.ts): closed면 문을 닫고, open이면 초대코드를 묻지 않는다.
+  // invite(기본)는 종전 그대로 — 아래 403과 메시지가 계약이다(app.test.ts).
+  const mode = await getSignupMode(db);
+  // 닫힌 문을 두드리는 것도 초대코드 오답과 같은 버킷에서 센다 — 가입을 닫는 방법이 INVITE_CODE를 비우는 것이던
+  // 때는 이 한도를 그대로 탔으므로, 모드가 생겼다고 한도 없는 엔드포인트가 되면 회귀다(#102). 메시지는 그대로 403.
+  const closed = mode === "closed";
+  if (closed || (mode === "invite" && (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE))) {
     if (await isRateLimited(db, signupBucket, IP_BUCKET_LIMIT)) {
       return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
     }
     await recordFailure(db, signupBucket);
-    return json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403);
+    return closed
+      ? json({ ok: false, error: SIGNUP_CLOSED_ERROR }, 403)
+      : json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403);
+  }
+  // 열린 모드에서는 성공한 가입을 센다 — 초대코드라는 문턱이 없는 대신 IP당 속도로 막는다(ratelimit.ts).
+  const openBucket = `signup-ok:${clientIp(c.req.raw)}`;
+  if (mode === "open" && (await isRateLimited(db, openBucket, OPEN_SIGNUP_LIMIT))) {
+    return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
   }
   const pin = body.password;
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
@@ -48,6 +71,8 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
     try {
       await db.insert(schema.users).values({ usercode, pass_hash: hash, recovery_hash: recoveryHash }).run();
       const session = await createSession(db, usercode);
+      // recordFailure는 고정 창 카운터를 +1 할 뿐이다 — 여기서는 실패가 아니라 "열린 모드 성공"을 센다
+      if (mode === "open") await recordFailure(db, openBucket);
       return json({
         ok: true,
         usercode,
