@@ -39,8 +39,11 @@ export async function reserveAiCall(
   usercode: string,
   quota: AiQuota = AI_QUOTA,
 ): Promise<number | null> {
-  // 하루 경계는 D1의 시계(UTC)를 따른다 — datetime('now')와 같은 기준이어야 리셋이 어긋나지 않는다.
-  const nextReset = sql.raw("datetime('now', '+1 day', 'start of day')");
+  // 하루 경계는 **한국 시간 자정**이다(#110) — 사용자가 "오늘"이라 읽는 날이 그날이다. UTC 자정이면 한국에서
+  // 오전 9시에 풀려 밤 11시에 다 쓴 사람이 자정이 지나도 "0번 남음"을 본다. 저장하는 값은 여전히 D1 시계(UTC)
+  // 문자열이다 — 위 비교(`reset_at <= datetime('now')`)와 같은 기준이어야 하므로, KST로 옮겨 날짜를 자른 뒤 다시 되돌린다.
+  // 서비스가 한국 전용이라는 가정이 여기 한 줄에 있다.
+  const nextReset = sql.raw("datetime('now', '+9 hours', '+1 day', 'start of day', '-9 hours')");
 
   async function bump(bucket: string): Promise<number> {
     // reset_at이 지났으면 1로 시작, 아니면 +1. RETURNING으로 확정된 값을 그대로 돌려받는다.

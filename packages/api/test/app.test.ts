@@ -635,6 +635,22 @@ test("AI 대행 할당량: 계정별 하루 한도를 넘기면 429 + fallback, 
   expect(rows?.n).toBe(1);
 });
 
+test("AI 대행 할당량: 하루 경계는 한국 시간 자정이다 — reset_at이 UTC 15:00 (#110)", async () => {
+  const { reserveAiCall } = await import("../src/lib/ai-quota");
+  const { createDb } = await import("../src/db");
+  const db = createDb(env.DB);
+  const uc = `KST${Math.random().toString(36).slice(2, 6)}`;
+  await reserveAiCall(db, uc, { perAccount: 2, global: 100000 });
+  const row = await env.DB.prepare(
+    "SELECT reset_at, reset_at > datetime('now') AS future, reset_at <= datetime('now', '+1 day') AS within_day FROM ai_usage WHERE bucket = ?",
+  )
+    .bind(`acct:${uc}`)
+    .first<{ reset_at: string; future: number; within_day: number }>();
+  expect(row?.reset_at.slice(11)).toBe("15:00:00"); // KST 00:00 = UTC 15:00
+  expect(row?.future).toBe(1);
+  expect(row?.within_day).toBe(1);
+});
+
 test("AI 대행 할당량: reset_at이 지나면 카운터가 1부터 다시 센다 — 같은 행을 재사용한다", async () => {
   const { reserveAiCall, remainingAiCalls } = await import("../src/lib/ai-quota");
   const { createDb } = await import("../src/db");
@@ -937,6 +953,31 @@ test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 �
   expect(wrong.status).toBe(403);
   expect(((await wrong.json()) as { error: string }).error).toBe("초대코드가 올바르지 않습니다.");
   expect((await api("/signup", jsonBody({ invite: INVITE, password: "1234" }))).status).toBe(200);
+});
+
+test("가입 모드 closed: 닫힌 문을 두드리는 것도 IP당 30회까지만 — 그 뒤 429, 다른 IP는 영향 없다 (#102)", async () => {
+  const admin = await signupUser();
+  const { env2, headers } = await unlockAs(admin);
+  const setMode = (mode: string) =>
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
+  const ip = `203.0.113.${Math.floor(Math.random() * 250)}`;
+  const signup = (from: string) =>
+    api("/signup", {
+      ...jsonBody({ invite: INVITE, password: "1234" }),
+      headers: { "CF-Connecting-IP": from },
+    });
+  expect((await setMode("closed")).status).toBe(200);
+  try {
+    for (let i = 0; i < 30; i++) {
+      const res = await signup(ip);
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: string }).error).toBe("지금은 가입을 받지 않습니다.");
+    }
+    expect((await signup(ip)).status).toBe(429);
+    expect((await signup(`${ip}9`)).status).toBe(403); // 다른 IP는 아직 403 — 한도는 IP별이다
+  } finally {
+    await setMode("invite"); // 같은 파일의 다른 테스트가 공유하는 D1이다
+  }
 });
 
 test("가입 모드 open: 초대코드 문턱이 없는 대신 IP당 성공 가입을 센다 — 3회 뒤 429", async () => {
