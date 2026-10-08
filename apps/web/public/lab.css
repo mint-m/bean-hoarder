@@ -1206,6 +1206,9 @@ input.upper {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
 }
+.card p + .tiles {
+  margin-top: var(--sp-3);
+}
 .tile {
   min-width: 0;
   padding: var(--sp-3) var(--sp-3) var(--sp-3);
@@ -1254,113 +1257,39 @@ input.upper {
   background: var(--accent);
 }
 
-/* 12개월 막대 — 가입은 잉크, 등록은 연하게. 라이브러리 없이 높이만 */
-.months {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 4px;
-  align-items: end;
-}
-.month-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
-  height: 72px;
-}
-.month-bars span {
-  display: block;
-  width: 6px;
-  min-height: 1px;
-  border-radius: 2px 2px 0 0;
-}
-.month-bars .b-signup {
-  background: var(--ink);
-}
-.month-bars .b-bean {
-  background: var(--sub);
-  opacity: 0.45;
-}
-.month-label {
-  margin-top: 4px;
-  text-align: center;
-  font-size: 10.5px;
-  color: var(--sub);
-  font-variant-numeric: tabular-nums;
-}
-
-/* 분포 — 이름 · 비율 막대 · 개수. 제일 큰 것이 100% */
-.dists {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-4) var(--sp-5);
-}
-.dist {
-  min-width: 0;
-}
-.dist-title {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--sub);
-  margin-bottom: 6px;
-}
-.dist-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 28px;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  padding: 3px 0;
-}
-.dist-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dist-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line);
-  overflow: hidden;
-}
-.dist-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--ink);
-  opacity: 0.7;
-  border-radius: 3px;
-}
-.dist-n {
-  text-align: right;
-  color: var(--sub);
-  font-variant-numeric: tabular-nums;
-}
-
-/* 승격 후보 — 알약 + 건수. 표 대신 훑어보는 목록 */
-.tags {
+/* 승격 후보 — 한 줄에 말 · 사람 수/건수 · 오타 힌트. 사용자 수가 판단 기준이라 굵게 */
+.cands {
   list-style: none;
   margin: 0 0 var(--sp-3);
   padding: 0;
+}
+.cands li {
   display: flex;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px var(--sp-3);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
 }
-.tags li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
+.cands li:first-child {
+  border-top: 0;
 }
-.tags li b {
-  font-size: 11px;
+.cand-note {
+  flex: 1 1 8em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cand-n {
   color: var(--sub);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
-@media (max-width: 420px) {
-  .dists {
-    grid-template-columns: 1fr;
-  }
+.cand-n b {
+  color: var(--ink);
+  font-size: 13px;
+}
+.cand-typo {
+  font-size: 11.5px;
+  color: var(--accent);
 }

@@ -835,85 +835,80 @@ test("관리 잠금 IP 버킷은 로그인 IP 버킷과 분리된 키를 쓴다 
   expect((await row(`admin-ip:${ip}`))?.count).toBe(1);
 });
 
-test("관리자 통계: 규모·최근 활동·한도 사용률·추이·분포를 읽는다 — 계정별 세부는 없다", async () => {
+test("관리자 통계: 가입 문·규모·한도까지의 거리만 — 결정에 안 쓰이는 분포·추이·세부는 없다", async () => {
   const admin = await signupUser();
   const other = await signupUser();
   await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamot", AGTRON: "#95 (Light)" });
   await addBean(other.auth, { ORIGIN: "KENYA", AGTRON: "#65 (Medium)" });
-  await addBean(other.auth, { ARCHIVED: "1" });
   const { env2, headers } = await unlockAs(admin);
   const stats = (await (await api("/admin/stats", { headers }, env2)).json()) as {
     ok: boolean;
     signup_mode: string;
     recent_days: number;
     users: { total: number; new_recent: number; active_recent: number };
-    beans: { total: number; archived: number; new_recent: number };
-    sessions: { active: number };
+    beans: { total: number; new_recent: number };
     auth: { live_buckets: number };
-    logos: { count: number; r2_objects: number; r2_objects_cap: number };
+    logos: { r2_objects: number; r2_objects_cap: number };
     r2: { month: string | null; writes: number; writes_cap: number };
     ai: { today_global: number; global_cap: number; accounts_today: number; per_account_cap: number };
-    monthly: { month: string; signups: number; beans: number }[];
-    origins: { name: string; n: number }[];
-    roasteries: { name: string; n: number }[];
-    roast_levels: { level: string; n: number }[];
-    top_notes: { note: string; n: number }[];
-    beans_per_account: { bucket: string; n: number }[];
-    accounts?: unknown;
   };
   expect(stats.ok).toBe(true);
   expect(stats.signup_mode).toBe("invite");
+  expect(stats.recent_days).toBeGreaterThan(0);
   expect(stats.users.total).toBeGreaterThanOrEqual(2);
   expect(stats.users.new_recent).toBeGreaterThanOrEqual(2); // 방금 가입했다
   expect(stats.users.active_recent).toBeGreaterThanOrEqual(2); // 방금 등록했다
-  expect(stats.beans.total).toBeGreaterThanOrEqual(3);
-  expect(stats.beans.new_recent).toBeGreaterThanOrEqual(3);
-  expect(stats.sessions.active).toBeGreaterThanOrEqual(2);
+  expect(stats.beans.total).toBeGreaterThanOrEqual(2);
+  expect(stats.beans.new_recent).toBeGreaterThanOrEqual(2);
+  expect(stats.auth.live_buckets).toBeGreaterThanOrEqual(0);
   expect(stats.logos.r2_objects_cap).toBeGreaterThan(0);
   expect(stats.r2.writes_cap).toBeGreaterThan(0);
   expect(stats.ai.global_cap).toBeGreaterThan(0);
   expect(stats.ai.per_account_cap).toBeGreaterThan(0);
-  // 12개월 축이 빈 달 없이 채워지고, 마지막 달이 이번 달이다
-  expect(stats.monthly).toHaveLength(12);
-  expect(stats.monthly.at(-1)?.month).toBe(new Date().toISOString().slice(0, 7));
-  expect(stats.monthly.at(-1)?.signups).toBeGreaterThanOrEqual(2);
-  expect(stats.origins.some((o) => o.name === "KENYA")).toBe(true);
-  expect(stats.roasteries[0]?.name).toBe("DANCHE");
-  expect(stats.roast_levels.map((r) => r.level).slice(0, 6)).toEqual([
-    "Ultra Light",
-    "Light",
-    "Medium Light",
-    "Medium",
-    "Medium Dark",
-    "Dark",
-  ]);
-  expect(stats.top_notes.find((t) => t.note === "Jasmine")?.n).toBeGreaterThanOrEqual(1);
-  expect(stats.beans_per_account.map((b) => b.bucket)).toEqual(["0", "1–5", "6–20", "21+"]);
-  // 계정별 표는 없다 — 대시보드는 멀리서 보는 숫자만이다
-  expect(stats.accounts).toBeUndefined();
+  // 보기엔 재미있지만 어떤 결정도 바꾸지 않는 숫자는 다시 자라지 않게 막아 둔다
+  for (const k of [
+    "accounts",
+    "monthly",
+    "origins",
+    "roasteries",
+    "roast_levels",
+    "top_notes",
+    "beans_per_account",
+    "sessions",
+  ]) {
+    expect(stats).not.toHaveProperty(k);
+  }
 });
 
-test("향미 승격 후보: 어휘 밖 노트만, 표기 변형은 하나로, 건수·사용자 수와 함께 (#78)", async () => {
+test("향미 승격 후보: 어휘 밖 노트만, 사용자 수 순, 오타 후보는 비슷한 어휘와 함께 (#78)", async () => {
   const admin = await signupUser();
   const other = await signupUser();
   await addBean(admin.auth, { TASTING_NOTE: "Jasmine, Bergamott, Yakult" });
   await addBean(other.auth, { TASTING_NOTE: "bergamott, 자스민, Yakult" });
   await addBean(other.auth, { TASTING_NOTE: "Bergamott" });
+  const hidden = await addBean(other.auth, { TASTING_NOTE: "Archivedonly" });
+  await api(`/bean/${hidden.data.key}/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived: true }),
+    headers: other.auth,
+  });
   const { env2, headers } = await unlockAs(admin);
   const res = await api("/admin/flavor-candidates", { headers }, env2);
   const data = (await res.json()) as {
     ok: boolean;
-    candidates: { note: string; count: number; users: number }[];
+    candidates: { note: string; count: number; users: number; similar: string | null }[];
   };
   expect(data.ok).toBe(true);
   // Jasmine·자스민은 어휘(영문·한글)라 빠진다. Bergamott 3건/2명이 Yakult 2건/2명보다 앞.
   // 다른 테스트가 남긴 노트("=SUM(A1)" 등)가 섞일 수 있어 이 둘만 골라 본다.
   const mine = data.candidates.filter((c) => ["Bergamott", "Yakult"].includes(c.note));
   expect(mine).toEqual([
-    { note: "Bergamott", count: 3, users: 2 },
-    { note: "Yakult", count: 2, users: 2 },
+    { note: "Bergamott", count: 3, users: 2, similar: "Bergamot" },
+    { note: "Yakult", count: 2, users: 2, similar: null },
   ]);
   expect(data.candidates.some((c) => /jasmine|자스민/i.test(c.note))).toBe(false);
+  // 보관한 원두의 노트는 후보가 아니다 (#101)
+  expect(data.candidates.some((c) => c.note === "Archivedonly")).toBe(false);
 });
 
 test("가입 모드: invite(기본)는 종전 그대로, open은 초대코드 없이, closed는 403", async () => {

@@ -4,9 +4,10 @@
 // 열쇠를 둔다. 받은 1시간 토큰은 이 세션에 묶이고 sessionStorage에만 둔다(lib/admin-token.ts — 로그아웃이
 // 지운다). 서버가 `locked`로 답하면 만료된 것이니 잠금 화면으로 돌아간다.
 //
-// 대시보드는 **멀리서 전체를 보는 숫자**다 — 규모, 최근 30일 움직임, 한도까지의 거리, 12개월 추이, 분포.
-// 계정별 표 같은 세부는 두지 않는다(운영자가 알아야 하는 것은 누가 무엇을 올렸는가가 아니다).
-// 크롬은 랩의 것을 그대로 쓰고, 차트는 라이브러리 없이 CSS 막대다 — 숫자 열두 개에 라이브러리는 과하다.
+// 대시보드는 **운영자가 내릴 결정에 쓰이는 숫자**만 둔다 — 가입 문을 열고 닫을지(최근 가입·인증 실패·한도 여유),
+// 무료 한도를 넘기기 전에 손을 쓸지(AI·R2), 어휘를 늘릴지(승격 후보). 산지·로스터리 분포나 월별 추이처럼 어떤
+// 결정도 바꾸지 않는 숫자는 두지 않는다. 계정별 표도 없다 — 누가 무엇을 올렸는가는 운영자가 알 일이 아니다.
+// 크롬은 랩의 것을 그대로 쓰고, 한도 막대는 라이브러리 없이 CSS다.
 // 향미 후보에는 "승격" 버튼이 없다: 어휘는 코드(@bnhd/schema/flavor)이고 색 커버리지 테스트가 색 없는
 // 승격을 막으므로, 후보를 보여 주고 PR에 붙여 넣을 목록을 복사하게 하는 데서 멈춘다(#78).
 import type { Account } from "@bnhd/session";
@@ -23,30 +24,20 @@ const MODE_HINT: Record<SignupMode, string> = {
   closed: "가입을 받지 않는다. 기존 계정은 그대로 쓴다.",
 };
 
-interface Named {
-  name: string;
-  n: number;
-}
 interface Stats {
   recent_days: number;
   users: { total: number; new_recent: number; active_recent: number };
-  beans: { total: number; archived: number; new_recent: number };
-  sessions: { active: number };
+  beans: { total: number; new_recent: number };
   auth: { live_buckets: number };
-  logos: { count: number; r2_objects: number; r2_objects_cap: number };
+  logos: { r2_objects: number; r2_objects_cap: number };
   r2: { month: string | null; writes: number; writes_cap: number };
   ai: { today_global: number; global_cap: number; accounts_today: number; per_account_cap: number };
-  monthly: { month: string; signups: number; beans: number }[];
-  origins: Named[];
-  roasteries: Named[];
-  roast_levels: { level: string; n: number }[];
-  top_notes: { note: string; n: number }[];
-  beans_per_account: { bucket: string; n: number }[];
 }
 interface Candidate {
   note: string;
   count: number;
   users: number;
+  similar: string | null;
 }
 
 const fmt = (n: number) => n.toLocaleString("ko-KR");
@@ -68,47 +59,6 @@ function Tile({ label, value, sub, cap }: { label: string; value: number; sub?: 
           <span style={{ width: `${used}%` }} className={used >= 80 ? "hot" : ""} />
         </div>
       )}
-    </div>
-  );
-}
-
-/** 이름·개수 목록을 비율 막대로 — 제일 큰 것을 100%로 두어 "무엇이 주류인가"만 보이게. */
-function Dist({ title, rows, empty = "—" }: { title: string; rows: Named[]; empty?: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.n));
-  return (
-    <div className="dist">
-      <div className="dist-title">{title}</div>
-      {rows.length ? (
-        rows.map((r) => (
-          <div className="dist-row" key={r.name}>
-            <span className="dist-name">{r.name}</span>
-            <span className="dist-bar">
-              <span style={{ width: `${(r.n / max) * 100}%` }} />
-            </span>
-            <span className="dist-n">{fmt(r.n)}</span>
-          </div>
-        ))
-      ) : (
-        <p className="hint">{empty}</p>
-      )}
-    </div>
-  );
-}
-
-/** 12개월 막대 두 줄 — 가입과 등록. 달 축은 서버가 빈 달까지 채워 준다. */
-function Monthly({ rows }: { rows: Stats["monthly"] }) {
-  const max = Math.max(1, ...rows.map((r) => Math.max(r.signups, r.beans)));
-  return (
-    <div className="months">
-      {rows.map((r) => (
-        <div className="month" key={r.month} title={`${r.month} — 가입 ${r.signups} · 등록 ${r.beans}`}>
-          <div className="month-bars">
-            <span className="b-signup" style={{ height: `${(r.signups / max) * 100}%` }} />
-            <span className="b-bean" style={{ height: `${(r.beans / max) * 100}%` }} />
-          </div>
-          <div className="month-label">{r.month.slice(5)}</div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -217,7 +167,9 @@ export default function AdminView({
   }
   const dirty = draft !== null && draft !== mode;
 
-  const candidateText = (candidates ?? []).map((c) => `${c.note}\t${c.count}건\t${c.users}명`).join("\n");
+  const candidateText = (candidates ?? [])
+    .map((c) => `${c.note}\t${c.users}명\t${c.count}건${c.similar ? `\t오타? ${c.similar}` : ""}`)
+    .join("\n");
   const days = stats?.recent_days ?? 30;
 
   if (!adminToken) {
@@ -301,35 +253,38 @@ export default function AdminView({
           </p>
         )}
         {modeMsg && <p className="hint">{modeMsg}</p>}
-      </section>
-
-      <section className="card">
-        <h2>
-          지금 <span className="h2-aux">규모와 최근 {days}일</span>
-        </h2>
-        {stats ? (
+        {/* 문을 여닫기 전에 보는 두 숫자 — 최근에 얼마나 들어왔나, 지금 누가 문을 두드리고 있나 */}
+        {stats && (
           <div className="tiles">
             <Tile
-              label="계정"
-              value={stats.users.total}
-              sub={`최근 ${days}일 · 신규 ${fmt(stats.users.new_recent)} · 등록한 계정 ${fmt(stats.users.active_recent)}`}
+              label={`최근 ${days}일 신규 가입`}
+              value={stats.users.new_recent}
+              sub={`원두를 등록한 계정 ${fmt(stats.users.active_recent)}`}
             />
-            <Tile
-              label="원두"
-              value={stats.beans.total}
-              sub={`최근 ${days}일 등록 ${fmt(stats.beans.new_recent)} · 보관 ${fmt(stats.beans.archived)}`}
-            />
-            <Tile label="로그인된 기기" value={stats.sessions.active} sub="만료되지 않은 세션" />
             <Tile
               label="인증 실패 감시"
               value={stats.auth.live_buckets}
               sub={stats.auth.live_buckets ? "10분 창 안에 실패가 있는 IP·계정" : "조용하다"}
             />
           </div>
-        ) : (
-          !error && <p className="hint">불러오는 중…</p>
         )}
       </section>
+
+      {stats && (
+        <section className="card">
+          <h2>
+            규모 <span className="h2-aux">지금까지 전체</span>
+          </h2>
+          <div className="tiles">
+            <Tile label="계정" value={stats.users.total} />
+            <Tile
+              label="원두"
+              value={stats.beans.total}
+              sub={`최근 ${days}일 등록 ${fmt(stats.beans.new_recent)}`}
+            />
+          </div>
+        </section>
+      )}
 
       {stats && (
         <section className="card">
@@ -349,46 +304,12 @@ export default function AdminView({
               cap={stats.r2.writes_cap}
               sub="로고 저장·교체 횟수 — 이달"
             />
-            <Tile
-              label="R2 로고"
-              value={stats.logos.r2_objects}
-              cap={stats.logos.r2_objects_cap}
-              sub={`로고 전체 ${fmt(stats.logos.count)} (레거시 인라인 포함)`}
-            />
+            <Tile label="R2 로고" value={stats.logos.r2_objects} cap={stats.logos.r2_objects_cap} />
           </div>
         </section>
       )}
 
-      {stats && (
-        <section className="card">
-          <h2>
-            추이 <span className="h2-aux">12개월 — 가입(진하게) · 원두 등록(연하게)</span>
-          </h2>
-          <Monthly rows={stats.monthly} />
-        </section>
-      )}
-
-      {stats && (
-        <section className="card">
-          <h2>
-            무엇이 등록되나 <span className="h2-aux">보관 제외</span>
-          </h2>
-          <div className="dists">
-            <Dist title="산지" rows={stats.origins} empty="아직 없다" />
-            <Dist title="로스터리" rows={stats.roasteries} empty="아직 없다" />
-            <Dist title="로스팅 레벨" rows={stats.roast_levels.map((r) => ({ name: r.level, n: r.n }))} />
-            <Dist
-              title="향미 노트"
-              rows={stats.top_notes.map((r) => ({ name: r.note, n: r.n }))}
-              empty="아직 없다"
-            />
-            <Dist
-              title="계정당 원두"
-              rows={stats.beans_per_account.map((r) => ({ name: `${r.bucket}개`, n: r.n }))}
-            />
-          </div>
-        </section>
-      )}
+      {!stats && !error && <p className="hint">불러오는 중…</p>}
 
       <section className="card">
         <h2>
@@ -397,11 +318,14 @@ export default function AdminView({
         {candidates ? (
           candidates.length ? (
             <>
-              <ul className="tags">
+              <ul className="cands">
                 {candidates.map((c) => (
-                  <li key={c.note} title={`${c.count}건 · ${c.users}명`}>
-                    {c.note}
-                    <b>{c.count}</b>
+                  <li key={c.note}>
+                    <span className="cand-note">{c.note}</span>
+                    <span className="cand-n">
+                      <b>{c.users}</b>명 · {c.count}건
+                    </span>
+                    {c.similar && <span className="cand-typo">오타? → {c.similar}</span>}
                   </li>
                 ))}
               </ul>
@@ -419,7 +343,8 @@ export default function AdminView({
                 />
               </div>
               <p className="hint">
-                숫자는 건수. 오타 후보(Bergamott)는 승격이 아니라 입력 시점 교정으로 볼 것. 승격하려면{" "}
+                여러 사람이 쓴 말부터 위에 둔다 — 한 사람이 여러 번 쓴 것은 취향이지 어휘 부족이 아니다.
+                「오타? →」가 붙은 것은 승격이 아니라 입력 시점 교정으로 볼 것. 승격하려면{" "}
                 <code>packages/schema/src/flavor.ts</code>에 한 줄 + 노트 색 — 커버리지 테스트가 색 없는
                 승격을 막는다.
               </p>
