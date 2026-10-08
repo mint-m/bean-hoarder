@@ -127,6 +127,7 @@ td code { white-space: nowrap; }
 <li class="d2"><a href="#claude-명령어">명령어</a></li>
 <li class="d2"><a href="#claude-절대-바꾸지-말-것">절대 바꾸지 말 것</a></li>
 <li class="d2"><a href="#claude-걸려-넘어지기-쉬운-것">걸려 넘어지기 쉬운 것</a></li>
+<li class="d2"><a href="#claude-커밋-규칙">커밋 규칙</a></li>
 <li class="d2"><a href="#claude-문서-관리-원칙">문서 관리 원칙</a></li>
 </ul></div>
 <div class="group"><a href="#design">DESIGN.md</a><ul>
@@ -535,6 +536,22 @@ CSV 헤더·필수 규칙·Zod 스키마·타입이 전부 여기서 파생되�
 <li><strong>새 파일은 <code>git add</code> 후에 <code>npm run gen:structure</code>를 돌린다</strong> — 생성기는 인덱스(커밋될 내용)만
 보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.</li>
 <li>커밋 전 <code>npm run check</code> 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 <code>npm run check:full</code>.</li>
+</ul>
+<h2 id="claude-커밋-규칙"><a class="anchor" href="#claude-커밋-규칙" aria-hidden="true">#</a>커밋 규칙</h2>
+<p>로그 한 줄만 보고 성격과 내용을 알 수 있게 쓴다. 예전 메시지(<code>… — …</code> 서사형 제목, 수십 줄
+본문)는 읽기 전에 해석이 필요했다 — 그래서 바꿨다(2026-10-06).</p>
+<ul>
+<li>제목: <code>&lt;type&gt;: &lt;한국어 요약&gt;</code> — 스코프 <code>()</code> 없음, 마침표 없음, 50자 안팎.
+type은 <code>feat</code>(기능) · <code>fix</code>(버그) · <code>refactor</code>(동작 불변 재구성) · <code>perf</code> · <code>test</code> ·
+<code>style</code>(UI/스타일만) · <code>docs</code> · <code>chore</code>(빌드·설정·의존성).</li>
+<li>본문: 선택. 쓴다면 <code>- </code> 항목 2~5줄, 항목마다 &quot;무엇을 왜&quot; 한 줄. 긴 근거·검증 기록은
+PR 본문에 둔다.</li>
+<li>커밋 하나에 논리적 변경 하나. 목적이 다르면 나눈다.</li>
+<li>브랜치는 <code>&lt;type&gt;/&lt;영문-케밥&gt;</code> (예: <code>feat/admin-page</code>).</li>
+<li><code>main</code> 병합은 squash라 <strong>PR 제목이 <code>main</code>의 커밋 제목이 된다</strong> — PR 제목도 위 형식으로 쓰고,
+병합 때 본문은 짧은 목록으로 줄인다(기본값은 브랜치 커밋 메시지 전체를 이어 붙인다).
+<code>main → deploy</code> 승격의 merge commit 제목은 예외다.</li>
+<li>Dependabot PR은 <code>.github/dependabot.yml</code>의 <code>commit-message.prefix</code>로 <code>chore:</code>가 붙는다.</li>
 </ul>
 <h2 id="claude-문서-관리-원칙"><a class="anchor" href="#claude-문서-관리-원칙" aria-hidden="true">#</a>문서 관리 원칙</h2>
 <p>에이전트가 만드는 변경은 코드보다 문서를 먼저 낡게 만든다. 그래서 <strong>파생할 수 있는 건 손으로

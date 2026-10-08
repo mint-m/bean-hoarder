@@ -125,6 +125,23 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.
 - 커밋 전 `npm run check` 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 `npm run check:full`.
 
+## 커밋 규칙
+
+로그 한 줄만 보고 성격과 내용을 알 수 있게 쓴다. 예전 메시지(`… — …` 서사형 제목, 수십 줄
+본문)는 읽기 전에 해석이 필요했다 — 그래서 바꿨다(2026-10-06).
+
+- 제목: `<type>: <한국어 요약>` — 스코프 `()` 없음, 마침표 없음, 50자 안팎.
+  type은 `feat`(기능) · `fix`(버그) · `refactor`(동작 불변 재구성) · `perf` · `test` ·
+  `style`(UI/스타일만) · `docs` · `chore`(빌드·설정·의존성).
+- 본문: 선택. 쓴다면 `- ` 항목 2~5줄, 항목마다 "무엇을 왜" 한 줄. 긴 근거·검증 기록은
+  PR 본문에 둔다.
+- 커밋 하나에 논리적 변경 하나. 목적이 다르면 나눈다.
+- 브랜치는 `<type>/<영문-케밥>` (예: `feat/admin-page`).
+- `main` 병합은 squash라 **PR 제목이 `main`의 커밋 제목이 된다** — PR 제목도 위 형식으로 쓰고,
+  병합 때 본문은 짧은 목록으로 줄인다(기본값은 브랜치 커밋 메시지 전체를 이어 붙인다).
+  `main → deploy` 승격의 merge commit 제목은 예외다.
+- Dependabot PR은 `.github/dependabot.yml`의 `commit-message.prefix`로 `chore:`가 붙는다.
+
 ## 문서 관리 원칙
 
 에이전트가 만드는 변경은 코드보다 문서를 먼저 낡게 만든다. 그래서 **파생할 수 있는 건 손으로
