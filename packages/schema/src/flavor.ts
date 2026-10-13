@@ -224,6 +224,11 @@ export function canonicalNote(note: string): string {
   return BY_TEXT.get(norm(t)) ?? t;
 }
 
+/** 어휘에 있는 노트인가 — 영문·한글·별칭 어느 표기로든. 관리자 페이지의 승격 후보 집계가 어휘 밖만 고르는 데 쓴다. */
+export function isKnownNote(note: string): boolean {
+  return BY_TEXT.has(norm(note));
+}
+
 /** 콤마 목록 전체를 되돌린다 — 자동 채우기·붙여넣기가 들어오는 길목에서 쓴다. */
 export function canonicalizeNotes(value: string): string {
   return serializeNotes(parseNotes(value).map(canonicalNote));

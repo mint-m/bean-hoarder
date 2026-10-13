@@ -4,6 +4,7 @@
 // 여기서 location.pathname을 읽어 KEY를 뽑는다. 그 계약은 e2e/routing.spec.ts가 지킨다.
 import { buildHeadline, displayValue, type HeadlineRow, headlineUsedFields } from "@bnhd/schema/headline";
 import { parseRoastLevel } from "@bnhd/schema/roast";
+import { loadSession } from "@bnhd/session";
 import { flavorGradient, originSignature } from "./lib/coffee-color";
 import { daysSince, el, escapeHtml, safeHttpUrl } from "./lib/dom";
 import { normalizeMemo } from "./lib/memo";
@@ -79,6 +80,32 @@ function showLanding(): void {
     }
   });
   setupScanner();
+  void showSignedIn();
+}
+
+/**
+ * 랜딩이 로그인을 알아본다 — 이 브라우저에 세션이 있으면 서버에 한 번 물어 "TEST로 로그인됨"과,
+ * 관리자면 관리 링크(/lab/#admin)를 보인다. 세션이 없으면 아무것도 묻지 않는다 — 익명 방문자와
+ * QR로 도착하는 조회(/{KEY})에는 호출이 하나도 늘지 않는다. 만료·오류면 조용히 익명 화면 그대로다
+ * (세션 정리는 그걸 실제로 쓰는 랩·덱이 맡는다).
+ */
+async function showSignedIn(): Promise<void> {
+  const { token } = loadSession();
+  if (!token) return;
+  let me: { ok?: boolean; usercode?: string; is_admin?: boolean } | null = null;
+  try {
+    const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    me = res.ok ? await res.json() : null;
+  } catch (_e) {
+    return;
+  }
+  if (!me?.ok || !me.usercode) return;
+  const line = el("landing-session");
+  const code = document.createElement("code");
+  code.textContent = me.usercode;
+  line.replaceChildren(code, document.createTextNode("로 로그인됨"));
+  line.classList.remove("hidden");
+  if (me.is_admin) el("landing-admin").classList.remove("hidden");
 }
 
 // ── 카메라 QR 스캔 ──

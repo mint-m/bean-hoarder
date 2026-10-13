@@ -49,12 +49,17 @@ export const sessions = sqliteTable("sessions", {
   expires_at: text().notNull(),
 });
 
-// 인증 시도 rate limit — bucket당 고정 윈도우 실패 카운터
-export const authAttempts = sqliteTable("auth_attempts", {
-  bucket: text().primaryKey(),
-  count: integer().notNull().default(0),
-  reset_at: text().notNull(),
-});
+// 인증 시도 rate limit — bucket당 고정 윈도우 실패 카운터.
+// reset_at 인덱스: recordFailure의 만료 청소(DELETE WHERE reset_at <= now)가 풀스캔이 아니게.
+export const authAttempts = sqliteTable(
+  "auth_attempts",
+  {
+    bucket: text().primaryKey(),
+    count: integer().notNull().default(0),
+    reset_at: text().notNull(),
+  },
+  (t) => [index("idx_auth_attempts_reset_at").on(t.reset_at)],
+);
 
 // AI 인식 사용량 — 서비스 키로 대신 호출해 주는 몫의 하루 한도(계정별·전역).
 // 사용자 본인 키는 브라우저에서 직접 나가므로 세지 않는다. 근거는 lib/ai-quota.ts.
@@ -85,3 +90,10 @@ export const logos = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.usercode, t.roastery] })],
 );
+
+// 서비스 설정 key/value — signup_mode 등. 관리자 페이지(#88)가 읽고 쓴다. 근거는 lib/settings.ts.
+export const settings = sqliteTable("settings", {
+  key: text().primaryKey(),
+  value: text().notNull(),
+  updated_at: text().notNull().default(sql`(datetime('now'))`),
+});
