@@ -26,7 +26,7 @@ const MODE_HINT: Record<SignupMode, string> = {
 
 interface Stats {
   recent_days: number;
-  users: { total: number; new_recent: number; active_recent: number };
+  users: { total: number; new_recent: number; new_with_beans: number };
   beans: { total: number; new_recent: number };
   auth: { live_buckets: number };
   logos: { r2_objects: number; r2_objects_cap: number };
@@ -259,7 +259,7 @@ export default function AdminView({
             <Tile
               label={`최근 ${days}일 신규 가입`}
               value={stats.users.new_recent}
-              sub={`원두를 등록한 계정 ${fmt(stats.users.active_recent)}`}
+              sub={`그중 원두를 등록한 계정 ${fmt(stats.users.new_with_beans)}`}
             />
             <Tile
               label="인증 실패 감시"

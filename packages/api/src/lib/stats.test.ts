@@ -31,6 +31,9 @@ test("nearestKnown: 어휘와 한두 글자 다른 말은 가장 가까운 표�
   expect(nearestKnown("Bergamott")).toBe("Bergamot");
   expect(nearestKnown("Yakult")).toBe(null);
   expect(nearestKnown("zz")).toBe(null); // 두 글자 이하는 한 글자 차이가 곧 다른 말이다
+  expect(nearestKnown("자뭉")).toBe("Grapefruit"); // 두 글자 한글 노트의 오타도 잡는다(자몽)
+  expect(nearestKnown("제스민")).toBe("Jasmine"); // 별칭(재스민)의 오타 — 한글 표기(자스민)와도 한 글자 차이
+  expect(nearestKnown("계하")).toBe("Osmanthus"); // 별칭(계화)에만 가까운 오타 — 한글 표기는 금목서
 });
 
 test("flavorCandidates: 오타 후보는 similar에 어휘 표기를 달고, 아닌 말은 null", () => {

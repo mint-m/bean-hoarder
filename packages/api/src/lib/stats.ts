@@ -27,17 +27,24 @@ function editDistance(a: string, b: string): number {
   return prev[b.length] ?? 0;
 }
 
-/** 허용 거리 — 짧은 말은 한 글자만 달라도 다른 말이라, 길이에 따라 0·1·2로 둔다. */
-const maxEdits = (len: number): number => (len < 3 ? 0 : len < 8 ? 1 : 2);
+/**
+ * 허용 거리 — 짧은 말은 한 글자만 달라도 다른 말이라 길이에 따라 둔다. 한글은 한 글자가 한 음절이라 두 글자
+ * 노트(자몽·라임)가 흔하다 — 라틴 문자 기준(3자 미만 0)을 그대로 쓰면 그 오타(자뭉)는 영영 힌트를 못 받는다.
+ */
+const maxEdits = (t: string): number => {
+  if (/[가-힣]/.test(t)) return t.length < 2 ? 0 : t.length < 5 ? 1 : 2;
+  return t.length < 3 ? 0 : t.length < 8 ? 1 : 2;
+};
 
-/** 어휘에서 가장 가까운 표기(영문) — 허용 거리 안에 없으면 null. 어휘 밖 말이므로 거리 0은 나오지 않는다. */
+/** 어휘에서 가장 가까운 표기(영문·한글·별칭 중 무엇에 가깝든 영문 표기로) — 허용 거리 안에 없으면 null. 어휘 밖 말이므로 거리 0은 나오지 않는다. */
 export function nearestKnown(token: string): string | null {
   const t = norm(token);
-  const limit = maxEdits(t.length);
+  const limit = maxEdits(t);
   if (!limit) return null;
   let best: { en: string; d: number } | null = null;
   for (const n of FLAVOR_NOTES) {
-    for (const form of [n.en, n.ko]) {
+    // 별칭도 본다 — 별칭 표기의 오타는 그 별칭에 가장 가깝다
+    for (const form of [n.en, n.ko, ...(n.alias ?? [])]) {
       const d = editDistance(t, norm(form));
       if (d <= limit && (!best || d < best.d)) best = { en: n.en, d };
     }

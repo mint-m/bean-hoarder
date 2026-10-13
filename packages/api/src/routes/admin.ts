@@ -32,7 +32,10 @@ export async function getStats(c: Context<AppEnv>): Promise<Response> {
       SELECT count(*) AS total,
              count(CASE WHEN created_at >= ${recent} THEN 1 END) AS new_recent
       FROM users`),
-    db.get<{ n: number }>(sql`SELECT count(DISTINCT usercode) AS n FROM beans WHERE created_at >= ${recent}`),
+    // 최근 신규 가입 중 원두를 하나라도 등록한 계정 — 가입 문을 열지 판단할 때 "들어온 사람이 실제로 쓰는가"
+    db.get<{ n: number }>(sql`
+      SELECT count(*) AS n FROM users u
+      WHERE u.created_at >= ${recent} AND EXISTS (SELECT 1 FROM beans b WHERE b.usercode = u.usercode)`),
     db.get<{ total: number; new_recent: number }>(sql`
       SELECT count(*) AS total,
              count(CASE WHEN created_at >= ${recent} THEN 1 END) AS new_recent
@@ -53,7 +56,7 @@ export async function getStats(c: Context<AppEnv>): Promise<Response> {
     ok: true,
     signup_mode: signupMode,
     recent_days: RECENT_DAYS,
-    users: { total: users?.total ?? 0, new_recent: users?.new_recent ?? 0, active_recent: active?.n ?? 0 },
+    users: { total: users?.total ?? 0, new_recent: users?.new_recent ?? 0, new_with_beans: active?.n ?? 0 },
     beans: { total: beans?.total ?? 0, new_recent: beans?.new_recent ?? 0 },
     auth: { live_buckets: limited?.n ?? 0 },
     logos: { r2_objects: logos?.r2 ?? 0, r2_objects_cap: MAX_R2_LOGO_OBJECTS },

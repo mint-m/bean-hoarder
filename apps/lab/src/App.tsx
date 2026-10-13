@@ -1,5 +1,5 @@
 import { type Account, clearSession, migrateLegacyPin } from "@bnhd/session";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AdminView from "./AdminView";
 import AuthView from "./AuthView";
 import SettingsMenu, { type AiQuota } from "./components/SettingsMenu";
@@ -24,8 +24,9 @@ export default function App() {
   // 로그인 직후 /api/me 한 번 — 관리자면 진입점을 보이고, AI 한도는 설정 문구가 쓴다(#72).
   // 실패해도 등록 동선은 멀쩡하다 — 둘 다 "있으면 보여 주는" 정보다.
   const [me, setMe] = useState<{ is_admin: boolean; ai_quota: AiQuota } | null>(null);
-  const [meFailed, setMeFailed] = useState(false);
-  const meFailedRef = useRef(false); // 재시도 판단용 — 이벤트 핸들러가 최신 값을 읽게
+  // /api/me의 상태 하나 — 로그아웃하면 loading으로 돌아가 다음 로그인이 이전 세션의 실패를 물려받지 않는다
+  const [meStatus, setMeStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [meAttempt, setMeAttempt] = useState(0); // 실패 뒤 다시 묻는 계기
   const [adminRoute, setAdminRoute] = useState(wantsAdmin);
   const signedIn = !!account?.usercode && !!account?.token;
   // 관리 화면은 주소가 #admin이고 서버가 관리자라고 답했을 때만이다. 비관리자에겐 #admin이 아무 뜻도 없다.
@@ -65,31 +66,36 @@ export default function App() {
     document.body.classList.toggle("signed-in", signedIn);
   }, [signedIn]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: meAttempt는 값이 아니라 "다시 물어라"는 계기다
   useEffect(() => {
     if (!signedIn || !account) {
       setMe(null);
+      setMeStatus("loading");
       return;
     }
     let alive = true;
-    const load = () =>
-      api<{ is_admin: boolean; ai_quota: AiQuota }>("/api/me", account.token).then((res) => {
-        if (!alive) return;
-        const ok = !!res.body?.ok;
-        if (ok && res.body) setMe({ is_admin: res.body.is_admin, ai_quota: res.body.ai_quota });
-        meFailedRef.current = !ok;
-        setMeFailed(!ok);
-      });
-    load();
-    // 한 번 실패하면 관리 진입점이 새로고침 전까지 안 보였다 — 탭으로 돌아올 때 다시 묻는다
-    const retry = () => {
-      if (document.visibilityState === "visible" && meFailedRef.current) load();
-    };
-    document.addEventListener("visibilitychange", retry);
+    setMeStatus("loading");
+    api<{ is_admin: boolean; ai_quota: AiQuota }>("/api/me", account.token).then((res) => {
+      if (!alive) return;
+      if (res.body?.ok) {
+        setMe({ is_admin: res.body.is_admin, ai_quota: res.body.ai_quota });
+        setMeStatus("ok");
+      } else setMeStatus("error");
+    });
     return () => {
       alive = false;
-      document.removeEventListener("visibilitychange", retry);
     };
-  }, [signedIn, account]);
+  }, [signedIn, account, meAttempt]);
+
+  // 한 번 실패하면 관리 진입점이 새로고침 전까지 안 보였다 — 실패해 있는 동안만, 탭으로 돌아올 때 다시 묻는다
+  useEffect(() => {
+    if (meStatus !== "error") return;
+    const retry = () => {
+      if (document.visibilityState === "visible") setMeAttempt((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", retry);
+    return () => document.removeEventListener("visibilitychange", retry);
+  }, [meStatus]);
 
   // 비관리자가 #admin으로 왔다 — 뜻 없는 주소를 남겨 두지 않는다(서버가 답한 뒤에만 판단한다)
   useEffect(() => {
@@ -165,7 +171,7 @@ export default function App() {
       </header>
       {signedIn && view === "admin" ? (
         <AdminView account={account} onBack={closeAdmin} onSessionExpired={handleSessionExpired} />
-      ) : signedIn && adminRoute && !me && !meFailed ? null : signedIn ? (
+      ) : signedIn && adminRoute && meStatus === "loading" ? null : signedIn ? (
         <Workspace
           account={account}
           onSessionExpired={handleSessionExpired}

@@ -22,11 +22,11 @@
 //   POST   /api/extract       AI 인식 대행 (서비스 키, 계정별·전역 하루 한도 — 본인 키가 있으면 브라우저 직접)
 //   GET    /api/me            내 계정 — 관리자 여부 + AI 한도/남은 횟수 (랩 문구가 이 값을 쓴다)
 //   POST   /api/admin/unlock             관리자 — ADMIN_KEY로 잠금 해제 → 1시간 관리 토큰 (X-Admin-Token)
-//   GET    /api/admin/stats              관리자 — 대시보드(규모·최근 활동·한도 사용률·12개월 추이·분포)
+//   GET    /api/admin/stats              관리자 — 결정에 쓰이는 숫자(가입 문·규모·무료 한도까지의 거리)
 //   GET    /api/admin/flavor-candidates  관리자 — 어휘 밖 향미 노트 집계 (승격은 PR로)
 //   GET    /api/admin/settings           관리자 — 가입 모드
 //   PUT    /api/admin/settings           관리자 — 가입 모드 변경 { signup_mode }
-// 환경변수: INVITE_CODE·ADMIN_USERCODES·ADMIN_KEY는 Cloudflare secret으로 관리 (wrangler pages secret put …)
+// 환경변수: INVITE_CODE·ADMIN_USERCODES·ADMIN_KEY·ADMIN_TOKEN_SECRET은 Cloudflare secret으로 관리 (wrangler pages secret put …)
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { authenticate } from "./auth";

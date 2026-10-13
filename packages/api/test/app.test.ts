@@ -824,6 +824,45 @@ test("관리 토큰: 세션에 묶이고, 레거시 인증으로는 못 풀고, 
   expect((await forge(ADMIN_KEY, nowSec + 60)).status).toBe(403);
 });
 
+test("관리 잠금 해제: 틀린 키 20건을 동시에 보내도 5건만 비교까지 간다 — 나머지는 429", async () => {
+  const user = await signupUser();
+  const env2 = adminEnv(user.usercode);
+  const ip = `198.18.0.${Math.floor(Math.random() * 250)}`;
+  const statuses = (
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        api(
+          "/admin/unlock",
+          { ...jsonBody({ key: `guess-${i}` }), headers: { ...user.session, "CF-Connecting-IP": ip } },
+          env2,
+        ),
+      ),
+    )
+  ).map((r) => r.status);
+  expect(statuses.filter((s) => s === 403)).toHaveLength(5);
+  expect(statuses.filter((s) => s === 429)).toHaveLength(15);
+});
+
+test("관리 잠금 해제: 맞힌 시도는 실패 한도를 깎지 않는다", async () => {
+  const user = await signupUser();
+  const env2 = adminEnv(user.usercode);
+  for (let i = 0; i < 4; i++) {
+    expect(
+      (await api("/admin/unlock", { ...jsonBody({ key: "nope" }), headers: user.session }, env2)).status,
+    ).toBe(403);
+  }
+  // 4번 틀린 뒤 맞혀도, 그 성공이 다섯 번째 실패로 세지지 않아 한 번 더 틀릴 여유가 남는다
+  expect(
+    (await api("/admin/unlock", { ...jsonBody({ key: ADMIN_KEY }), headers: user.session }, env2)).status,
+  ).toBe(200);
+  expect(
+    (await api("/admin/unlock", { ...jsonBody({ key: "nope" }), headers: user.session }, env2)).status,
+  ).toBe(403);
+  expect(
+    (await api("/admin/unlock", { ...jsonBody({ key: "nope" }), headers: user.session }, env2)).status,
+  ).toBe(429);
+});
+
 test("관리 잠금 IP 버킷은 로그인 IP 버킷과 분리된 키를 쓴다 — 서로의 실패가 섞이지 않는다", async () => {
   // 고유 가짜 IP를 써서 이 테스트의 카운트가 다른 테스트의 "unknown" IP 실패와 섞이지 않게 한다.
   const ip = `203.0.113.${Math.floor(Math.random() * 250)}`;
@@ -861,7 +900,7 @@ test("관리자 통계: 가입 문·규모·한도까지의 거리만 — 결정
     ok: boolean;
     signup_mode: string;
     recent_days: number;
-    users: { total: number; new_recent: number; active_recent: number };
+    users: { total: number; new_recent: number; new_with_beans: number };
     beans: { total: number; new_recent: number };
     auth: { live_buckets: number };
     logos: { r2_objects: number; r2_objects_cap: number };
@@ -873,7 +912,7 @@ test("관리자 통계: 가입 문·규모·한도까지의 거리만 — 결정
   expect(stats.recent_days).toBeGreaterThan(0);
   expect(stats.users.total).toBeGreaterThanOrEqual(2);
   expect(stats.users.new_recent).toBeGreaterThanOrEqual(2); // 방금 가입했다
-  expect(stats.users.active_recent).toBeGreaterThanOrEqual(2); // 방금 등록했다
+  expect(stats.users.new_with_beans).toBeGreaterThanOrEqual(2); // 방금 가입해 등록했다
   expect(stats.beans.total).toBeGreaterThanOrEqual(2);
   expect(stats.beans.new_recent).toBeGreaterThanOrEqual(2);
   expect(stats.auth.live_buckets).toBeGreaterThanOrEqual(0);
@@ -975,8 +1014,38 @@ test("가입 모드 closed: 닫힌 문을 두드리는 것도 IP당 30회까지�
     }
     expect((await signup(ip)).status).toBe(429);
     expect((await signup(`${ip}9`)).status).toBe(403); // 다른 IP는 아직 403 — 한도는 IP별이다
+    // 다시 열면 닫혀 있던 동안의 두드림이 초대코드 오답 한도를 깎아 먹지 않는다 — 오답은 429가 아니라 403이다
+    expect((await setMode("invite")).status).toBe(200);
+    const typo = await api("/signup", {
+      ...jsonBody({ invite: "WRONG", password: "1234" }),
+      headers: { "CF-Connecting-IP": ip },
+    });
+    expect(typo.status).toBe(403);
+    expect((await signup(ip)).status).toBe(200);
   } finally {
     await setMode("invite"); // 같은 파일의 다른 테스트가 공유하는 D1이다
+  }
+});
+
+test("가입 모드 open: 같은 IP에서 동시에 10건이 와도 3건만 가입된다 — 검사와 기록이 원자적이다", async () => {
+  const admin = await signupUser();
+  const { env2, headers } = await unlockAs(admin);
+  const setMode = (mode: string) =>
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
+  const ip = `192.0.2.${Math.floor(Math.random() * 250)}`;
+  expect((await setMode("open")).status).toBe(200);
+  try {
+    const statuses = (
+      await Promise.all(
+        Array.from({ length: 10 }, () =>
+          api("/signup", { ...jsonBody({ password: "1234" }), headers: { "CF-Connecting-IP": ip } }),
+        ),
+      )
+    ).map((r) => r.status);
+    expect(statuses.filter((s) => s === 200)).toHaveLength(3);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(7);
+  } finally {
+    await setMode("invite");
   }
 });
 

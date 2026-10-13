@@ -18,7 +18,7 @@ import { createDb } from "../db";
 import type { AppEnv, Env } from "../env";
 import { sha256hex } from "./crypto";
 import { json } from "./http";
-import { clientIp, IP_BUCKET_LIMIT, isRateLimited, RATE_LIMIT_ERROR, recordFailure } from "./ratelimit";
+import { clientIp, IP_BUCKET_LIMIT, RATE_LIMIT_ERROR, releaseAttempt, reserveAttempt } from "./ratelimit";
 
 export const ADMIN_TOKEN_TTL_SEC = 60 * 60;
 /** 관리 키 실패 한도 — PIN(10회)보다 빡빡하다. 키가 짧아도 되는 근거가 이 숫자다. */
@@ -148,21 +148,19 @@ export async function unlockAdmin(c: Context<AppEnv>): Promise<Response> {
   // 그대로 썼다면 로그인 실패 버킷(auth.ts)과 같은 키를 공유해, 같은 IP의 로그인 실패가 관리
   // 잠금 시도를 막거나 그 반대가 되는 교차 오염이 생긴다(#92 리뷰).
   const ipBucket = `admin-ip:${clientIp(c.req.raw)}`;
-  if (
-    (await isRateLimited(db, ucBucket, ADMIN_KEY_BUCKET_LIMIT)) ||
-    (await isRateLimited(db, ipBucket, IP_BUCKET_LIMIT))
-  ) {
-    return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
-  }
+  // 비교 **전에** 시도를 예약한다 — 동시 요청도 버킷당 한도만큼만 비교까지 간다. 키가 짧아도 되는 근거가
+  // 이 한도이므로, 검사와 기록을 따로 하면(병렬 요청이 모두 검사를 통과) 그 근거가 사라진다.
+  const ucOk = await reserveAttempt(db, ucBucket, ADMIN_KEY_BUCKET_LIMIT);
+  const ipOk = await reserveAttempt(db, ipBucket, IP_BUCKET_LIMIT);
+  if (!ucOk || !ipOk) return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
   const body = (await c.req.json().catch(() => ({}))) as { key?: unknown };
   const given = typeof body.key === "string" ? body.key : "";
   // 길이가 달라도 같은 비용을 치르게 해시를 비교한다 — 키 길이가 새지 않게
   const ok = given !== "" && equalHex(await sha256hex(given), await sha256hex(key));
-  if (!ok) {
-    await recordFailure(db, ucBucket);
-    await recordFailure(db, ipBucket);
-    return json({ ok: false, error: ADMIN_KEY_ERROR }, 403);
-  }
+  if (!ok) return json({ ok: false, error: ADMIN_KEY_ERROR }, 403); // 예약이 곧 실패 기록이다
+  // 맞혔다 — 실패 한도를 깎지 않게 예약을 돌려준다
+  await releaseAttempt(db, ucBucket);
+  await releaseAttempt(db, ipBucket);
   const exp = Math.floor(Date.now() / 1000) + ADMIN_TOKEN_TTL_SEC;
   return json({
     ok: true,
