@@ -61,6 +61,13 @@ body {
   font-size: 11.5px;
   border-radius: var(--radius-pill);
 }
+/* 지금 보고 있는 화면 — 누를 일이 없는 버튼이라 채워서 "여기"임만 보인다 */
+.acct-chip button[aria-current="page"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+  cursor: default;
+}
 .topbar-right {
   display: flex;
   align-items: center;

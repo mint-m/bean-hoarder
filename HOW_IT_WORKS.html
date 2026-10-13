@@ -274,7 +274,7 @@ merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 �
 </li>
 <li><p><strong>초대코드</strong>: Cloudflare <strong>secret</strong>으로 관리 — <code>npx wrangler pages secret put INVITE_CODE</code> (교체도 동일, 저장소에 커밋하지 않는다)</p>
 </li>
-<li><p><strong>관리자</strong>: <code>npx wrangler pages secret put ADMIN_USERCODES</code> — 관리자로 쓸 <strong>본인 계정의 유저코드</strong>를 콤마로 나열한다(예: <code>ABCD,EFGH</code>). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩에 <strong>관리</strong>가 뜨고(<code>/api/me</code>), 아니면 <code>/api/admin/*</code>은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.</p>
+<li><p><strong>관리자</strong>: <code>npx wrangler pages secret put ADMIN_USERCODES</code> — 관리자로 쓸 <strong>본인 계정의 유저코드</strong>를 콤마로 나열한다(예: <code>ABCD,EFGH</code>). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩과 메인 랜딩(로그인된 브라우저)에 <strong>관리</strong>가 뜨고(<code>/api/me</code>), 관리 화면의 주소는 **<code>/lab/#admin</code>**이다(북마크·새로고침 가능. 경로가 아니라 해시인 이유는 경로를 QR 폴백이 가져가기 때문). 아니면 <code>/api/admin/*</code>은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.</p>
 </li>
 <li><p><strong>관리 키</strong>: <code>npx wrangler pages secret put ADMIN_KEY</code> — 관리 화면에 들어갈 때 계정과 별개로 묻는 <strong>두 번째 열쇠</strong>. 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 계정이 새도 관리까지 넘어가지 않게 한다. 맞으면 그 로그인 세션에 묶인 1시간짜리 관리 토큰이 발급되고(로그아웃하거나 탭을 닫으면 사라진다), 틀리면 유저코드당 <strong>10분에 5회</strong>까지만 시도할 수 있다 — 그래서 키는 긴 무작위 문자열이 아니라 <strong>기억할 수 있는 8~12자</strong>면 된다(PIN과 다르게, 다른 곳에서 쓰지 않는 것으로). 비어 있으면 관리자여도 전부 잠긴다.</p>
 </li>
@@ -284,7 +284,7 @@ merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 �
 </li>
 <li><p><strong>가입 모드</strong>: 관리 화면에서 <strong>초대코드 / 누구나 / 받지 않음</strong> 셋 중 하나 — D1 <code>settings</code> 테이블의 <code>signup_mode</code>. 초대코드 값 자체는 여전히 위 secret이고, 여기서 바꾸는 것은 &quot;지금 문이 열려 있는가&quot;뿐이다. 행이 없으면 초대코드(종전 동작).</p>
 </li>
-<li><p><strong>향미 어휘 승격</strong>: 관리 화면 &quot;향미 승격 후보&quot;가 어휘(<code>packages/schema/src/flavor.ts</code>)에 없는데 등록된 노트를 건수·사용자 수와 함께 보여 준다. <strong>승격은 PR로</strong> — 그 파일에 한 줄 + <code>apps/web/src/lib/coffee-color.ts</code>의 노트 색. 색 없이 노트만 더하면 <code>flavor-coverage.test.ts</code>가 막는다. 오타 후보(<code>Bergamott</code>)는 승격하지 않는다.</p>
+<li><p><strong>향미 어휘 승격</strong>: 관리 화면 &quot;향미 승격 후보&quot;가 어휘(<code>packages/schema/src/flavor.ts</code>)에 없는데 등록된 노트를 사용자 수 순으로, 건수와 함께 보여 준다. 어휘와 한두 글자 다른 말에는 &quot;오타? →&quot;가 붙는다. <strong>승격은 PR로</strong> — 그 파일에 한 줄 + <code>apps/web/src/lib/coffee-color.ts</code>의 노트 색. 색 없이 노트만 더하면 <code>flavor-coverage.test.ts</code>가 막는다. 오타 후보(<code>Bergamott</code>)는 승격하지 않는다.</p>
 </li>
 <li><p><strong>AI 인식 키(선택)</strong>: <code>npx wrangler pages secret put GEMINI_API_KEY</code> — 키를 넣지 않으면 AI 대행이 503으로 응답하고 클라이언트가 규칙 기반 인식으로 내려가므로 서비스는 그대로 동작한다. 하루 한도는 계정별 10회·전역 100회(<code>packages/api/src/lib/ai-quota.ts</code>) — 무료 등급을 넘겨 조용히 죽는 대신 코드가 먼저 막는다.</p>
 </li>
@@ -1282,6 +1282,10 @@ overflow-wrap: break-word; /* 단, 한 덩어리가 줄보다 길면(긴 URL 등
 </tr>
 </thead>
 <tbody><tr>
+<td><code>e2e/admin-route.spec.ts</code></td>
+<td>관리 화면으로 가는 길 — 랜딩이 로그인을 알아보고, 관리 화면은 주소(/lab/#admin)를 가진다.</td>
+</tr>
+<tr>
 <td><code>e2e/routing.spec.ts</code></td>
 <td>배포 산출물의 라우팅 계약 — 인쇄된 라벨의 QR이 향하는 경로가 살아 있는지 검증한다.</td>
 </tr>
