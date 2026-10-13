@@ -284,7 +284,7 @@ merge-base가 옛날에 묶인 채 굳고, 다음 승격 PR이 <strong>내용 �
 <li><p><strong>DB 백업 (3중 안전망)</strong>:</p>
 <ol>
 <li><strong>D1 Time Travel</strong> — 최근 30일 내 임의 시점 복구: <code>npx wrangler d1 time-travel info bnhd-v2</code>로 북마크 확인, <code>npx wrangler d1 time-travel restore bnhd-v2 --timestamp=&lt;unix|ISO&gt;</code>로 복구.</li>
-<li><strong>자동 덤프</strong> — <code>.github/workflows/backup.yml</code>이 매일 04:17 KST에 <code>wrangler d1 export</code>를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 <code>bnhd-v2-backup.sql</code>을 받아 <code>npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql</code> (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 <code>CLOUDFLARE_API_TOKEN</code>에 D1:Edit 권한 추가.</li>
+<li><strong>자동 덤프</strong> — <code>.github/workflows/backup.yml</code>이 매일 04:17 KST에 <code>wrangler d1 export</code>를 실행해 <strong>age 공개키로 암호화한 뒤</strong> Actions artifact(30일 보관)로 저장. 저장소가 공개라 artifact는 누구나 받을 수 있으므로 평문은 올리지 않는다 — 공개키는 저장소 변수 <code>BACKUP_AGE_RECIPIENT</code>, 개인키는 운영자만 저장소 밖(비밀번호 관리자 등)에 보관한다. 키 만들기: <code>age-keygen -o bnhd-backup.key</code>(출력의 <code>age1…</code>이 공개키) → <code>gh variable set BACKUP_AGE_RECIPIENT --body &#39;age1…&#39;</code>. 복구: artifact의 <code>bnhd-v2-backup.sql.age</code>를 받아 <code>age -d -i bnhd-backup.key -o bnhd-v2-backup.sql bnhd-v2-backup.sql.age</code> → <code>npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql</code> (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 <code>CLOUDFLARE_API_TOKEN</code>에 D1:Edit 권한 추가.</li>
 <li><strong>사용자 셀프 백업</strong> — 각자 랩에서 CSV 내보내기/복원.
 (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)</li>
 </ol>
