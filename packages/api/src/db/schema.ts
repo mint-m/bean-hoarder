@@ -50,7 +50,7 @@ export const sessions = sqliteTable("sessions", {
 });
 
 // 인증 시도 rate limit — bucket당 고정 윈도우 실패 카운터.
-// reset_at 인덱스: recordFailure의 만료 청소(DELETE WHERE reset_at <= now)가 풀스캔이 아니게.
+// reset_at 인덱스: reserveAttempt의 만료 청소(DELETE WHERE reset_at <= now)가 풀스캔이 아니게.
 export const authAttempts = sqliteTable(
   "auth_attempts",
   {

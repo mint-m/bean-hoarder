@@ -1,9 +1,11 @@
-// D1 기반 고정 윈도우 rate limit — 인증 실패 시도에만 사용한다.
+// D1 기반 고정 윈도우 rate limit — 인증 시도(로그인·초대코드·복구키·관리 잠금)와 열린 가입에 쓴다.
+// 판정과 기록은 언제나 **한 문장**(reserveAttempt의 UPSERT … RETURNING)이다. "읽어서 검사 → 검증 →
+// 실패면 기록"으로 나누면 동시에 보낸 요청이 전부 검사를 통과해 한도가 없는 것과 같아진다 — 그래서
+// 검사만 하는 함수를 두지 않는다. 맞힌 시도는 releaseAttempt로 돌려준다.
 // Workers Rate Limiting binding은 Pages Functions에서 지원되지 않아 D1 카운터로 구현.
 // 정확한 슬라이딩 윈도우가 아니어도 무차별 대입(4자리 PIN 전수 시도) 차단 목적엔 충분하다.
-import { and, eq, gt, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { schema } from "../db";
 
 export const AUTH_WINDOW_SEC = 600; // 10분
 export const PW_BUCKET_LIMIT = 10; // 유저코드당 실패 10회/10분
@@ -18,24 +20,13 @@ export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") || "unknown";
 }
 
-/** 윈도우 내 실패 횟수가 한도를 넘었는지 (읽기 전용, 단일 쿼리 — 만료 판정은 SQL에서) */
-export async function isRateLimited(db: Db, bucket: string, limit: number): Promise<boolean> {
-  const row = await db
-    .select({ count: schema.authAttempts.count })
-    .from(schema.authAttempts)
-    .where(
-      and(eq(schema.authAttempts.bucket, bucket), gt(schema.authAttempts.reset_at, sql`datetime('now')`)),
-    )
-    .get();
-  return !!row && row.count >= limit;
-}
-
 /** 버킷 +1을 원자적으로 하고 확정된 값을 돌려받는다 — 윈도우가 지났으면 1로 리셋하며 시작. */
 async function bump(db: Db, bucket: string): Promise<number> {
   const windowExpr = sql.raw(`datetime('now', '+${AUTH_WINDOW_SEC} seconds')`);
   // 그 전에 만료된 버킷을 기회적으로 지운다(#41). 버킷 키는 IP에서 파생돼 카디널리티가 무제한이라,
   // 지우는 곳이 없으면 한 번 실패하고 다시 오지 않는 IP의 행이 영원히 남는다. 세션이 로그인 때마다
-  // 만료분을 지우는 것과 같은 장치 — 기록 경로에서만 도니 정상 로그인에는 비용이 없다.
+  // 만료분을 지우는 것과 같은 장치. 이제 시도마다 돈다(정상 로그인 포함) — reset_at 인덱스가 있어 만료된
+  // 행만 찾아가므로 테이블 크기에 비례하지 않는다.
   await db.run(sql`DELETE FROM auth_attempts WHERE reset_at <= datetime('now')`);
   const row = await db.get<{ count: number }>(sql`
     INSERT INTO auth_attempts (bucket, count, reset_at) VALUES (${bucket}, 1, ${windowExpr})
@@ -45,11 +36,6 @@ async function bump(db: Db, bucket: string): Promise<number> {
     RETURNING count
   `);
   return row?.count ?? Number.MAX_SAFE_INTEGER; // 값을 못 받으면 보수적으로 "초과"로 본다
-}
-
-/** 실패 1회 기록 (검사는 isRateLimited가 따로 한다). */
-export async function recordFailure(db: Db, bucket: string): Promise<void> {
-  await bump(db, bucket);
 }
 
 /**

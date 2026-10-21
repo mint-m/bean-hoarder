@@ -591,17 +591,99 @@ test("AI 대행: 400은 다음 후보로 넘어가지 않는다", async () => {
   }
 });
 
-test("rate limit: 만료된 auth_attempts 버킷은 다음 실패 기록 때 지워진다 (#41)", async () => {
-  const { recordFailure } = await import("../src/lib/ratelimit");
+// ── 인증 시도 rate limit — 판정과 기록이 한 문장이어야 동시 요청에도 한도가 선다(ratelimit.ts) ──
+
+/** 고유 IP — 같은 파일의 다른 테스트와 버킷이 섞이지 않게 */
+const freshIp = () => `198.19.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+const postFrom = (path: string, body: unknown, ip: string) =>
+  api(path, { ...jsonBody(body), headers: { "CF-Connecting-IP": ip } });
+const count = (statuses: number[], code: number) => statuses.filter((s) => s === code).length;
+
+test("rate limit 로그인: 틀린 PIN 20건을 동시에 보내도 유저코드당 10건만 검증까지 간다", async () => {
+  const user = await signupUser("1234");
+  const ip = freshIp();
+  const statuses = (
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        postFrom("/login", { usercode: user.usercode, password: String(5000 + i) }, ip),
+      ),
+    )
+  ).map((r) => r.status);
+  expect(count(statuses, 401)).toBe(10);
+  expect(count(statuses, 429)).toBe(10);
+  // 한도에 걸린 뒤에는 맞는 PIN도 429 — 맞았는지 틀렸는지를 응답으로 알려 주지 않는다
+  expect((await postFrom("/login", { usercode: user.usercode, password: "1234" }, freshIp())).status).toBe(
+    429,
+  );
+});
+
+test("rate limit 로그인: 맞힌 로그인은 실패 한도를 깎지 않는다", async () => {
+  const user = await signupUser("1234");
+  const ip = freshIp();
+  const login = (pin: string) => postFrom("/login", { usercode: user.usercode, password: pin }, ip);
+  for (let i = 0; i < 9; i++) expect((await login("9999")).status).toBe(401);
+  expect((await login("1234")).status).toBe(200); // 10번째 시도지만 맞혔다 — 예약을 돌려받는다
+  expect((await login("9999")).status).toBe(401); // 그래서 한 번 더 틀릴 여유가 있다
+  expect((await login("9999")).status).toBe(429);
+});
+
+test("rate limit 초대코드: 한도에 걸리면 맞는 코드도 429 — 맞고 틀림이 응답으로 갈리지 않는다", async () => {
+  const ip = freshIp();
+  for (let i = 0; i < 30; i++) {
+    expect((await postFrom("/signup", { invite: `WRONG${i}`, password: "1234" }, ip)).status).toBe(403);
+  }
+  expect((await postFrom("/signup", { invite: INVITE, password: "1234" }, ip)).status).toBe(429);
+  expect((await postFrom("/signup", { invite: INVITE, password: "1234" }, freshIp())).status).toBe(200);
+});
+
+test("rate limit 초대코드: 틀린 코드 40건을 동시에 보내도 IP당 30건만 비교까지 간다", async () => {
+  const ip = freshIp();
+  const statuses = (
+    await Promise.all(
+      Array.from({ length: 40 }, (_, i) =>
+        postFrom("/signup", { invite: `GUESS${i}`, password: "1234" }, ip),
+      ),
+    )
+  ).map((r) => r.status);
+  expect(count(statuses, 403)).toBe(30);
+  expect(count(statuses, 429)).toBe(10);
+});
+
+test("rate limit 초대코드: 맞는 코드로 가입해도 오답 한도를 깎지 않는다", async () => {
+  const ip = freshIp();
+  for (let i = 0; i < 29; i++) {
+    expect((await postFrom("/signup", { invite: `WRONG${i}`, password: "1234" }, ip)).status).toBe(403);
+  }
+  expect((await postFrom("/signup", { invite: INVITE, password: "1234" }, ip)).status).toBe(200);
+  expect((await postFrom("/signup", { invite: "WRONG", password: "1234" }, ip)).status).toBe(403);
+  expect((await postFrom("/signup", { invite: "WRONG", password: "1234" }, ip)).status).toBe(429);
+});
+
+test("rate limit 복구키: 틀린 복구키 40건을 동시에 보내도 IP당 30건만 조회까지 간다", async () => {
+  const ip = freshIp();
+  const key = (i: number) => `${String(i).padStart(4, "0")}-0000-0000-0000-0000`;
+  const statuses = (
+    await Promise.all(
+      Array.from({ length: 40 }, (_, i) =>
+        postFrom("/recover", { recovery_key: key(i), password: "5678" }, ip),
+      ),
+    )
+  ).map((r) => r.status);
+  expect(count(statuses, 404)).toBe(30);
+  expect(count(statuses, 429)).toBe(10);
+});
+
+test("rate limit: 만료된 auth_attempts 버킷은 다음 시도 기록 때 지워진다 (#41)", async () => {
+  const { reserveAttempt } = await import("../src/lib/ratelimit");
   const { createDb } = await import("../src/db");
   const db = createDb(env.DB);
   const stale = `ip:203.0.113.${Math.floor(Math.random() * 250)}`;
-  await recordFailure(db, stale);
+  await reserveAttempt(db, stale, 30);
   await env.DB.prepare("UPDATE auth_attempts SET reset_at = datetime('now', '-1 second') WHERE bucket = ?")
     .bind(stale)
     .run();
-  // 다른 버킷의 실패가 기록되면서 만료된 행이 함께 사라진다
-  await recordFailure(db, `ip:198.51.100.${Math.floor(Math.random() * 250)}`);
+  // 다른 버킷의 시도가 기록되면서 만료된 행이 함께 사라진다
+  await reserveAttempt(db, `ip:198.51.100.${Math.floor(Math.random() * 250)}`, 30);
   const row = await env.DB.prepare("SELECT count(*) AS n FROM auth_attempts WHERE bucket = ?")
     .bind(stale)
     .first<{ n: number }>();
