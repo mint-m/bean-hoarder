@@ -134,6 +134,10 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   (v1.2.0 때 36건). 이유는 README "운영"의 브랜치 보호 규칙 항목에 있다.
 - **새 파일은 `git add` 후에 `npm run gen:structure`를 돌린다** — 생성기는 인덱스(커밋될 내용)만
   보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.
+- **rate limit은 `reserveAttempt`(판정과 기록이 UPSERT … RETURNING 한 문장)로만 건다.** "읽어서 검사 →
+  검증 → 실패면 기록"으로 나누면 동시에 보낸 요청이 모두 검사를 통과해 한도가 없는 것과 같다. 예약은 검증
+  **전에**, 그리고 맞고 틀림과 무관하게 한다 — 맞는 입력만 한도를 건너뛰면 응답이 정답을 알려 준다.
+  맞힌 시도는 `releaseAttempt`로 돌려준다. 그래서 `ratelimit.ts`에는 검사만 하는 함수가 없다.
 - 커밋 전 `npm run check` 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 `npm run check:full`.
 
 ## 커밋 규칙

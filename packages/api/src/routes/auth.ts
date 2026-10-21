@@ -18,10 +18,8 @@ import { json } from "../lib/http";
 import {
   clientIp,
   IP_BUCKET_LIMIT,
-  isRateLimited,
   OPEN_SIGNUP_LIMIT,
   RATE_LIMIT_ERROR,
-  recordFailure,
   releaseAttempt,
   reserveAttempt,
 } from "../lib/ratelimit";
@@ -46,12 +44,16 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
     }
     return json({ ok: false, error: SIGNUP_CLOSED_ERROR }, 403);
   }
-  if (mode === "invite" && (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE)) {
-    if (await isRateLimited(db, signupBucket, IP_BUCKET_LIMIT)) {
+  if (mode === "invite") {
+    // 초대코드를 비교하기 **전에** 예약한다 — 한도 판정이 코드의 맞고 틀림보다 먼저다. 한도에 걸리면 맞는
+    // 코드도 429여야 응답이 맞고 틀림을 알려 주지 않는다.
+    if (!(await reserveAttempt(db, signupBucket, IP_BUCKET_LIMIT))) {
       return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
     }
-    await recordFailure(db, signupBucket);
-    return json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403);
+    if (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE) {
+      return json({ ok: false, error: "초대코드가 올바르지 않습니다." }, 403); // 예약이 곧 실패 기록이다
+    }
+    await releaseAttempt(db, signupBucket); // 맞혔다 — 오답 한도를 깎지 않는다
   }
   const pin = body.password;
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
@@ -127,7 +129,8 @@ export async function recoverAccount(c: Context<AppEnv>): Promise<Response> {
 
   const db = createDb(c.env.DB);
   const recoverBucket = `recover:${clientIp(c.req.raw)}`;
-  if (await isRateLimited(db, recoverBucket, IP_BUCKET_LIMIT)) {
+  // 복구키를 찾기 **전에** 예약한다(로그인과 같은 이유 — 동시 요청이 한도를 넘지 못하게). 맞히면 돌려준다.
+  if (!(await reserveAttempt(db, recoverBucket, IP_BUCKET_LIMIT))) {
     return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
   }
   const recoveryHash = await sha256hex(normalized);
@@ -136,10 +139,8 @@ export async function recoverAccount(c: Context<AppEnv>): Promise<Response> {
     .from(schema.users)
     .where(eq(schema.users.recovery_hash, recoveryHash))
     .get();
-  if (!row) {
-    await recordFailure(db, recoverBucket);
-    return json({ ok: false, error: "복구키가 일치하지 않습니다." }, 404);
-  }
+  if (!row) return json({ ok: false, error: "복구키가 일치하지 않습니다." }, 404); // 예약이 곧 실패 기록이다
+  await releaseAttempt(db, recoverBucket);
 
   const usercode = row.usercode;
   const newHash = await hashPassword(usercode, pin);

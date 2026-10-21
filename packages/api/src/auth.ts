@@ -1,12 +1,12 @@
 // 인증 — 두 방식 지원:
 //   Bearer bhs_{토큰}          세션 토큰 (기본 — 프론트는 로그인 후 이것만 사용)
 //   Bearer {유저코드}:{암호}    레거시 (이행기 호환 — PIN을 저장해 둔 구버전 클라이언트)
-// 레거시 경로는 실패 시 rate limit 카운터에 기록된다 (4자리 PIN 전수 대입 차단).
+// 레거시 경로도 /api/login과 같은 rate limit을 탄다 (4자리 PIN 전수 대입 차단).
 import { and, eq } from "drizzle-orm";
 import { createDb, schema } from "./db";
 import type { AuthedUser, Env } from "./env";
 import { DUMMY_PASS_HASH, hashPassword, verifyPassword } from "./lib/crypto";
-import { clientIp, IP_BUCKET_LIMIT, isRateLimited, PW_BUCKET_LIMIT, recordFailure } from "./lib/ratelimit";
+import { clientIp, IP_BUCKET_LIMIT, PW_BUCKET_LIMIT, releaseAttempt, reserveAttempt } from "./lib/ratelimit";
 import { lookupSession, SESSION_TOKEN_RE } from "./lib/session";
 
 const LEGACY_RE = /^Bearer\s+([A-Z0-9]{4}):(\d{4})$/i;
@@ -28,12 +28,11 @@ export async function verifyCredentials(
   const ip = clientIp(request);
   const pwBucket = `pw:${usercode}`;
   const ipBucket = `ip:${ip}`;
-  if (
-    (await isRateLimited(db, pwBucket, PW_BUCKET_LIMIT)) ||
-    (await isRateLimited(db, ipBucket, IP_BUCKET_LIMIT))
-  ) {
-    return { kind: "limited" };
-  }
+  // 검증 **전에** 시도를 예약한다(판정과 기록을 한 문장으로 — ratelimit.ts 머리 주석). 예약이 곧 실패
+  // 기록이고, 맞히면 아래에서 돌려준다 — 정상 로그인이 실패 한도를 깎지 않게.
+  const pwOk = await reserveAttempt(db, pwBucket, PW_BUCKET_LIMIT);
+  const ipOk = await reserveAttempt(db, ipBucket, IP_BUCKET_LIMIT);
+  if (!pwOk || !ipOk) return { kind: "limited" };
 
   const row = await db
     .select({ usercode: schema.users.usercode, pass_hash: schema.users.pass_hash })
@@ -42,11 +41,9 @@ export async function verifyCredentials(
     .get();
   // 미존재 유저코드도 더미 해시로 같은 PBKDF2 비용을 치른다 — 타이밍 기반 유저코드 열거 방지
   const v = await verifyPassword(row?.pass_hash ?? DUMMY_PASS_HASH, usercode, pin);
-  if (!row || !v.ok) {
-    await recordFailure(db, pwBucket);
-    await recordFailure(db, ipBucket);
-    return { kind: "fail" };
-  }
+  if (!row || !v.ok) return { kind: "fail" }; // 예약이 곧 실패 기록이다
+  await releaseAttempt(db, pwBucket);
+  await releaseAttempt(db, ipBucket);
 
   // 구형(단일 SHA-256) 해시는 로그인 성공 시점에 PBKDF2로 무중단 업그레이드
   if (v.legacy) {
