@@ -130,6 +130,35 @@ test("랩: 필수 칸이 비면 확인이 막히고, 등록은 그 스텝으로 
 // 세션 토큰은 90일 고정 만료라, 실서비스 전환 시점에 로그인한 세션들이 한꺼번에 만료된다.
 // 예전엔 랩에 401 처리 경로가 없어 목록이 조용히 비고 저장 때마다 "인증 실패 — 유저코드와
 // 암호를 확인하세요"만 떴다(덱은 처리하는데 랩만 빠져 있었다).
+// 한글은 조합 중에 친 Enter가 "글자 확정"이다. Chrome은 그 keydown(isComposing)과 확정 뒤 keydown을 둘 다
+// 보내므로, 조합 중 Enter를 "담기"로 받으면 Enter 한 번에 노트가 둘 담긴다(남은 글자나 첫 후보 Floral).
+// 실제 IME는 띄울 수 없어 브라우저가 보내는 두 keydown을 그대로 재현한다.
+test("랩: 향미 피커는 한글 조합 중의 Enter를 담기로 받지 않는다", async ({ page }) => {
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await page.getByRole("button", { name: /직접 입력으로 시작하기/ }).click();
+  await page.getByRole("button", { name: /플레이버 · 커피 이름/ }).click();
+
+  const search = page.getByRole("combobox", { name: "향미 검색" });
+  await search.fill("자스민");
+  await expect(page.getByRole("option", { name: /Jasmine/ })).toBeVisible();
+
+  // ① 조합 중 Enter — 아무것도 담기지 않고 친 글자도 그대로다
+  await search.evaluate((node) =>
+    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true })),
+  );
+  await expect(page.locator(".note-token")).toHaveCount(0);
+  await expect(search).toHaveValue("자스민");
+
+  // ② 확정 뒤 Enter — 그제야 한 번 담긴다
+  await search.press("Enter");
+  await expect(page.locator(".note-token")).toHaveCount(1);
+  await expect(page.locator(".note-token")).toContainText("Jasmine");
+  await expect(search).toHaveValue("");
+});
+
 test("랩: 세션이 만료되면 안내와 함께 로그인 화면으로 돌아간다", async ({ page }) => {
   await page.goto("/lab/");
   await page.getByPlaceholder("ABCD").fill("TEST");

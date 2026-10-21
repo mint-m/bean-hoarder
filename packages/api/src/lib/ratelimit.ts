@@ -15,6 +15,8 @@ export const IP_BUCKET_LIMIT = 30; // IP당 실패 30회/10분
  * 그 문턱이 없다 — 이게 없으면 스크립트 하나로 계정을 무제한 만들어 D1·PBKDF2 CPU·AI 전역 한도를 소진한다.
  */
 export const OPEN_SIGNUP_LIMIT = 3;
+/** 열린 가입 버킷의 접두 — 다른 버킷과 달리 **성공**을 센다. 관리자 통계가 실패 집계에서 뺄 때 쓴다. */
+export const OPEN_SIGNUP_BUCKET_PREFIX = "signup-ok:";
 
 export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") || "unknown";
