@@ -1017,6 +1017,50 @@ test("관리자 통계: 가입 문·규모·한도까지의 거리만 — 결정
   }
 });
 
+test("관리자 통계: 인증 실패 감시는 실패만 센다 — 맞힌 시도·열린 가입 성공이 남긴 버킷은 빼고", async () => {
+  const admin = await signupUser();
+  const other = await signupUser();
+  const { env2, headers } = await unlockAs(admin);
+  // 같은 파일의 다른 테스트가 D1을 공유하므로 절대값이 아니라 증감으로 본다
+  const live = async () =>
+    ((await (await api("/admin/stats", { headers }, env2)).json()) as { auth: { live_buckets: number } }).auth
+      .live_buckets;
+  const uniqueIp = () => `203.0.113.${Math.floor(Math.random() * 250)}`;
+  const base = await live();
+
+  // 맞힌 시도 — 로그인·레거시 인증 모두 검증 전에 예약하고 맞히면 0으로 돌려받는다. 행은 10분간 남는다
+  const login = await api("/login", {
+    ...jsonBody({ usercode: admin.usercode, password: "1234" }),
+    headers: { "CF-Connecting-IP": uniqueIp() },
+  });
+  expect(login.status).toBe(200);
+  expect((await addBean(admin.auth)).res.status).toBe(200);
+  expect(await live()).toBe(base);
+
+  // 열린 가입의 성공 — 그 버킷은 실패가 아니라 성공을 센다
+  const setMode = (mode: string) =>
+    api("/admin/settings", { method: "PUT", body: JSON.stringify({ signup_mode: mode }), headers }, env2);
+  expect((await setMode("open")).status).toBe(200);
+  try {
+    const opened = await api("/signup", {
+      ...jsonBody({ password: "1234" }),
+      headers: { "CF-Connecting-IP": uniqueIp() },
+    });
+    expect(opened.status).toBe(200);
+  } finally {
+    await setMode("invite"); // 같은 파일의 다른 테스트가 공유하는 D1이다
+  }
+  expect(await live()).toBe(base);
+
+  // 틀린 시도 한 번 — 유저코드 버킷과 IP 버킷 둘이 실패를 안고 산다
+  const bad = await api("/login", {
+    ...jsonBody({ usercode: other.usercode, password: "9999" }),
+    headers: { "CF-Connecting-IP": uniqueIp() },
+  });
+  expect(bad.status).toBe(401);
+  expect(await live()).toBe(base + 2);
+});
+
 test("향미 승격 후보: 어휘 밖 노트만, 사용자 수 순, 오타 후보는 비슷한 어휘와 함께 (#78)", async () => {
   const admin = await signupUser();
   const other = await signupUser();

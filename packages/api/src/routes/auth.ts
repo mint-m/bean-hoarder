@@ -18,6 +18,7 @@ import { json } from "../lib/http";
 import {
   clientIp,
   IP_BUCKET_LIMIT,
+  OPEN_SIGNUP_BUCKET_PREFIX,
   OPEN_SIGNUP_LIMIT,
   RATE_LIMIT_ERROR,
   releaseAttempt,
@@ -59,7 +60,7 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
   // 열린 모드에서는 가입을 센다 — 초대코드라는 문턱이 없는 대신 IP당 속도로 막는다(ratelimit.ts). 계정을 만들기
   // **전에** 예약해야 병렬 요청이 한도를 넘지 못한다. 만들지 못하고 끝나면(아래 500) 예약을 돌려준다.
-  const openBucket = mode === "open" ? `signup-ok:${clientIp(c.req.raw)}` : null;
+  const openBucket = mode === "open" ? `${OPEN_SIGNUP_BUCKET_PREFIX}${clientIp(c.req.raw)}` : null;
   if (openBucket && !(await reserveAttempt(db, openBucket, OPEN_SIGNUP_LIMIT))) {
     return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
   }

@@ -16,6 +16,7 @@ import type { AppEnv } from "../env";
 import { AI_QUOTA } from "../lib/ai-quota";
 import { MAX_R2_LOGO_OBJECTS, MONTHLY_WRITE_BUDGET } from "../lib/budget";
 import { json } from "../lib/http";
+import { OPEN_SIGNUP_BUCKET_PREFIX } from "../lib/ratelimit";
 import { getSignupMode, isSignupMode, SIGNUP_MODES, setSignupMode } from "../lib/settings";
 import { flavorCandidates } from "../lib/stats";
 
@@ -40,7 +41,13 @@ export async function getStats(c: Context<AppEnv>): Promise<Response> {
       SELECT count(*) AS total,
              count(CASE WHEN created_at >= ${recent} THEN 1 END) AS new_recent
       FROM beans`),
-    db.get<{ n: number }>(sql`SELECT count(*) AS n FROM auth_attempts WHERE reset_at > datetime('now')`),
+    // 지금 실패가 남아 있는 버킷만 — 시도는 검증 전에 예약되고(reserveAttempt) 맞히면 0으로 돌려받으므로,
+    // 행이 살아 있다는 것만으로는 실패가 아니다(정상 로그인도 10분간 0인 행을 남긴다). 열린 가입의 버킷은
+    // 실패가 아니라 **성공**을 세므로 뺀다.
+    db.get<{ n: number }>(sql`
+      SELECT count(*) AS n FROM auth_attempts
+      WHERE reset_at > datetime('now') AND count > 0
+        AND bucket NOT LIKE ${`${OPEN_SIGNUP_BUCKET_PREFIX}%`}`),
     db.get<{ r2: number }>(sql`SELECT count(CASE WHEN data_url = '' THEN 1 END) AS r2 FROM logos`),
     db.get<{ month: string; write_count: number }>(
       sql`SELECT month, write_count FROM r2_usage WHERE id = 'global'`,
