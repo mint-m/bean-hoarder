@@ -1,7 +1,12 @@
 name: backup
 
 # 프로덕션 D1 자동 백업 — 매일 04:17 KST (19:17 UTC) SQL 덤프를 GitHub Actions
-# artifact(비공개 리포, 30일 보관)로 남긴다. 복구 절차는 README 운영 섹션 참고.
+# artifact(30일 보관)로 남긴다. 복구 절차는 README 운영 섹션 참고.
+#
+# 덤프는 **업로드 전에 공개키로 암호화한다(age).** 이 저장소는 공개라 artifact를 GitHub 로그인만 있으면
+# 누구나 받을 수 있고, 덤프에는 계정 인증 정보가 들어 있다. 암호화에 쓰는
+# 공개키는 저장소 변수 BACKUP_AGE_RECIPIENT에 두고, 풀 수 있는 개인키는 운영자만 저장소 밖에 보관한다 —
+# GitHub 쪽이 통째로 새도 덤프는 열리지 않는다. 변수가 없으면 **평문을 올리지 않고 실패한다.**
 # 참고: D1 자체의 Time Travel(30일 시점 복구)이 1차 안전망이고 이 덤프는 오프사이트 2차 백업.
 #
 # CLOUDFLARE_API_TOKEN에 "D1:Edit" 권한이 없으면 export가 Authentication error [code: 10000]로
@@ -48,11 +53,24 @@ jobs:
           done
           echo "덤프 정상 — $(wc -c < bnhd-v2-backup.sql) bytes / $(grep -c '^INSERT INTO' bnhd-v2-backup.sql) INSERT"
 
+      # 평문 덤프는 러너 밖으로 나가지 않는다 — 암호화한 파일만 올리고 평문은 지운다.
+      - name: Encrypt dump
+        env:
+          RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          set -euo pipefail
+          [[ "$RECIPIENT" == age1* ]] || { echo "저장소 변수 BACKUP_AGE_RECIPIENT(age 공개키, age1…)가 없다 — 평문은 올리지 않는다"; exit 1; }
+          sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
+          age -r "$RECIPIENT" -o bnhd-v2-backup.sql.age bnhd-v2-backup.sql
+          rm -f bnhd-v2-backup.sql
+          test -s bnhd-v2-backup.sql.age
+
       - uses: actions/upload-artifact@v7
         with:
           name: d1-backup-${{ github.run_id }}
-          path: bnhd-v2-backup.sql
+          path: bnhd-v2-backup.sql.age
           retention-days: 30
+          if-no-files-found: error
 
       # 스케줄 잡의 실패는 Actions 탭에 빨간불만 남기고 지나간다. 백업은 깨진 걸
       # 모르는 것이 곧 손실이므로, 실패를 이슈로 올려 읽히게 만든다.
@@ -83,6 +101,9 @@ jobs:
           로그에 \`Authentication error [code: 10000]\`이 있으면 \`CLOUDFLARE_API_TOKEN\`의 권한
           문제다 — 토큰에 **D1:Edit** 를 추가하면 해결된다 (export는 읽기처럼 보이지만 D1 Edit를
           요구한다).
+
+          \`BACKUP_AGE_RECIPIENT\`가 없다는 메시지면 암호화 단계에서 멈춘 것이다 — 저장소 변수에 age
+          공개키(\`age1…\`)를 넣는다(README 운영 "DB 백업").
 
           그 외라면 덤프 검증 단계에서 걸렸을 수 있다. 테이블이 빠졌다는 메시지면 스키마가 바뀐
           것이므로 이 워크플로의 검증 목록도 함께 갱신한다.
