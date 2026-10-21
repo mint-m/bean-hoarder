@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
 const dbDir = fileURLToPath(new URL("../../db/", import.meta.url));
 const schemaSql = readFileSync(`${dbDir}schema.sql`, "utf8");
 // 원격에 아직 안 넣은 마이그레이션(db/에 남아 있는 migrate_*.sql) — 파일명 → SQL. 적용이 끝나 파일을
-// 지우면 여기서도 빠지고, 그 파일을 겨냥한 테스트는 스스로 건너뛴다(test/migrations.test.ts).
+// 지우면 여기서도 빠진다 — 그 파일을 겨냥한 검사도 함께 지운다(test/migrations.test.ts).
 const pendingMigrations = Object.fromEntries(
   readdirSync(dbDir)
     .filter((f) => /^migrate_.*\.sql$/.test(f))

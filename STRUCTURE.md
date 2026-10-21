@@ -35,7 +35,6 @@
 
 | 경로 | 역할 |
 |---|---|
-| `db/migrate_roastery_upper.sql` | 로스터리 저장값 대문자 소급 — 등록·수정·복원은 이제 로스터리를 대문자로 저장하고(normalizeRoastery), 조회·덱은 CSS text-transform을 걷어내 저장값을 그대로 보인다. |
 | `db/schema.sql` | D1 스키마의 단일 소스 — 새 환경은 이 파일 하나로 만든다. |
 | `db/seed.sql` | 로컬·e2e 픽스처 — e2e 계정 하나와 조회 테스트용 원두 한 건. |
 
