@@ -224,10 +224,15 @@ export default function AdminView({
         <h2>
           가입 <span className="h2-aux">초대코드 값은 secret에 있다 — 여기서는 문만 여닫는다</span>
         </h2>
-        <p className="field-name">가입 모드{mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}</p>
+        {/* 이름은 label로 select에 잇는다 — 없으면 스크린리더가 "초대코드 콤보박스"처럼 현재 값만 읽는다(#109) */}
+        <p className="field-name">
+          <label htmlFor="signup-mode">가입 모드</label>
+          {mode ? ` — 지금: ${MODE_LABEL[mode]}` : ""}
+        </p>
         <div className="mode-row">
           <div className="select-wrap mode-select">
             <select
+              id="signup-mode"
               value={draft ?? ""}
               disabled={mode === null || saving}
               onChange={(e) => {

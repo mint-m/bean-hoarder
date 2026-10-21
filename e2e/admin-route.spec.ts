@@ -62,6 +62,8 @@ test("랩 #admin: 새로고침해도 관리 화면에 머물고, 잠금을 푼 �
   await page.locator('input[type="password"]').fill("e2e-admin-key");
   await page.getByRole("button", { name: "잠금 풀기" }).click();
   await expect(page.getByRole("heading", { name: /향미 승격 후보/ })).toBeVisible();
+  // 가입 모드 드롭다운은 현재 값이 아니라 "가입 모드"라는 이름으로 읽힌다(#109)
+  await expect(page.getByRole("combobox", { name: "가입 모드" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { name: /향미 승격 후보/ })).toBeVisible();
