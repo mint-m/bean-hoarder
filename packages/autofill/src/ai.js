@@ -6,15 +6,31 @@
 // 둘이 다른 프롬프트를 쓰면 "키를 넣었더니 결과가 달라진다"가 되므로 규칙은 반드시 하나여야 한다.
 // HTTP 호출 자체는 각자 담당한다 — 브라우저는 fetch + 사용자 키, 서버는 fetch + secret.
 
-/** 모델 — 두 경로가 같은 모델을 써야 결과가 일관된다. */
-export const AI_MODEL = "gemini-3.5-flash-lite";
+import { roastLevelsForPrompt } from "@bnhd/schema/roast";
+
+/**
+ * 모델 후보 — 앞에서부터 시도한다. 두 경로가 **같은 목록**을 써야 결과가 일관된다.
+ *
+ * 왜 하나가 아니라 목록인가: 같은 키라도 모델마다 되고 안 되고가 갈린다. 실제로 이 저장소의
+ * AI 리뷰 워크플로 로그에 404(그 키에 미제공)·429(무료 등급 할당이 0)·503(과부하)이 모델별로
+ * 다르게 찍혔다. 하나만 못 박아 두면 그 모델이 막히는 날 기능 전체가 조용히 죽는다.
+ */
+export const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"];
+
+/**
+ * 이 상위 응답이 "다음 후보로 넘어가면 될 일"인지.
+ * 모델에 매인 실패만 넘긴다 — 400(우리가 잘못 보냄)·401·403(키 문제)은 후보를 바꿔도 그대로다.
+ */
+export function shouldTryNextModel(status) {
+  return status === 404 || status === 429 || status >= 500;
+}
 
 export const AI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /** 한 번에 보낼 최대 글자 수. /api/fetch가 이미 20,000자로 자르므로 사실상의 상한이다. */
 export const AI_MAX_CHARS = 30000;
 
-/** AI가 채울 수 있는 필드 — 로스팅일·패키징일은 페이지에 없는 정보라 제외한다. */
+/** AI가 채울 수 있는 필드 — 로스팅일·소분일은 페이지에 없는 정보라 제외한다. */
 export const AI_FIELD_KEYS = [
   "ROASTERY",
   "ORIGIN",
@@ -49,10 +65,13 @@ export const AI_PROMPT = `다음 텍스트는 커피 원두 상품 페이지에�
 - NET_WEIGHT: 그램 숫자만 (예: "200").
 - HARVEST: 수확시기 (예: "25/26", "25.12-26.01").
 - AGTRON: 로스팅 포인트. 라이트~다크 표현(Light/Medium/City/Full City/Vienna/French roast 등)이나 숫자
-  (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 "#숫자 (한글표현)" 형식으로 변환한다:
-  #120(울트라라이트), #95(라이트), #75(미디움라이트), #65(미디움), #55(미디움다크), #45(다크).
+  (Agtron/아그트론 값)가 있으면 다음 6단계 중 가장 가까운 것으로 **아래 표기 그대로** 옮긴다
+  (원문이 한국어여도 영문 표기로):
+  ${roastLevelsForPrompt()}.
   아무 단서도 없으면 생략한다.
-- TASTING_NOTE: 콤마로 구분한 짧은 노트.
+- TASTING_NOTE: 콤마로 구분한 짧은 노트. **반드시 영문 표기**로 쓴다 — 원문이 한국어여도
+  영문으로 옮긴다 (파인애플 → "Pineapple", 자스민 → "Jasmine", 다크 초콜릿 → "Dark Chocolate").
+  라벨 인쇄와 기존 데이터가 영문 표기를 전제한다.
 - MEMO: 산지·농장의 배경 스토리, 또는 PROCESS·VARIETY 등 다른 필드에 넣기엔 너무 긴 상세 설명
   (발효 시간, 건조 방식, 컵핑 히스토리 등 문단형 서술)이 있으면 2~3문장으로 한국어 요약, 없으면 생략.
 - ROAST_DATE, PACKAGE_DATE는 추출하지 않는다.

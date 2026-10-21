@@ -41,7 +41,9 @@ export const BEAN_FIELDS = [
   { column: "altitude", csv: "ALTITUDE" },
   { column: "harvest", csv: "HARVEST" },
   { column: "roast_date", csv: "ROAST_DATE", label: "로스팅일", required: "always" },
-  { column: "package_date", csv: "PACKAGE_DATE", label: "패키징일", required: "always" },
+  // 라벨은 "소분일" — 내가 원두를 받아 나눠 담은 날이지 로스터가 포장한 날이 아니다.
+  // 키(PACKAGE_DATE)는 CSV 헤더·D1 컬럼·인쇄된 라벨의 PKGD와 묶여 있어 바꾸지 않는다.
+  { column: "package_date", csv: "PACKAGE_DATE", label: "소분일", required: "always" },
   { column: "net_weight", csv: "NET_WEIGHT" },
   { column: "agtron", csv: "AGTRON" },
   { column: "tasting_note", csv: "TASTING_NOTE" },
@@ -114,6 +116,25 @@ export function beanToPublic(row: BeanRow): BeanPublic {
   for (const f of BEAN_FIELDS) out[f.csv] = row[f.column];
   out.ARCHIVED = !!row.archived;
   return out as BeanPublic;
+}
+
+/**
+ * 로스터리명 정규화 — **저장값을 대문자로 올린다.**
+ *
+ * 화면이 CSS로 대문자로 보여 주고 저장은 원문이던 시절, 보이는 글자를 복사하면 다른 표기가 나왔다
+ * ("BIGSUR COFFEE"로 보고 복사하면 "BigSur Coffee"). 표시를 원문으로 내리는 대신 저장을 올린 것은
+ * 로스터리명이 이 서비스에서 **KEY와 함께 대문자 체계**이기 때문이다 — 라벨의 마이크로 캡스,
+ * 로고 R2 키(roasteryName)가 이미 대문자로 산다. (헤드라인 등 나머지 값은 반대로 원문이 기준이라
+ * 표시 쪽 text-transform을 걷어냈다 — label.js의 "헤드라인은 대문자로 강제하지 않는다" 참고.)
+ *
+ * 등록·수정(routes/beans.ts)과 CSV 복원(routes/backup.ts)이 함께 쓴다 — 한쪽만 정규화하면
+ * 복원한 원두만 표기가 갈린다.
+ */
+export function normalizeRoastery(v: unknown): string {
+  return String(v || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, ROASTERY_MAX_LEN);
 }
 
 /** 임의 페이로드에서 필드 값을 추출 — 문자열화·trim·길이 상한. (기존 _lib.js pickFields와 동일 동작) */

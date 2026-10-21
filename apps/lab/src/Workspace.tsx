@@ -5,6 +5,8 @@
 // 도착하는 상세 페이지"라서 이 순서다.
 import { FIELD_LABELS_KO, parseBeanText } from "@bnhd/autofill";
 import { buildLabelSVG, buildQrSVG, type LabelDesign, SPEC_POOL, SUB_POOL, verifyQr } from "@bnhd/label";
+import { canonicalizeNotes, parseNotes, serializeNotes } from "@bnhd/schema/flavor";
+import { canonicalRoast } from "@bnhd/schema/roast";
 import type { Account } from "@bnhd/session";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BeanListCard from "./components/BeanListCard";
@@ -17,9 +19,50 @@ import { api } from "./lib/api";
 import { insertByPriority, loadDesign, saveDesign } from "./lib/design";
 import { capitalizeNoteSegments, dotToIso, download, isoToDot, withUnit } from "./lib/format";
 import { geminiExtract } from "./lib/gemini";
+import { collectMyNotes } from "./lib/suggest";
 import { type BeanPublicRow, emptyForm, type FormKey, type FormState, type StatusLine } from "./types";
 
 const SITE = "https://bnhd.pages.dev";
+
+/**
+ * 폼에 들어오는 값의 표기를 저장될 모습으로 미리 맞춘다.
+ *
+ * 폼이 원문을 들고 화면만 다르게 보이면, 접힌 요약·라벨 미리보기·저장값이 서로 다른 말을 한다
+ * (로스터리 칸은 BIGSUR COFFEE인데 그 위 요약은 "BigSur Coffee · ETHIOPIA"로 뜬다). 값을 넣는
+ * 길이 셋이라(직접 입력·칩·자동 채우기) 화면 쪽에서 막을 수 없어, 들어오는 길목 하나로 모은다.
+ *
+ * ROASTERY는 서버가 대문자로 정규화해 저장한다(@bnhd/schema normalizeRoastery) — 여기가 그 규칙의
+ * 사본이라는 뜻이므로, 서버 쪽이 바뀌면 함께 바뀌어야 한다. AGTRON의 # 자동 부착도 같은 성격이다.
+ */
+function normalizeFieldValue(key: FormKey, value: string): string {
+  if (key === "ROASTERY") return value.toUpperCase();
+  if (key === "AGTRON" && /^\d/.test(value)) return `#${value}`; // 숫자로 시작하면 # 자동 부착
+  return value;
+}
+
+/**
+ * "같은 원두"를 가르는 필드 — 이 전부가 같을 때만 중복으로 본다.
+ *
+ * 헤드라인(@bnhd/schema/headline)이 쓰는 식별 필드에 품종·가공방식을 더한 것이다. 둘은 등록
+ * 필수라 늘 채워져 있고, 같은 로스터리·같은 산지·같은 날짜라도 이 둘이 다르면 다른 원두다.
+ */
+const DUP_KEYS = [
+  "ROASTERY",
+  "ORIGIN",
+  "COFFEE_NAME",
+  "REGION",
+  "PRODUCER",
+  "WASHING_STATION",
+  "LOT",
+  "VARIETY",
+  "PROCESS",
+  "ROAST_DATE",
+] as const;
+
+const norm = (v: unknown): string =>
+  String(v ?? "")
+    .trim()
+    .toUpperCase();
 const LOGO_MAX_LEN = 140_000; // 서버와 동일한 상한 (base64 문자 수 ≈ 원본 100KB)
 const YY = String(new Date().getFullYear() % 100).padStart(2, "0");
 
@@ -42,10 +85,13 @@ export default function Workspace({
   account,
   onSessionExpired,
   onOpenSettings,
+  onAiRemaining,
 }: {
   account: Account;
   onSessionExpired: () => void;
   onOpenSettings: () => void;
+  /** 서버가 알려 준 오늘 남은 AI 대행 횟수 — 설정 서랍의 "오늘 N번 남음"이 같은 숫자를 보게 App에 올린다(#103) */
+  onAiRemaining: (remaining: number) => void;
 }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   // 이벤트 핸들러에서 "지금의 폼"을 읽기 위한 최신값 참조 — 자동 채우기가 다음 상태를
@@ -76,6 +122,11 @@ export default function Workspace({
   const [aiNudge, setAiNudge] = useState(false);
   // 서비스 키로 남은 AI 인식 횟수 — 3회 이하로 떨어졌을 때만 알린다 (0이면 소진)
   const [aiQuotaLeft, setAiQuotaLeft] = useState<number | null>(null);
+  // 서비스 키 대행이 응답하지 못했다 — 사용자에겐 규칙 기반 결과만 보이므로 이유를 한 줄 남긴다
+  const [aiServiceDown, setAiServiceDown] = useState(false);
+  // 등록이 필수 항목에서 막혔을 때 검증 스텝에 보내는 신호 — 그 칸이 있는 스텝을 열고 데려간다
+  const [focusField, setFocusField] = useState<{ key: FormKey; seq: number } | undefined>();
+  const focusSeq = useRef(1);
   const [stage, setStage] = useState<Stage>("input");
 
   // 화면 이동을 히스토리에 쌓아 브라우저 뒤로가기가 "이전 단계"로 동작하게 한다 —
@@ -120,10 +171,17 @@ export default function Workspace({
   const currentKey =
     confirmedKey ?? `${account.usercode || "????"}${YY}-${String(previewSeq).padStart(3, "0")}`;
 
+  /**
+   * 로스터리는 **저장될 때 대문자로 올라간다**(@bnhd/schema normalizeRoastery, 서버가 진짜 기준).
+   * 라벨 미리보기와 로고 R2 키가 그 값을 그대로 써야 미리 본 것과 저장된 것이 같다 —
+   * 라벨 렌더러는 더 이상 스스로 대문자로 바꾸지 않으므로 여기서 안 올리면 미리보기만 원문이 된다.
+   */
+  const roasteryUpper = form.ROASTERY.trim().toUpperCase();
+
   const row = useMemo(
     () => ({
       KEY: currentKey,
-      ROASTERY: form.ROASTERY.trim(),
+      ROASTERY: roasteryUpper,
       ORIGIN: form.ORIGIN.trim(),
       COFFEE_NAME: form.COFFEE_NAME.trim(),
       REGION: form.REGION.trim(),
@@ -142,7 +200,7 @@ export default function Workspace({
       MEMO: form.MEMO.trim(),
       SOURCE_URL: form.SOURCE_URL.trim(),
     }),
-    [form, currentKey],
+    [form, roasteryUpper, currentKey],
   );
 
   const label = useMemo(() => buildLabelSVG(row, design, logo.dataUrl), [row, design, logo.dataUrl]);
@@ -171,7 +229,7 @@ export default function Workspace({
   // ── 표시 토글 자동 체크: 값이 방금 채워지면 켜고, 비워지면 끈다 ──
   const updateField = useCallback(
     (key: FormKey, value: string) => {
-      if (key === "AGTRON" && /^\d/.test(value)) value = `#${value}`; // 숫자로 시작하면 # 자동 부착
+      value = normalizeFieldValue(key, value);
       // 사용자가 직접 손댄 순간 그 칸은 더 이상 "AI가 채운 미확인 값"이 아니다
       setAiFilled((prev) => {
         if (!prev.has(key)) return prev;
@@ -219,7 +277,6 @@ export default function Workspace({
   );
 
   // ── 로고: 로스터리 입력값에 저장된 로고 자동 적용 ───────────
-  const roasteryUpper = form.ROASTERY.trim().toUpperCase();
   useEffect(() => {
     setLogo((cur) => {
       if (cur.source === "manual") return cur;
@@ -318,30 +375,37 @@ export default function Workspace({
   // ── 저장 / 초기화 / 편집 / 삭제 ─────────────────────────────
   async function save() {
     const missing: string[] = [];
-    if (!row.ROASTERY) missing.push("로스터리");
-    if (!row.ORIGIN) missing.push("국가(산지)");
-    if (!row.VARIETY) missing.push("품종");
-    if (!row.PROCESS) missing.push("가공방식");
-    if (!row.ROAST_DATE) missing.push("로스팅일");
-    if (!row.PACKAGE_DATE) missing.push("패키징일");
+    let firstMissing: FormKey | null = null;
+    const need = (filled: string, key: FormKey, label: string) => {
+      if (filled) return;
+      missing.push(label);
+      firstMissing ??= key;
+    };
+    need(row.ROASTERY, "ROASTERY", "로스터리");
+    need(row.ORIGIN, "ORIGIN", "국가(산지)");
+    need(row.VARIETY, "VARIETY", "품종");
+    need(row.PROCESS, "PROCESS", "가공방식");
+    need(row.ROAST_DATE, "ROAST_DATE", "로스팅일");
+    need(row.PACKAGE_DATE, "PACKAGE_DATE", "소분일");
     if (missing.length) {
       setStatus({ msg: `필수 항목을 입력하세요: ${missing.join(", ")}`, cls: "error" });
+      // 문구만 띄우면 그 칸을 사용자가 직접 찾아야 한다 — 첫 미충족 칸이 있는 스텝으로 데려간다.
+      // seq는 같은 칸으로 두 번 막혀도 다시 반응하게 하는 일련번호다.
+      if (firstMissing) setFocusField({ key: firstMissing, seq: focusSeq.current++ });
       return;
     }
-    // 같은 로스터리·산지·로스팅일이면 사실상 같은 봉지일 가능성이 높다. 소분해서 라벨을 더 만드는
-    // 정상 동작을 막지는 않고 한 번 확인만 받는다 — 실수로 두 번 등록하는 쪽이 훨씬 흔하다.
+    // 실수로 두 번 등록하는 것만 잡는다. 예전에는 로스터리·산지·로스팅일 셋으로 봤는데, 한
+    // 로스터리가 같은 날 콜롬비아를 여러 종 볶는 것은 흔한 일이라 **전혀 다른 원두가 계속 걸렸다**.
+    // 그래서 원두를 가르는 필드가 하나라도 다르면 다른 원두로 본다 — 같은 봉지를 두 번 등록하는
+    // 경우는 같은 출처에서 같은 값이 채워지므로 전부 일치해 여전히 걸린다.
+    // (출처 URL이 같은 경우는 인테이크가 가져오기 전에 먼저 걸러 낸다 — findByUrl)
     if (mode === "new") {
-      const dup = (beans || []).find(
-        (b) =>
-          (b.ROASTERY || "").trim().toUpperCase() === row.ROASTERY.toUpperCase() &&
-          (b.ORIGIN || "").trim().toUpperCase() === row.ORIGIN.toUpperCase() &&
-          (b.ROAST_DATE || "") === row.ROAST_DATE,
-      );
+      const dup = (beans || []).find((b) => DUP_KEYS.every((k) => norm(b[k]) === norm(row[k])));
       if (
         dup &&
         !confirm(
           `이미 같은 원두가 등록돼 있습니다 — ${dup.KEY}\n` +
-            `로스터리·산지·로스팅일이 모두 같습니다.\n\n` +
+            `산지·지역·생산자·랏·품종·가공방식·로스팅일이 모두 같습니다.\n\n` +
             `소분해서 라벨을 더 만드는 경우라면 그대로 진행하세요. 새로 등록할까요?`,
         )
       ) {
@@ -391,6 +455,7 @@ export default function Workspace({
     setAiFilled(new Set());
     setAiNudge(false);
     setAiQuotaLeft(null);
+    setAiServiceDown(false);
     setStarted(false); // 인테이크(링크 붙여넣기)부터 다시
     setFormSeq((s) => s + 1); // 검증 스텝의 완료·건너뜀 상태 초기화
     pruneSelections(next);
@@ -402,8 +467,16 @@ export default function Workspace({
     const b = beans?.find((x) => x.KEY === key);
     if (!b) return;
     const g = (k: string) => String(b[k] || "");
+    // 저장된 노트에 한글 표기가 섞여 있을 수 있다 — 자동 채우기가 "파인애플"을 넣던 시절에 등록된
+    // 원두다. 폼으로 들어오는 모든 길이 같은 규칙을 지나게 한다(fillParsed와 같은 이유).
+    // 여기서는 아무것도 저장하지 않는다. 바뀐 표기는 노트 칩으로 눈에 보이고, 반영은 저장할 때다.
+    const notes = canonicalizeNotes(g("TASTING_NOTE"));
+    // 공백·중복만 다듬은 형태와 견줘, 표기가 실제로 바뀐 경우에만 알린다
+    const retyped = notes !== serializeNotes(parseNotes(g("TASTING_NOTE")));
     const next: FormState = {
-      ROASTERY: g("ROASTERY"),
+      // 소급 마이그레이션을 두지 않았으므로 옛 원두는 원문으로 저장돼 있다 — 폼에 들이면서
+      // 저장될 표기로 맞춘다. 안 그러면 칸은 대문자로 보이는데(input.upper) 접힌 요약만 원문이다.
+      ROASTERY: normalizeFieldValue("ROASTERY", g("ROASTERY")),
       ORIGIN: g("ORIGIN"),
       COFFEE_NAME: g("COFFEE_NAME"),
       REGION: g("REGION"),
@@ -417,8 +490,8 @@ export default function Workspace({
       ROAST_DATE: dotToIso(g("ROAST_DATE")),
       PACKAGE_DATE: dotToIso(g("PACKAGE_DATE")),
       NET_WEIGHT: g("NET_WEIGHT").replace(/g$/, ""),
-      AGTRON: g("AGTRON"),
-      TASTING_NOTE: g("TASTING_NOTE"),
+      AGTRON: canonicalRoast(g("AGTRON")),
+      TASTING_NOTE: notes,
       MEMO: g("MEMO"),
       SOURCE_URL: g("SOURCE_URL"),
     };
@@ -426,7 +499,10 @@ export default function Workspace({
     setLogo((cur) => (cur.source === "manual" ? { dataUrl: null, source: null } : cur)); // 저장된 로고 우선
     setMode("edit");
     setConfirmedKey(key);
-    setStatus({ msg: `${key} 를 수정 중입니다.`, cls: "ok" });
+    setStatus({
+      msg: `${key} 를 수정 중입니다.${retyped ? " 플레이버 노트 표기를 영문으로 맞췄습니다 — 저장하면 반영됩니다." : ""}`,
+      cls: "ok",
+    });
     setAiFilled(new Set()); // 저장된 값이므로 "AI가 채운 미확인 값"이 아니다
     setStarted(true); // 이미 값이 다 있으니 인테이크는 건너뛴다
     setFormSeq((s) => s + 1); // 전 스텝을 완료 상태로 다시 구성
@@ -527,7 +603,16 @@ export default function Workspace({
         continue;
       }
       // 파서는 단위 없는 값을 주므로 원문 그대로 폼에 (ALTITUDE·NET_WEIGHT 포함)
-      next[key] = field === "TASTING_NOTE" ? capitalizeNoteSegments(v) : v;
+      // 노트는 영문 표기로 되돌린 뒤 담는다 — AI가 "파인애플"을 주는 일이 있었고, 그대로 저장되면
+      // 라벨에 한글이 찍히고 같은 향미가 카드마다 달라진다. 어휘 밖의 말은 그대로 둔다.
+      next[key] = normalizeFieldValue(
+        key,
+        field === "TASTING_NOTE"
+          ? capitalizeNoteSegments(canonicalizeNotes(v))
+          : field === "AGTRON"
+            ? canonicalRoast(v)
+            : v,
+      );
       filled.push(FIELD_LABELS_KO[field] || field);
       filledKeys.add(key);
     }
@@ -608,6 +693,9 @@ export default function Workspace({
    * 어느 단계에서 멈추든 사용자는 "채워졌다/못 채웠다"만 보면 되므로 실패는 다음 단계로 흘린다.
    */
   async function recognizeText(raw: string): Promise<boolean> {
+    // 지난 실패 표시는 **사다리에 들어서는 이 한 곳에서** 지운다. 아래 서비스 키 분기에서만
+    // 지우면 자체 키를 등록해 ①로 갈아탄 뒤에는 성공해도 배너가 영영 남는다 — 실제로 그랬다.
+    setAiServiceDown(false);
     if ((localStorage.getItem("bh_gemini_key") || "").trim()) return runAiRecognition(raw);
 
     setAutofillStatus({ msg: "AI 인식 중…", cls: "" });
@@ -620,6 +708,7 @@ export default function Workspace({
       },
     );
     if (body?.ok && body.fields) {
+      if (typeof body.remaining === "number") onAiRemaining(body.remaining);
       const ok = fillParsed(body.fields, "AI ", true);
       // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게
       if (ok && typeof body.remaining === "number" && body.remaining <= 3) {
@@ -631,7 +720,13 @@ export default function Workspace({
     // 소진 판정은 상태 코드로 한다: 서버가 429를 내는 경우는 이것뿐이고, 문구(AI_QUOTA_ERROR)는
     // 사용자에게 보이는 말이라 다듬는 순간 조건이 빗나가도 테스트는 전부 통과한다.
     // fallback 플래그로는 못 가른다 — 키 미설정(503)·호출 실패(502)도 같은 플래그를 준다.
-    if (status === 429) setAiQuotaLeft(0);
+    if (status === 429) {
+      setAiQuotaLeft(0);
+      onAiRemaining(0);
+    }
+    // 키 미설정(503)·상위 호출 실패(502)는 우리 쪽 사정이다. 조용히 내려가면 사용자는 "AI가 원래
+    // 이 정도"라고 오해하고, 우리는 기능이 죽은 줄도 모른다 — 서버 로그와 짝이 되는 화면 신호다.
+    if (status === 502 || status === 503) setAiServiceDown(true);
     return fillParsed(parseBeanText(raw), "", false);
   }
 
@@ -655,8 +750,12 @@ export default function Workspace({
     [beans],
   );
 
-  // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩·datalist가 쓴다
+  // 로고를 가진 로스터리를 앞에(★), 나머지는 등록 이력에서 — 검증 스텝의 추천 칩이 쓴다
   const withLogo = useMemo(() => new Set(Object.keys(logosMap)), [logosMap]);
+  // 내가 전에 쓴 노트 — 로스터리 추천과 같은 방식으로 등록된 원두에서 파생한다(새 저장소를 두지
+  // 않으므로 오타가 남에게 번지지 않고, 원두를 지우면 노트도 함께 사라진다).
+  const myNotes = useMemo(() => collectMyNotes(beans), [beans]);
+
   const roasteryOptions = useMemo(() => {
     const fromBeans = (beans || []).map((b) => (b.ROASTERY || "").trim().toUpperCase()).filter(Boolean);
     const sorted = [...new Set([...withLogo, ...fromBeans])].sort();
@@ -689,6 +788,7 @@ export default function Workspace({
             filledCount={aiFilled.size}
             aiNudge={aiNudge}
             aiQuotaLeft={aiQuotaLeft}
+            aiServiceDown={aiServiceDown}
             onOpenSettings={() => {
               setAiNudge(false); // 한 번 안내했으면 충분하다
               onOpenSettings();
@@ -704,8 +804,10 @@ export default function Workspace({
                 aiFilled={aiFilled}
                 roasteryOptions={roasteryOptions}
                 withLogo={withLogo}
+                myNotes={myNotes}
                 onRoasteryBlur={handleRoasteryBlur}
                 allDone={mode === "edit"}
+                focusField={focusField}
               />
 
               {/* 입력 화면의 결론 — 등록해야 KEY가 나오고, KEY가 나와야 QR을 만들 수 있다 */}
@@ -723,7 +825,9 @@ export default function Workspace({
                     처음부터
                   </button>
                 </div>
-                <div className={`status-line register-status ${status.cls}`}>{status.msg}</div>
+                <div role="status" className={`status-line register-status ${status.cls}`}>
+                  {status.msg}
+                </div>
               </div>
             </>
           )}
@@ -780,7 +884,6 @@ export default function Workspace({
       {view === "list" && (
         <BeanListCard
           beans={beans}
-          site={SITE}
           onEdit={loadBeanForEdit}
           onDelete={deleteBean}
           onRefresh={refreshList}

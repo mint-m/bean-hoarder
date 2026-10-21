@@ -1,34 +1,64 @@
 name: AI PR Review
 
 on:
+  # 열릴 때 한 번만. synchronize(=브랜치 push)를 뺀 이유: push마다 리뷰가 돌면 한 PR에서 열 번도
+  # 도는데, diff 전량을 싣는 지금은 회당 수만 토큰이라 그 대부분이 낭비다(같은 코드를 조금씩 늘려
+  # 가며 다시 읽는 셈이다). 코드가 바뀐 뒤 다시 보고 싶으면 아래 코멘트 명령으로 부른다.
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
+  # 수동 트리거 — PR에 "/gemini review"라고 코멘트하면 그 PR을 다시 검토한다.
+  issue_comment:
+    types: [created]
 
-# 같은 PR에 연속 push가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+# 같은 PR에 연속 트리거가 오면 이전 리뷰 잡을 취소한다 — 중복 코멘트/경쟁 방지.
+# issue_comment 이벤트에는 pull_request.number가 없어 issue.number로 떨어진다(같은 번호다).
 concurrency:
-  group: ai-review-${{ github.event.pull_request.number }}
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
-# PR 코멘트는 issues API를 쓰지만 PR 대상이면 pull-requests:write로 충분하다 (issues:write 불필요).
+# pull-requests:write — 리뷰와 인라인 코멘트 등록.
+# issues:write      — 호출 코멘트에 👀 반응을 남기는 데 필요하다(반응 API는 issues 쪽이다).
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    # 과부하(503)를 만나면 아래 세대로 내리지 않고 최신 모델을 붙잡고 기다린다(ai-review.mjs의
+    # ATTEMPTS_BY_RANK). 최악이 1차+검증 합쳐 10분대라 여유를 두되, 기본값 360분처럼 하루를
+    # 태우지는 않게 상한을 둔다. 공개 저장소라 러너 시간 자체는 무료다.
+    timeout-minutes: 30
+    # 코멘트 트리거는 세 가지를 모두 만족해야 돈다:
+    #   1) 이슈가 아니라 PR에 달린 코멘트일 것 (issue.pull_request가 있어야 한다)
+    #   2) 본문이 "/gemini review"로 시작할 것 — 봇 자신의 코멘트로 되돌아 도는 일도 이걸로 막힌다
+    #   3) 쓰기 권한이 있는 사람일 것 — 아니면 누구나 코멘트 한 줄로 API 쿼터를 태울 수 있다
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request != null &&
+       startsWith(github.event.comment.body, '/gemini review') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     # Dependabot 등의 자동 PR은 필요에 따라 건너뛰거나 실행할 수 있음
     steps:
+      # 코멘트 트리거일 때는 PR이 아니라 기본 브랜치가 체크아웃된다. 스크립트는 diff를 API로
+      # 가져오므로 상관없고, 규칙(CLAUDE.md)은 오히려 main 것을 쓰는 편이 맞다 — 심사받는 PR이
+      # 자신을 심사할 규칙까지 바꿔 오면 안 된다.
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Run AI Review
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # CI 전용 키가 있으면 그것을 쓴다 — 서비스(랩 자동 채우기)와 같은 키를 쓰면 Google 쪽
+          # 쿼터를 함께 갉아먹어, 리뷰 한 번(수만 토큰)이 같은 시각의 사용자 자동 채우기를 429로
+          # 밀어낼 수 있다. 없으면 기존 키로 떨어지므로 시크릿을 안 만들어도 그대로 동작한다.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_CI || secrets.GEMINI_API_KEY }}
           # 비워 두면 스크립트가 ListModels로 사용 가능한 모델을 동적 탐색한다 (vars.GEMINI_MODEL로 고정 가능).
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          # 코멘트로 부른 경우에만 채워진다 — 그 코멘트에 👀를 달아 접수를 알린다.
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
         run: node .github/scripts/ai-review.mjs

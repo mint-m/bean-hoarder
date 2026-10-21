@@ -295,7 +295,11 @@ export default function DesignCard(p: Props) {
               }}
             />
             <LogoUrlLoader onLoad={loadLogoFromUrl} />
-            <div className={`status-line logo-status ${p.logoStatus.cls}`} style={{ marginTop: 6 }}>
+            <div
+              role="status"
+              className={`status-line logo-status ${p.logoStatus.cls}`}
+              style={{ marginTop: 6 }}
+            >
               {p.logoStatus.msg}
             </div>
           </div>

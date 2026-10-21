@@ -14,8 +14,8 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 | 랩 (등록·QR 발급) | **[bnhd.pages.dev/lab](https://bnhd.pages.dev/lab)** — 가입/로그인 필요 |
 | 덱 (내 원두 카드) | **[bnhd.pages.dev/deck](https://bnhd.pages.dev/deck)** — 로그인 필요 |
 | 데모 (로그인 없이 둘러보기) | **[bnhd.pages.dev/demo](https://bnhd.pages.dev/demo)** — 정적 페이지 |
-| 작동 방식 (그래픽 문서) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
-| 디자인 시스템 | [DESIGN.md](DESIGN.md) · 저장소 구조 [STRUCTURE.md](STRUCTURE.md) |
+| 문서 한 장 (사람용 — 아래 문서 넷을 렌더한 생성물) | [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 디자인 시스템 · 저장소 구조 · 작업 원칙 | [DESIGN.md](DESIGN.md) · [STRUCTURE.md](STRUCTURE.md) · [CLAUDE.md](CLAUDE.md) |
 
 ## 사용 흐름
 
@@ -25,7 +25,7 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
    - **로고 재사용**: 로스터리 이름을 입력한 상태에서 로고를 올리면 서버(D1)에 저장되어, 다음부터 어느 기기에서든 이름만 입력하면 자동 적용. 로스터리 이름도 내 등록 이력에서 자동 제안.
    - **기타 정보**: 개인 감상평이 아니라 산지·로스터리·생산자의 스토리나 배경 정보를 적는 칸(예: "About Beans" 형식의 소개글) — QR 조회 페이지에 공개 표시된다. 자동 채우기가 상품 페이지의 소개글(About/Description/Story 등)도 후보로 인식한다.
 3. **QR 발급** — 등록으로 KEY가 확정되면 인쇄용 QR을 받는다. 인쇄 크기는 **203dpi 도트 격자의 정수배**(약 9.4 / 12.5 / 15.6mm)로만 제시해 모듈 경계가 픽셀에 정확히 떨어지고, **최소 여백(2모듈)이 이미지에 포함**돼 어떤 라벨 소프트웨어에 얹어도 그대로 쓸 수 있다(주변은 흰 바탕이어야 한다 — 라벨의 흰 여백이 나머지를 대신한다). PNG·**SVG(벡터)** 다운로드와 QR 이미지·상세 URL 복사를 제공하며, KEY나 인쇄 크기가 바뀔 때마다 203dpi로 래스터화해 **실제 디코드되는지 자동 검증**한다(타이핑마다 돌지 않는다 — 검증 대상이 라벨 도안이 아니라 QR이기 때문). QR은 KEY를 담으므로 등록 전(예상 KEY)에는 내보내지 않는다 — 확정 전 QR을 인쇄하면 없는 곳을 가리키게 된다.
-4. **라벨 이미지 — 선택** — 직접 쓰는 라벨 양식이 있으면 위 QR만 가져다 쓰면 되고, 도안까지 필요할 때만 편다. 사이즈는 40×20(기본)·50×30(여유형)·50×60(카드형) 중 선택. 사이즈가 커질수록 부제목·스펙 칸에 기본으로 더 많은 정보(품종·고도 등)를 표시한다(직접 커스터마이즈한 항목은 사이즈를 바꿔도 유지). 인쇄 색상은 컬러(레드+블랙)·흑백 중 선택 가능하며 **기본값은 흑백**(2도 인쇄를 지원하지 않는 감열 프린터가 많음). 부제목 줄(지역·랏·워싱스테이션·생산자 중 최대 3개)은 라벨의 핵심 정보라 **절대 잘리지 않고** 필요하면 여러 줄로 줄바꿈해 전문을 싣는다. 하단 스펙 칸(용량·로스팅포인트·가공·품종·고도·수확시기)에 표시할 정보는 값이 있는 항목만 선택 가능(빈 항목은 체크박스 비활성화)하고 ↑↓ 버튼으로 **표시 우선순위를 직접 조정**할 수 있으며 기본 순위는 용량·로스팅포인트·가공·품종·고도·수확시기 순. 값이 길면 자동으로 줄바꿈되며, 공간이 부족하면 잘리는 대신 우선순위 낮은 스펙부터 자동으로 숨겨진다(부제목·필수 날짜는 항상 유지, 스펙이 노트보다 우선). 테이스팅 노트는 스펙 칸 아래·날짜 바로 위에 **한 줄만** 표시하고, 콤마로 구분된 항목 중 그 줄에 다 들어가는 항목까지만 보여준다(중간에서 말줄임(…)으로 자르지 않음) — 남는 공간이 있으면 항상 표시. 로스팅일·패키징일은 항상 고정 표시 — 가로형(40×20·50×30)은 라벨 최하단에 한 줄(2열)로, 카드형(50×60)은 QR 좌측에 "RSTD26.06.29 PKGD26.07.09" 식으로 한 줄에 촘촘히 이어 QR 하단과 맞춰 배치한다. 특히 가장 작은 40×20은 감열 인쇄 가독성을 위해 글자를 키우고 표시 정보량을 줄였다 — 자세한 정보는 QR로 확인. QR은 스캔에 필요한 크기(약 9.4mm)로 3사이즈 모두 동일하게 고정 — 커진 여백은 QR 확대가 아니라 표시 정보량 차이로 쓴다.
+4. **라벨 이미지 — 선택** — 직접 쓰는 라벨 양식이 있으면 위 QR만 가져다 쓰면 되고, 도안까지 필요할 때만 편다. 사이즈는 40×20(기본)·50×30(여유형)·50×60(카드형) 중 선택. 사이즈가 커질수록 부제목·스펙 칸에 기본으로 더 많은 정보(품종·고도 등)를 표시한다(직접 커스터마이즈한 항목은 사이즈를 바꿔도 유지). 인쇄 색상은 컬러(레드+블랙)·흑백 중 선택 가능하며 **기본값은 흑백**(2도 인쇄를 지원하지 않는 감열 프린터가 많음). 부제목 줄(지역·랏·워싱스테이션·생산자 중 최대 3개)은 라벨의 핵심 정보라 **절대 잘리지 않고** 필요하면 여러 줄로 줄바꿈해 전문을 싣는다. 하단 스펙 칸(용량·로스팅포인트·가공·품종·고도·수확시기)에 표시할 정보는 값이 있는 항목만 선택 가능(빈 항목은 체크박스 비활성화)하고 ↑↓ 버튼으로 **표시 우선순위를 직접 조정**할 수 있으며 기본 순위는 용량·로스팅포인트·가공·품종·고도·수확시기 순. 값이 길면 자동으로 줄바꿈되며, 공간이 부족하면 잘리는 대신 우선순위 낮은 스펙부터 자동으로 숨겨진다(부제목·필수 날짜는 항상 유지, 스펙이 노트보다 우선). 테이스팅 노트는 스펙 칸 아래·날짜 바로 위에 **한 줄만** 표시하고, 콤마로 구분된 항목 중 그 줄에 다 들어가는 항목까지만 보여준다(중간에서 말줄임(…)으로 자르지 않음) — 남는 공간이 있으면 항상 표시. 로스팅일·소분일은 항상 고정 표시 — 가로형(40×20·50×30)은 라벨 최하단에 한 줄(2열)로, 카드형(50×60)은 QR 좌측에 "RSTD26.06.29 PKGD26.07.09" 식으로 한 줄에 촘촘히 이어 QR 하단과 맞춰 배치한다. 특히 가장 작은 40×20은 감열 인쇄 가독성을 위해 글자를 키우고 표시 정보량을 줄였다 — 자세한 정보는 QR로 확인. QR은 스캔에 필요한 크기(약 9.4mm)로 3사이즈 모두 동일하게 고정 — 커진 여백은 QR 확대가 아니라 표시 정보량 차이로 쓴다.
 5. **유지관리** — "내 원두 목록"에서 수정·삭제·URL 복사. 덱(`/deck`)의 카드 메뉴에서 "정보 수정"을 고르면 랩이 그 원두의 편집 상태로 바로 열린다. **CSV 백업 다운로드 / 백업 복원**(내 유저코드 KEY만, 같은 KEY는 백업 내용으로 덮어쓰기 — 실수 삭제·악의적 변조를 백업 시점으로 되돌림).
 6. **조회** — QR 스캔 → `bnhd.pages.dev/{KEY}` → 원두 카드(테이스팅 노트·기타 정보 포함). 누구나 볼 수 있고 빈 필드는 자동 숨김. 코드 없이 접속하면 랩(`/lab`)으로 안내. 조회 카드와 덱(`/deck`)은 **산지 시그니처 색(작은 스와치·닷)**과 **향미 무드 그라데이션**으로 원두를 구별한다 — 라벨 인쇄 색과는 무관한 화면 전용 표시다([DESIGN.md](DESIGN.md) §3).
 
@@ -34,7 +34,8 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 **총 운영 비용 0�
 Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙은 단일 서비스다.
 
 저장소 배치·API 라우트·D1 테이블은 저장소에서 생성되는 **[STRUCTURE.md](STRUCTURE.md)** 에 있다.
-작업 시 지켜야 할 원칙과 함정은 [CLAUDE.md](CLAUDE.md).
+작업 시 지켜야 할 원칙과 함정은 [CLAUDE.md](CLAUDE.md). 이 문서 넷을 한 페이지로 렌더한 사람용 생성물이
+[HOW_IT_WORKS.html](HOW_IT_WORKS.html)이다(`npm run gen:html`).
 
 - 쓰기(등록·수정·삭제·백업·복원·로고)는 **세션 토큰** 인증(`POST /api/login`으로 발급, 90일 만료, 서버엔 SHA-256 해시만 저장), 읽기(QR 조회)는 공개. 브라우저는 암호를 저장하지 않고 세션 토큰만 보관하며, 구버전이 저장해 둔 암호는 첫 방문 시 세션으로 자동 교환된다. 레거시 `Bearer 유저코드:암호` 인증도 이행기 동안 동작.
 - 암호는 탈취돼도 무방한 편의용(무단 등록·수정 방지 수준) — PBKDF2 해시만 저장 (구형 SHA-256 해시는 로그인 시 자동 업그레이드). **인증 실패는 D1 기반 rate limit**(유저코드당 10회/10분, IP당 30회/10분 — 초과 시 429)으로 4자리 암호 전수 대입을 차단
@@ -86,12 +87,18 @@ Cloudflare Pages 프로젝트 하나에 D1(`bnhd-v2`)과 R2(`bnhd-logos`)가 붙
 - **의존성 갱신**: `.github/dependabot.yml`이 매주 월요일 `main`으로 PR을 연다(액션은 월 1회). 자동 병합은 켜지 않는다 — `main` 푸시가 프리뷰 배포를 트리거하므로 사람이 검사 결과를 보고 병합한다. Cloudflare 툴체인(`wrangler`·`miniflare`·`@cloudflare/*`)은 한 PR로 묶여 오고, `hono`·`drizzle-orm`·`zod` 같은 런타임 의존성은 API 계약에 닿으므로 개별 PR로 온다.
 - **배포(수동/로컬)**: `npx wrangler pages deploy public` — 긴급 핫픽스나 로컬 검증용, 정상 경로는 위 자동 배포.
 - **초대코드**: Cloudflare **secret**으로 관리 — `npx wrangler pages secret put INVITE_CODE` (교체도 동일, 저장소에 커밋하지 않는다)
+- **관리자**: `npx wrangler pages secret put ADMIN_USERCODES` — 관리자로 쓸 **본인 계정의 유저코드**를 콤마로 나열한다(예: `ABCD,EFGH`). DB에는 특별한 계정이 없다 — 관리자도 일반 계정으로 로그인하고, 서버가 요청마다 이 목록과 대조할 뿐이다. 목록에 있으면 랩 계정 칩과 메인 랜딩(로그인된 브라우저)에 **관리**가 뜨고(`/api/me`), 관리 화면의 주소는 **`/lab/#admin`**이다(북마크·새로고침 가능. 경로가 아니라 해시인 이유는 경로를 QR 폴백이 가져가기 때문). 아니면 `/api/admin/*`은 전부 404다(존재를 알리지 않는다). secret이 비어 있으면 관리자가 없다.
+- **관리 키**: `npx wrangler pages secret put ADMIN_KEY` — 관리 화면에 들어갈 때 계정과 별개로 묻는 **두 번째 열쇠**. 계정 인증은 접근성을 위해 얕으므로(4자리 PIN) 그 계정이 새도 관리까지 넘어가지 않게 한다. 맞으면 그 로그인 세션에 묶인 1시간짜리 관리 토큰이 발급되고(로그아웃하거나 탭을 닫으면 사라진다), 틀리면 유저코드당 **10분에 5회**까지만 시도할 수 있다 — 그래서 키는 긴 무작위 문자열이 아니라 **기억할 수 있는 8~12자**면 된다(PIN과 다르게, 다른 곳에서 쓰지 않는 것으로). 비어 있으면 관리자여도 전부 잠긴다.
+- **관리 토큰 서명 secret**: `openssl rand -hex 32 | npx wrangler pages secret put ADMIN_TOKEN_SECRET` — **기억할 값이 아니라 무작위 32자 이상**(짧으면 관리 기능이 잠긴다). 관리 키와 따로 두는 이유: 키는 짧아도 온라인 시도 횟수로 막히지만, 그 키로 토큰을 서명하면 토큰 하나가 새는 순간 rate limit 없이 오프라인으로 키를 추측할 수 있게 된다. 이 secret은 사람이 입력하지 않으므로 길어도 불편이 없다. 바꾸면 발급된 관리 토큰이 전부 무효가 된다(다시 잠금을 풀면 된다).
+- **가입 모드 "누구나"**: 초대코드라는 문턱이 없는 대신 IP당 **성공 가입 3회/10분**으로 막는다(`OPEN_SIGNUP_LIMIT`, `packages/api/src/lib/ratelimit.ts`). 잠깐 문을 열 때만 쓰고 다시 닫는다.
+- **가입 모드**: 관리 화면에서 **초대코드 / 누구나 / 받지 않음** 셋 중 하나 — D1 `settings` 테이블의 `signup_mode`. 초대코드 값 자체는 여전히 위 secret이고, 여기서 바꾸는 것은 "지금 문이 열려 있는가"뿐이다. 행이 없으면 초대코드(종전 동작).
+- **향미 어휘 승격**: 관리 화면 "향미 승격 후보"가 어휘(`packages/schema/src/flavor.ts`)에 없는데 등록된 노트를 사용자 수 순으로, 건수와 함께 보여 준다. 어휘와 한두 글자 다른 말에는 "오타? →"가 붙는다. **승격은 PR로** — 그 파일에 한 줄 + `apps/web/src/lib/coffee-color.ts`의 노트 색. 색 없이 노트만 더하면 `flavor-coverage.test.ts`가 막는다. 오타 후보(`Bergamott`)는 승격하지 않는다.
 - **AI 인식 키(선택)**: `npx wrangler pages secret put GEMINI_API_KEY` — 키를 넣지 않으면 AI 대행이 503으로 응답하고 클라이언트가 규칙 기반 인식으로 내려가므로 서비스는 그대로 동작한다. 하루 한도는 계정별 10회·전역 100회(`packages/api/src/lib/ai-quota.ts`) — 무료 등급을 넘겨 조용히 죽는 대신 코드가 먼저 막는다.
 - **무차별 대입 완화**: 코드 레벨 rate limit 내장(인증 실패 유저코드당 10회/10분·IP당 30회/10분 → 429, D1 카운터). Cloudflare 대시보드 Rate Limiting 룰은 추가 방어층으로 선택 적용.
 - **R2 비용 백스톱**: 로고 저장(`PUT /api/logos`)에 서비스 전역 물리적 상한 내장(`packages/api/src/lib/budget.ts`) — 월간 R2 쓰기 10만 회·R2 저장 로고 2만 개 초과 시 503으로 저장 거부(무료 티어를 넘겨 과금되기 전에 차단). 삭제는 무과금이라 제한하지 않는다(한도에 걸려도 삭제로 공간 확보 가능). 코드 밖 안전망으로 **Cloudflare 대시보드 → R2/Billing 사용량 알림**을 별도로 설정할 것(대시보드 예산은 서비스를 멈추지 않는 알림뿐이라 코드 백스톱이 실제 상한).
 - **DB 백업 (3중 안전망)**:
   1. **D1 Time Travel** — 최근 30일 내 임의 시점 복구: `npx wrangler d1 time-travel info bnhd-v2`로 북마크 확인, `npx wrangler d1 time-travel restore bnhd-v2 --timestamp=<unix|ISO>`로 복구.
-  2. **자동 덤프** — `.github/workflows/backup.yml`이 매일 04:17 KST에 `wrangler d1 export`를 실행해 Actions artifact(30일 보관)로 저장. 복구: artifact의 `bnhd-v2-backup.sql`을 받아 `npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql` (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 `CLOUDFLARE_API_TOKEN`에 D1:Edit 권한 추가.
+  2. **자동 덤프** — `.github/workflows/backup.yml`이 매일 04:17 KST에 `wrangler d1 export`를 실행해 **age 공개키로 암호화한 뒤** Actions artifact(30일 보관)로 저장. 저장소가 공개라 artifact는 누구나 받을 수 있으므로 평문은 올리지 않는다 — 공개키는 저장소 변수 `BACKUP_AGE_RECIPIENT`, 개인키는 운영자만 저장소 밖(비밀번호 관리자 등)에 보관한다. 키 만들기: `age-keygen -o bnhd-backup.key`(출력의 `age1…`이 공개키) → `gh variable set BACKUP_AGE_RECIPIENT --body 'age1…'`. 복구: artifact의 `bnhd-v2-backup.sql.age`를 받아 `age -d -i bnhd-backup.key -o bnhd-v2-backup.sql bnhd-v2-backup.sql.age` → `npx wrangler d1 execute bnhd-v2 --remote --file=bnhd-v2-backup.sql` (덤프는 CREATE+INSERT 전체 스냅샷 — 빈 DB 기준. 기존 DB 위 복구는 Time Travel을 먼저 고려). 토큰에 D1 권한이 없어 잡이 실패하면 `CLOUDFLARE_API_TOKEN`에 D1:Edit 권한 추가.
   3. **사용자 셀프 백업** — 각자 랩에서 CSV 내보내기/복원.
   (R2 로고 원본은 백업 대상 제외 — 유실 시 사용자가 재업로드하는 트레이드오프 수용, D1 레거시 행은 덤프에 포함됨)
 - **서버 로그**: 5xx는 구조화 JSON(`level/msg/stack/method/path`)으로 `console.error` — 실시간 확인은 `npx wrangler pages deployment tail`, 또는 대시보드 > Pages > bnhd > Real-time Logs.
@@ -123,9 +130,12 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 로컬 계정 + e2e 픽스처 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
+  --binding ADMIN_TOKEN_SECRET=local-dev-admin-token-secret-0123456789 \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # (--d1/--r2 플래그: wrangler 4.x의 pages dev가 wrangler.toml의 바인딩을 붙여주지 않아 명시 필요)
+# (ADMIN_USERCODES=TEST · ADMIN_KEY=test-key · ADMIN_TOKEN_SECRET: 시드 계정을 관리자로, 관리 잠금은 test-key로 — 로컬에서 관리 화면을 보려면. 서명 secret은 로컬 전용 값)
 # /lab(랩)을 로컬에서 띄우려면 먼저 npm run build -w @bnhd/lab
 ```
 
@@ -135,7 +145,7 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - 로그인 없이 둘러보는 화면은 정적 데모(`/demo`)가 맡는다 — 공개 계정도, 데모용 DB 행도 없다.
 - 랩을 고치는 중이라면 `npm run dev -w @bnhd/lab`(Vite HMR)를 쓰고, 이때 위 wrangler는
   **`--port 8790`**으로 띄운다 — Vite 프록시가 8790을 본다. 8788은 e2e 전용이다.
-- 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + check:docs) — 커밋 전 필수.
+- 검증: 저장소 루트에서 `npm run check` (lint + typecheck + test + 생성 문서·문서 참조 검증) — 커밋 전 필수.
   `npm run e2e`는 Playwright가 wrangler를 직접 띄우므로 별도 서버 기동이 필요 없다.
 
 ## 주요 변경
@@ -158,6 +168,8 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 | [v1.3.0](../../releases/tag/v1.3.0) | 2026-08-16 | **MPA 전환** — 정적 페이지와 번들의 경계를 없애 조회·덱·랩이 한 빌드에서 나오게 하고, 헤드라인·세션 같은 공유 로직을 `packages/`로 내렸다 |
 | [v1.3.0](../../releases/tag/v1.3.0) | 2026-08-24 | **디자인 리뉴얼과 서비스 목표 재정의** — 목표를 입력·QR·유지관리 셋으로 좁히고 디자인 시스템([DESIGN.md](DESIGN.md))을 세웠다. 라벨과 분리된 단독 QR 내보내기와, 본인 키 없이도 되는 AI 자동 채우기(서비스 키 서버 대행 + 계정·전역 한도) |
 | [v1.3.0](../../releases/tag/v1.3.0) | 2026-08-26 | **데모를 계정에서 콘텐츠로** — 공개 `DEMO` 계정을 걷어내고, D1도 세션도 타지 않는 정적 데모 덱 `/demo`로 옮겼다 |
+| [v1.4.0](../../releases/tag/v1.4.0) | 2026-09-04~12 | **모바일 덱과 향미 색** — 폰에서 덱을 훑고 등록 폼의 값을 치는 대신 고르게 했다. 향미 노트마다 제 색을 주고, 그라데이션이 계열 비중과 로스팅으로 원두의 톤을 미리 보여 준다 |
+| [v1.4.0](../../releases/tag/v1.4.0) | 2026-10-21 | **관리자 페이지** — 가입 문 여닫기, 결정에 쓰이는 숫자만 둔 대시보드, 향미 어휘 승격 후보. 관리자는 DB가 아니라 secret으로 정하고, 계정과 별개의 관리 키로 한 번 더 잠근다 |
 
 ## 로드맵 / 남은 작업
 

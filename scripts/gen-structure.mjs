@@ -186,7 +186,9 @@ function workspaces() {
       const entry = typeof pkg.exports?.["."] === "string" ? pkg.exports["."] : pkg.main;
       const resolved = entry
         ? `${dir}/${entry.replace(/^\.\//, "")}`
-        : ["src/main.tsx", "src/index.ts", "src/index.js"].map((c) => `${dir}/${c}`).find(existsSync);
+        : ["src/main.tsx", "src/index.ts", "src/index.js", "index.html"]
+            .map((c) => `${dir}/${c}`)
+            .find(existsSync); // index.html: Vite MPA 앱(apps/web)은 HTML이 진입점
       out.push({ path: `${dir}/`, name: pkg.name, desc: resolved ? describe(resolved) : "" });
     }
   }

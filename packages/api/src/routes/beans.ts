@@ -6,8 +6,8 @@ import {
   FIELDS,
   KEY_RE,
   missingRequired,
+  normalizeRoastery,
   pickFields,
-  ROASTERY_MAX_LEN,
 } from "@bnhd/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { Context } from "hono";
@@ -18,9 +18,8 @@ import { json } from "../lib/http";
 type BeanBody = Record<string, unknown>;
 
 function readBeanPayload(body: BeanBody) {
-  const roastery = String(body.ROASTERY || "")
-    .trim()
-    .slice(0, ROASTERY_MAX_LEN);
+  // 등록(POST)·수정(PUT)이 함께 지나는 유일한 지점 — 로스터리 대문자 정규화를 여기 한 번만 건다.
+  const roastery = normalizeRoastery(body.ROASTERY);
   const vals = pickFields(body);
   return { roastery, vals };
 }

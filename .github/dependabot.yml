@@ -24,6 +24,9 @@ updates:
       timezone: Asia/Seoul
     # 1인 저장소다. 읽히지 않는 PR 더미는 없느니만 못하므로 동시에 열리는 수를 묶어둔다.
     open-pull-requests-limit: 4
+    # 커밋 규칙(CLAUDE.md "커밋 규칙")의 `chore:` 접두. PR 제목이 곧 main 커밋 제목이 된다.
+    commit-message:
+      prefix: "chore"
     groups:
       # 함께 움직여야 하는 것들만 묶는다. 아래 그룹에 안 걸리는 것(hono, drizzle-orm, zod
       # 같은 런타임 의존성)은 개별 PR로 열린다 — API 계약에 닿으므로 하나씩 본다.
@@ -64,6 +67,8 @@ updates:
       interval: monthly
       timezone: Asia/Seoul
     open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore"
     groups:
       actions:
         patterns:

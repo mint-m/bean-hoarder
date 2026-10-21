@@ -162,6 +162,20 @@ textarea {
   color: var(--ink);
   transition: border-color var(--t);
 }
+/* iOS Safari는 16px 미만인 입력에 포커스하면 화면을 확대하고, 빠져나와도 되돌리지 않는다 —
+   한 칸을 탭한 뒤로 화면이 어긋난 채 남는다. 데스크톱까지 16px로 올리면 랩의 12~14px 밀도가
+   무너지므로, 손가락으로 쓰는 기기에서만 올린다. */
+@media (pointer: coarse) {
+  input[type="text"],
+  input[type="url"],
+  input[type="password"],
+  input[type="date"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
 input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--focus-ring);

@@ -44,8 +44,8 @@ test("데모: API를 전부 끊어도 덱과 카드가 그대로 뜬다", async 
 });
 
 test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱에서 카드 확인", async ({ page }) => {
-  // 같은 원두를 다시 등록하면 확인 창이 뜬다(로스터리·산지·로스팅일 일치). e2e DB는 실행 간
-  // 유지되므로 두 번째 실행부터 실제로 걸린다 — 계속 진행을 선택해 원래 동선을 그대로 검증한다.
+  // 같은 원두를 다시 등록하면 확인 창이 뜬다(식별 필드가 전부 일치). e2e DB는 실행 간 유지되므로
+  // 두 번째 실행부터 실제로 걸린다 — 계속 진행을 선택해 원래 동선을 그대로 검증한다.
   page.on("dialog", (d) => d.accept());
   await page.goto("/lab/");
 
@@ -67,6 +67,20 @@ test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱�
   await page.getByPlaceholder("Washed", { exact: true }).fill("Washed");
   await page.getByPlaceholder("SL9", { exact: true }).fill("SL28");
 
+  // 스텝 3(날짜) — 로스팅일은 빼기 버튼을 겹쳐 누르는 계산기다. 누적되지 않으면 "한 달 전에서
+  // 며칠 더" 같은 실제 사용이 성립하지 않으므로, 두 번 눌러 합이 맞는지 확인한다.
+  await page.getByRole("button", { name: /확인하고 다음/ }).click();
+  const roast = page.locator('input[type="date"]').first();
+  const before = await roast.inputValue();
+  await page.getByRole("button", { name: "일주일 전" }).click();
+  await page.getByRole("button", { name: "1일 전" }).click();
+  const after = await roast.inputValue();
+  expect((Date.parse(before) - Date.parse(after)) / 86_400_000).toBe(8);
+
+  // 되돌리기는 직전 한 번만 취소한다 — 연타 중 오탭의 대가가 "처음부터 다시"가 되지 않게 하는 장치다
+  await page.getByRole("button", { name: "직전 선택 되돌리기" }).click();
+  expect((Date.parse(before) - Date.parse(await roast.inputValue())) / 86_400_000).toBe(7);
+
   // 등록(KEY 서버 채번) — 날짜는 기본값이 채워져 있어 그대로 통과한다.
   // 성공하면 화면이 'QR 발급'으로 넘어간다(한 화면에 한 맥락).
   await page.getByRole("button", { name: /등록 — KEY 발급받기/ }).click();
@@ -80,9 +94,71 @@ test("랩: 로그인 → 순차 검증 입력 → 등록 → QR 발급 → 덱�
   await expect(page.locator(".wcard").first()).toBeVisible();
 });
 
+// 필수 항목의 강제 지점은 두 곳이다. "확인하고 다음"은 이 스텝을 봤다는 선언이라 빈 채로 통과하면
+// 그 선언이 거짓이 되고, 등록은 서버가 어차피 막으므로 사용자를 그 칸까지 데려다주는 것이 일이다.
+// 반면 헤더로 다른 스텝을 여는 길은 계속 열려 있어야 한다 — 뒤를 보고 앞을 정하는 것이 이 화면의 일이다.
+test("랩: 필수 칸이 비면 확인이 막히고, 등록은 그 스텝으로 데려간다", async ({ page }) => {
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await page.getByRole("button", { name: /직접 입력으로 시작하기/ }).click();
+
+  // 산지를 비운 채 확인 → 막히고 이유가 그 자리에 뜬다
+  await page.getByPlaceholder("SEY", { exact: true }).fill("BLOCK TEST");
+  await page.getByPlaceholder("ETHIOPIA", { exact: true }).fill("");
+  await page.getByRole("button", { name: /확인하고 다음/ }).click();
+  await expect(page.getByText(/필수 1칸을 채워야 확인할 수 있습니다/)).toBeVisible();
+  // 다음 스텝으로 넘어가지 않았다 — 스텝 1이 그대로 열려 있다
+  await expect(page.getByPlaceholder("ETHIOPIA", { exact: true })).toBeVisible();
+
+  // 채우면 통과하고 다음 스텝이 열린다
+  await page.getByPlaceholder("ETHIOPIA", { exact: true }).fill("KENYA");
+  await page.getByRole("button", { name: /확인하고 다음/ }).click();
+  await expect(page.getByPlaceholder("Washed", { exact: true })).toBeVisible();
+
+  // 품종을 비운 채 다른 스텝(상세)으로 옮겨 간다 — 헤더 점프는 막지 않는다
+  await page.getByPlaceholder("Washed", { exact: true }).fill("Washed");
+  await page.getByRole("button", { name: /상세 \(선택\)/ }).click();
+  await expect(page.getByPlaceholder("SL9", { exact: true })).toBeHidden();
+
+  // 등록 → 문구만 띄우는 게 아니라 비어 있는 칸이 있는 스텝을 열어 준다
+  await page.getByRole("button", { name: /등록 — KEY 발급받기/ }).click();
+  await expect(page.getByPlaceholder("SL9", { exact: true })).toBeVisible();
+});
+
 // 세션 토큰은 90일 고정 만료라, 실서비스 전환 시점에 로그인한 세션들이 한꺼번에 만료된다.
 // 예전엔 랩에 401 처리 경로가 없어 목록이 조용히 비고 저장 때마다 "인증 실패 — 유저코드와
 // 암호를 확인하세요"만 떴다(덱은 처리하는데 랩만 빠져 있었다).
+// 한글은 조합 중에 친 Enter가 "글자 확정"이다. Chrome은 그 keydown(isComposing)과 확정 뒤 keydown을 둘 다
+// 보내므로, 조합 중 Enter를 "담기"로 받으면 Enter 한 번에 노트가 둘 담긴다(남은 글자나 첫 후보 Floral).
+// 실제 IME는 띄울 수 없어 브라우저가 보내는 두 keydown을 그대로 재현한다.
+test("랩: 향미 피커는 한글 조합 중의 Enter를 담기로 받지 않는다", async ({ page }) => {
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await page.getByRole("button", { name: /직접 입력으로 시작하기/ }).click();
+  await page.getByRole("button", { name: /플레이버 · 커피 이름/ }).click();
+
+  const search = page.getByRole("combobox", { name: "향미 검색" });
+  await search.fill("자스민");
+  await expect(page.getByRole("option", { name: /Jasmine/ })).toBeVisible();
+
+  // ① 조합 중 Enter — 아무것도 담기지 않고 친 글자도 그대로다
+  await search.evaluate((node) =>
+    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true })),
+  );
+  await expect(page.locator(".note-token")).toHaveCount(0);
+  await expect(search).toHaveValue("자스민");
+
+  // ② 확정 뒤 Enter — 그제야 한 번 담긴다
+  await search.press("Enter");
+  await expect(page.locator(".note-token")).toHaveCount(1);
+  await expect(page.locator(".note-token")).toContainText("Jasmine");
+  await expect(search).toHaveValue("");
+});
+
 test("랩: 세션이 만료되면 안내와 함께 로그인 화면으로 돌아간다", async ({ page }) => {
   await page.goto("/lab/");
   await page.getByPlaceholder("ABCD").fill("TEST");
@@ -98,4 +174,57 @@ test("랩: 세션이 만료되면 안내와 함께 로그인 화면으로 돌아
   await expect(page.getByRole("button", { name: "이 브라우저에 로그인" })).toBeVisible();
   // 죽은 토큰이 남아 있으면 다음 방문에도 같은 일이 반복된다
   expect(await page.evaluate(() => localStorage.getItem("bh_session"))).toBeNull();
+});
+
+// 설정 서랍의 "오늘 N번 남음"은 로그인 때 한 번 받은 값이었다 — AI 대행을 써도 줄지 않았다(#103).
+// e2e 서버엔 서비스 키가 없으므로 /api/extract 응답만 가로채 "서버가 7번 남았다고 답했다"를 만든다.
+test("랩: AI 대행을 쓰면 설정 서랍의 남은 횟수가 서버가 준 값으로 바뀐다", async ({ page }) => {
+  await page.route("**/api/extract", (route) =>
+    route.fulfill({
+      json: { ok: true, fields: { ROASTERY: "MOCK ROASTERY", ORIGIN: "KENYA" }, remaining: 7 },
+    }),
+  );
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByPlaceholder("원두 [링크] 또는 [정보/노트] 붙여넣기").fill("MOCK ROASTERY Kenya AA washed");
+  await page.getByRole("button", { name: "채우기" }).click();
+  await expect(page.getByPlaceholder("ETHIOPIA", { exact: true })).toHaveValue("KENYA");
+
+  await page.getByRole("button", { name: "설정" }).click();
+  await expect(page.getByText("오늘 7번 남음", { exact: false })).toBeVisible();
+});
+
+// 위 테스트의 반대 순서 — AI 대행 응답이 로그인 직후의 /api/me보다 **먼저** 오는 경우. CI가 느리면 실제로
+// 이 순서가 되어, 갱신이 버려지거나 뒤늦은 /api/me의 옛 값(10번)이 덮어썼다. /api/me를 붙잡아 순서를 고정한다.
+test("랩: /api/me가 AI 대행보다 늦게 와도 남은 횟수는 더 새 값(AI 대행 응답)을 따른다", async ({ page }) => {
+  let releaseMe: () => void = () => {};
+  const meHeld = new Promise<void>((r) => {
+    releaseMe = r;
+  });
+  await page.route("**/api/me", async (route) => {
+    await meHeld;
+    await route.continue();
+  });
+  await page.route("**/api/extract", async (route) => {
+    await route.fulfill({
+      json: { ok: true, fields: { ROASTERY: "MOCK ROASTERY", ORIGIN: "KENYA" }, remaining: 7 },
+    });
+    releaseMe();
+  });
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByPlaceholder("원두 [링크] 또는 [정보/노트] 붙여넣기").fill("MOCK ROASTERY Kenya AA washed");
+  await page.getByRole("button", { name: "채우기" }).click();
+  await expect(page.getByPlaceholder("ETHIOPIA", { exact: true })).toHaveValue("KENYA");
+
+  await page.getByRole("button", { name: "설정" }).click();
+  await expect(page.getByText("오늘 7번 남음", { exact: false })).toBeVisible();
 });

@@ -7,7 +7,8 @@
 // 검사 대상은 저장소 루트의 모든 `*.md`·`*.html`이다 — 목록을 손으로 유지하다가 DESIGN.md가 빠져
 // 낡은 라우트 목록을 오래 방치한 전례가 있어 자동 수집으로 바꿨다. 생성물인 STRUCTURE.md도
 // 포함하고(생성기가 소스 주석을 실어 나르므로 지워진 파일을 가리키면 여기서 잡힌다),
-// HOW_IT_WORKS.html도 포함한다 — .md가 아니라 검사에서 빠져 모노레포 이전 경로가 조용히 낡았던 전례가 있다.
+// HOW_IT_WORKS.html도 포함한다 — 지금은 .md 넷을 렌더한 생성물이지만, .md가 아니라 검사에서 빠져 모노레포
+// 이전 경로가 조용히 낡았던 전례가 있어 그대로 둔다.
 //
 // 실행: npm run check:docs
 
@@ -37,7 +38,8 @@ const FILE_EXT = /\.(?:js|mjs|cjs|ts|tsx|jsx|sql|css|html|json|ya?ml|md|toml)$/;
 const SPLIT = /[\s`(),"'|·→←—–…?!;=ㄱ-ㆎ가-힣]+/;
 
 const MD_LINK = /\[([^\]]*)\]\(([^)]*)\)/g;
-const NPM_RUN = /\bnpm run ([A-Za-z0-9:_-]+)(?:\s+(?:-w|--workspace)[=\s]([^\s`]+))?/g;
+// 워크스페이스 이름은 HTML 안에서 `</code>`로 닫힐 수 있어 `<`에서도 끊는다 (생성물 HOW_IT_WORKS.html).
+const NPM_RUN = /\bnpm run ([A-Za-z0-9:_-]+)(?:\s+(?:-w|--workspace)[=\s]([^\s`<]+))?/g;
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" }).split("\n").filter(Boolean);

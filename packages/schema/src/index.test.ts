@@ -62,12 +62,12 @@ test("파생 상수: 기존 _lib.js와 동일한 순서·구성 (계약 고정)"
     variety: "품종",
     process: "가공방식",
     roast_date: "로스팅일",
-    package_date: "패키징일",
+    package_date: "소분일",
   });
   assert.deepEqual(IMPORT_REQUIRED_LABELS, {
     origin: "국가(산지)",
     roast_date: "로스팅일",
-    package_date: "패키징일",
+    package_date: "소분일",
   });
 });
 
@@ -103,7 +103,7 @@ test("missingRequired: 로스터리·산지·날짜 필수", () => {
   const missing = missingRequired("", vals);
   assert.ok(missing.includes("로스터리"));
   assert.ok(missing.includes("국가(산지)"));
-  assert.ok(missing.includes("패키징일"));
+  assert.ok(missing.includes("소분일"));
   assert.ok(!missing.includes("로스팅일"));
 });
 

@@ -4,6 +4,12 @@ declare namespace Cloudflare {
     DB: D1Database;
     LOGOS: R2Bucket;
     INVITE_CODE: string;
+    /** 테스트는 바인딩에 두지 않고 요청마다 덮어써 넣는다(api()의 envOverride) */
+    ADMIN_USERCODES?: string;
+    ADMIN_KEY?: string;
+    ADMIN_TOKEN_SECRET?: string;
     TEST_SCHEMA_SQL: string;
+    /** db/에 남아 있는(원격 미적용) migrate_*.sql — JSON { 파일명: SQL } */
+    TEST_MIGRATIONS: string;
   }
 }

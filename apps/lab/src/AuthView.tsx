@@ -340,7 +340,9 @@ export default function AuthView({
           </div>
         )}
 
-        <div className={`status-line ${status.ok ? "ok" : "error"}`}>{status.msg}</div>
+        <div role="status" className={`status-line ${status.ok ? "ok" : "error"}`}>
+          {status.msg}
+        </div>
       </div>
     </div>
   );

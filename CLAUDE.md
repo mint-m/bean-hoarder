@@ -1,7 +1,8 @@
 # Bean-Hoarder 작업 가이드
 
 커피 원두 소분 라벨링(QR) & 조회 서비스. Cloudflare Pages + Functions + D1 + R2, 운영비 0원.
-실서비스 전환은 2026-07-13에 끝났고, 패스키(WebAuthn) 도입만 후속 과제로 남아 있다.
+실서비스 전환은 2026-07-13에 끝났다. 패스키(WebAuthn)는 검토 끝에 도입하지 않기로 했다(#24, 2026-08-06) —
+PIN + 세션 토큰 + D1 rate limit 조합을 유지한다.
 
 **이 문서는 원칙과 함정만 다룬다.** 디렉터리·파일 배치와 API 라우트는 생성되는
 [STRUCTURE.md](STRUCTURE.md), 사용법·운영 절차는 [README.md](README.md)에 있고
@@ -30,8 +31,9 @@ npm run lint           # Biome 체크
 npm run lint:fix       # Biome 자동 수정
 npm run typecheck      # tsc (워크스페이스 + functions + e2e)
 npm run gen:structure  # STRUCTURE.md 재생성 (저장소에서 파생)
+npm run gen:html       # HOW_IT_WORKS.html 재생성 (문서 넷을 사람용 한 페이지로 렌더)
 npm run check:docs     # 문서가 가리키는 경로·npm 스크립트의 실존 검증
-npm run check          # lint + typecheck + test + 문서 검증 — 커밋 전 필수
+npm run check          # lint + typecheck + test + 생성 문서·문서 참조 검증 — 커밋 전 필수
 npm run e2e            # Playwright 스모크 — e2e:server(전용 .wrangler-e2e persist) 자동 기동
 npm run check:full     # check + e2e — 배포 경로(디렉터리·wrangler 설정)를 건드렸다면 이걸로
 
@@ -40,6 +42,8 @@ npx wrangler d1 execute bnhd-v2 --local --file=db/schema.sql  # 로컬 D1 초기
 npx wrangler d1 execute bnhd-v2 --local --file=db/seed.sql    # 데모/테스트 계정 + 데모 원두 (선택)
 npm run build                                                 # dist/ 생성 (최초 1회·수정 후)
 npx wrangler pages dev dist --binding INVITE_CODE=test \
+  --binding ADMIN_USERCODES=TEST --binding ADMIN_KEY=test-key \
+  --binding ADMIN_TOKEN_SECRET=local-dev-admin-token-secret-0123456789 \
   --d1 DB=f6b539d0-3394-4011-9f00-f3961d549409 \
   --r2 LOGOS=bnhd-logos                                     # http://localhost:8788
 # --d1/--r2 플래그 필수: wrangler 4.x pages dev가 wrangler.toml의 바인딩을 무시함
@@ -64,8 +68,12 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **헤드라인 조합 규칙은 `@bnhd/schema/headline` 한 곳뿐**(조회·덱·라벨이 함께 import). 두 가지가
   얽혀 있으니 주의: (1) 반드시 **서브패스** `@bnhd/schema/headline`로 가져온다 — 인덱스
   `@bnhd/schema`를 import하면 zod가 딸려와 조회·덱 번들이 부푼다(이 격리가 서브패스로 나눈 이유다).
-  (2) 이 함수는 **대문자화를 하지 않는다** — 조회·덱은 CSS `text-transform`으로, 라벨은 SVG라
-  호출부에서 `.toUpperCase()`를 직접 건다. 공유 함수에 대문자를 넣으면 화면이 이중으로 처리된다.
+  (2) 이 함수는 **대문자화를 하지 않는다**. 예전에는 호출부(조회·덱의 CSS `text-transform`, 라벨의
+  `.toUpperCase()`)가 각자 대문자를 걸었는데, **지금은 헤드라인에 아무도 걸지 않는다** — 대문자는
+  같은 이름을 7% 넓게 만들어(383px vs 355px) 카드·라벨 모두에서 잘림을 앞당기고, `Yirgacheffe`·
+  `La Cabaña` 같은 고유명사의 결을 뭉갠다. 로스터리·KEY는 마이크로 캡스(DESIGN.md §4)라 그대로
+  대문자다. 다시 대문자를 걸려면 **세 곳(덱 CSS·조회 CSS·라벨 SVG)을 함께** 손대야 하고, 공유
+  함수에 넣으면 화면이 이중으로 처리된다.
 - **`setState(updater)` 안에서 바깥 변수를 채우고 곧바로 읽지 말 것.** React는 대기 중인 업데이트가
   없을 때만 updater를 즉시 실행한다(eager state) — 직전에 다른 상태 변경이 있으면 렌더까지 미뤄진다.
   그래서 "updater 안에서 결과를 모으고 호출 직후 그 값으로 성공을 판정"하면 **되다 안 되다** 한다.
@@ -75,7 +83,16 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 - **`db/seed.sql`은 로컬 픽스처다 — 원격 D1에 실행하지 말 것.** `TEST`의 암호가 저장소에 적혀
   있어, 원격에 넣으면 누구나 로그인하는 계정이 라이브에 생긴다. **서비스에 특별 취급되는 계정은
   없다** — 예전엔 공개 데모 계정을 두고 서버가 쓰기를 막았지만, 그 구조는 계정을 관리할 방법까지
-  함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다.
+  함께 없앴다. 지금은 구경거리가 계정이 아니라 페이지라 그 문제 자체가 없다. **관리자도 예외가
+  아니다** — DB에 role이 없고, secret `ADMIN_USERCODES`의 목록과 대조할 뿐이다(`packages/api/src/lib/admin.ts`).
+  관리자 판정을 DB로 옮기면 첫 관리자를 누가 지정하느냐는 부트스트랩 문제와 "특별한 행"이 함께 돌아온다.
+  관리 요청에는 계정과 별개로 secret `ADMIN_KEY`로 푼 1시간 토큰(`X-Admin-Token`)이 더 필요하다 — 계정
+  인증이 일부러 얕은 만큼(4자리 PIN) 그 계정 하나가 새도 관리까지는 못 가게. **관리 라우트를 더할 때는
+  `adminRequired` 뒤에 `adminUnlocked`도 건다.** 잠긴 상태는 401이 아니라 403+`locked` — 401은 랩이 세션
+  만료로 읽어 로그아웃시킨다. **`ADMIN_KEY`로 토큰을 서명하지 말 것** — 키는 기억할 길이라 온라인 시도
+  횟수로만 막는데, 그 키로 서명한 토큰이 하나라도 새면 rate limit 없는 오프라인 추측의 재료가 된다. 서명은
+  무작위 32자 이상의 `ADMIN_TOKEN_SECRET`으로 하고, 토큰은 세션 토큰 해시에 묶는다(레거시 `유저코드:PIN`
+  인증으로는 관리에 들어올 수 없다).
 - **데모는 DB가 아니라 콘텐츠다 — D1과 이어 붙이지 말 것.** 덱(`/demo`)도 카드(`/DEMO…`)도
   `apps/web/src/demo-beans.json` 하나로 그리는 정적 페이지이고, D1은 데모를 전혀 모른다.
   조회 페이지가 `DEMO` 접두 KEY를 API 대신 이 JSON으로 답한다(`apps/web/src/viewer.ts`) —
@@ -117,7 +134,28 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   (v1.2.0 때 36건). 이유는 README "운영"의 브랜치 보호 규칙 항목에 있다.
 - **새 파일은 `git add` 후에 `npm run gen:structure`를 돌린다** — 생성기는 인덱스(커밋될 내용)만
   보므로, 스테이징 전에 생성하면 새 파일이 빠진 채로 커밋되고 CI에서 잡힌다.
+- **rate limit은 `reserveAttempt`(판정과 기록이 UPSERT … RETURNING 한 문장)로만 건다.** "읽어서 검사 →
+  검증 → 실패면 기록"으로 나누면 동시에 보낸 요청이 모두 검사를 통과해 한도가 없는 것과 같다. 예약은 검증
+  **전에**, 그리고 맞고 틀림과 무관하게 한다 — 맞는 입력만 한도를 건너뛰면 응답이 정답을 알려 준다.
+  맞힌 시도는 `releaseAttempt`로 돌려준다. 그래서 `ratelimit.ts`에는 검사만 하는 함수가 없다.
 - 커밋 전 `npm run check` 통과 확인. 디렉터리 배치나 wrangler 설정을 건드렸다면 `npm run check:full`.
+
+## 커밋 규칙
+
+로그 한 줄만 보고 성격과 내용을 알 수 있게 쓴다. 예전 메시지(`… — …` 서사형 제목, 수십 줄
+본문)는 읽기 전에 해석이 필요했다 — 그래서 바꿨다(2026-10-06).
+
+- 제목: `<type>: <한국어 요약>` — 스코프 `()` 없음, 마침표 없음, 50자 안팎.
+  type은 `feat`(기능) · `fix`(버그) · `refactor`(동작 불변 재구성) · `perf` · `test` ·
+  `style`(UI/스타일만) · `docs` · `chore`(빌드·설정·의존성).
+- 본문: 선택. 쓴다면 `- ` 항목 2~5줄, 항목마다 "무엇을 왜" 한 줄. 긴 근거·검증 기록은
+  PR 본문에 둔다.
+- 커밋 하나에 논리적 변경 하나. 목적이 다르면 나눈다.
+- 브랜치는 `<type>/<영문-케밥>` (예: `feat/admin-page`).
+- `main` 병합은 squash라 **PR 제목이 `main`의 커밋 제목이 된다** — PR 제목도 위 형식으로 쓰고,
+  병합 때 본문은 짧은 목록으로 줄인다(기본값은 브랜치 커밋 메시지 전체를 이어 붙인다).
+  `main → deploy` 승격의 merge commit 제목은 예외다.
+- Dependabot PR은 `.github/dependabot.yml`의 `commit-message.prefix`로 `chore:`가 붙는다.
 
 ## 문서 관리 원칙
 
@@ -133,14 +171,17 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
 | 변경 이력 (한 줄 요약) | [README.md](README.md) "주요 변경" |
 | 릴리스 노트 (전문) | GitHub Releases — 태그가 버전의 단일 소스 |
 | 남은 작업·백로그 | GitHub Issues (README "로드맵"이 색인) |
-| 설계 배경·아키텍처 근거 | [README.md](README.md) "구조" · [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
+| 설계 배경·아키텍처 근거 | [README.md](README.md) "구조" |
 | 디자인 시스템 (색·타이포·컴포넌트·컬러 규칙) | [DESIGN.md](DESIGN.md) — 값의 단일 소스는 `apps/web/public/theme.css` |
 | 원칙·금지 사항·함정 | 이 문서 |
+| 위 문서 전부를 사람이 한눈에 보는 페이지 | **생성** — `npm run gen:html` → [HOW_IT_WORKS.html](HOW_IT_WORKS.html) |
 
 - **문서 파일을 늘리지 않는다.** 새 `.md`를 만들기 전에 기존 문서의 한 섹션으로 들어갈 수
   없는지 먼저 본다. 문서가 늘면 같은 사실이 여러 곳에 흩어지고, 그게 곧 낡는 원인이다.
-  `STRUCTURE.md`는 예외인데 — 전부 생성물이라 사람이 유지할 게 없고, README에서 덜어낸
-  것이지 새로 더한 게 아니다.
+  `STRUCTURE.md`와 `HOW_IT_WORKS.html`은 예외인데 — 둘 다 전부 생성물이라 사람이 유지할 게 없고,
+  STRUCTURE.md는 README에서 덜어낸 것이지 새로 더한 게 아니다. HOW_IT_WORKS.html은 `.md` 넷(README·
+  CLAUDE·DESIGN·STRUCTURE)을 사람이 읽기 좋게 한 페이지로 렌더한 것이라 **손으로 고치지 않는다** —
+  문장을 바꾸려면 원본 `.md`를 고치고 다시 생성한다.
 - **문서는 독자로 가른다.** README는 사람이 읽는다(무엇인지·어떻게 쓰는지·어떻게 운영하는지),
   STRUCTURE.md는 코드 파악용, DESIGN.md는 디자인 시스템(색·타이포·컴포넌트 규칙), 이 문서는 원칙.
   한 파일이 여러 독자를 상대하기 시작하면 양쪽 모두에게 불친절해진다.

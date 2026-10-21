@@ -103,7 +103,9 @@ export default function QrCard(p: Props) {
             </div>
           </div>
 
-          <div className={`status-line ${p.status.cls}`}>{p.status.msg}</div>
+          <div role="status" className={`status-line ${p.status.cls}`}>
+            {p.status.msg}
+          </div>
 
           <p className="hint">
             여백은 최소로만 넣었습니다 — <b>주변은 흰 바탕</b>이어야 스캔됩니다.

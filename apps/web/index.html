@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 조회·덱·데모 정적 앱 — 인쇄된 QR이 도착하는 곳. Vite MPA(index·deck·demo.html)로 빌드돼 dist/ 루트가 된다. -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -46,15 +47,17 @@
   .pass-band { padding: 20px 22px 16px; background-color: var(--surface-2); }
   .band-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .origin-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  /* 대문자는 CSS가 아니라 저장값이 진다(@bnhd/schema normalizeRoastery) — 보이는 글자를
+     복사하면 그대로 나와야 한다. 여기 남은 자간·웨이트가 캡스의 결을 만든다. */
   .band-roastery {
     font-size: 11.5px; font-weight: 700; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--ink); opacity: .78;
+    color: var(--ink); opacity: .78;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   h1.origin {
     margin: 0; font-family: var(--display); font-weight: 700;
     font-size: clamp(28px, 7.6vw, 36px); line-height: 1.06;
-    letter-spacing: -.01em; text-transform: uppercase; text-wrap: balance;
+    letter-spacing: -.01em; text-wrap: balance;
   }
   .subline { margin: 8px 0 0; font-size: 14px; color: var(--sub); font-weight: 500; }
   .subline .sep { padding: 0 5px; }
@@ -80,6 +83,8 @@
   dl.ticket-row > div { display: flex; flex-direction: column; min-width: 0; }
   dt { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--sub); }
   dl.ticket-row dd { margin: 3px 0 0; font-family: var(--mono); font-size: 15px; font-weight: 700; }
+  /* 로스팅 레벨 견본 — 실제 원두 색(화면 전용, DESIGN.md §3). 밝은 쪽이 흰 배경에 묻히지 않게 테두리를 둔다 */
+  .roast-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; border: 1px solid rgb(128 128 128 / .4); vertical-align: 1px; }
   /* 부가 스펙(가공·품종·고도…)은 행이 아니라 한 줄 텍스트로 — 티켓 행과 위계를 가른다 */
   .specline { margin: 12px 0 0; font-size: 12.5px; color: var(--sub); line-height: 1.7; }
   .specline b { color: var(--ink); font-weight: 600; }
@@ -107,6 +112,9 @@
   .memo { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
   .memo-label { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--sub); margin-bottom: 3px; }
   .memo-body { font-size: 13.5px; }
+  /* 문단 사이는 빈 줄이 아니라 여백으로 — 문단 안의 줄바꿈(블렌드 구성 등)은 pre-line이 살린다 */
+  .memo-body p { margin: 0 0 8px; white-space: pre-line; }
+  .memo-body p:last-child { margin-bottom: 0; }
 
   /* ---- 상태 / 랜딩 ---- */
   .status { text-align: center; padding: 52px 22px; color: var(--sub); font-size: 14px; }
@@ -126,6 +134,8 @@
     text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
   }
   .landing-links a:hover { text-decoration-color: var(--ink); }
+  .landing-session { margin: 10px 0 0; font-size: 12px; color: var(--sub); }
+  .landing-session code { font-family: var(--mono); font-weight: 700; color: var(--ink); letter-spacing: .06em; }
 
   /* ---- 카메라 QR 스캔 ---- */
   /* 보조 동선이므로 accent를 쓰지 않는다 — 주 동선(조회 버튼)과 경쟁하지 않게 중립 보더로 */
@@ -183,8 +193,10 @@
       <button class="primary" type="submit">조회</button>
     </form>
     <div class="landing-links">
-      <a href="/demo">데모 둘러보기</a> &nbsp;·&nbsp; <a href="/deck">내 원두 덱</a> &nbsp;·&nbsp; <a href="/lab">랩 (등록·QR 발급)</a>
+      <a href="/demo">데모 둘러보기</a> &nbsp;·&nbsp; <a href="/deck">내 원두 덱</a> &nbsp;·&nbsp; <a href="/lab">랩 (등록·QR 발급)</a><span id="landing-admin" class="hidden"> &nbsp;·&nbsp; <a href="/lab/#admin">관리</a></span>
     </div>
+    <!-- 이 브라우저에 세션이 있고 서버가 받아 줄 때만 보인다 — 채우는 것은 viewer.ts의 showSignedIn -->
+    <p id="landing-session" class="landing-session hidden"></p>
   </div>
 
   <div id="scanner" class="scanner hidden">
@@ -215,7 +227,7 @@
         <div id="f-roasted-box" class="hidden"><dt>RSTD</dt><dd id="f-roasted"></dd></div>
         <div id="f-packed-box" class="hidden"><dt>PKGD</dt><dd id="f-packed"></dd></div>
         <div id="f-net-box" class="hidden"><dt>NET</dt><dd id="f-net"></dd></div>
-        <div id="f-roastpt-box" class="hidden"><dt>ROAST PT</dt><dd id="f-roastpt"></dd></div>
+        <div id="f-roastpt-box" class="hidden"><dt>ROAST</dt><dd id="f-roastpt"></dd></div>
       </dl>
       <p class="specline hidden" id="f-specline"></p>
     </div>

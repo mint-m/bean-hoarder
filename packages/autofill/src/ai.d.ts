@@ -1,6 +1,7 @@
 // ai.js의 타입 선언 — 브라우저(랩)와 서버(api)가 같은 모듈을 쓰므로 선언도 패키지 안에 둔다
 // (각 앱이 따로 손으로 선언하면 갈라진다).
-export declare const AI_MODEL: string;
+export declare const AI_MODELS: string[];
+export declare function shouldTryNextModel(status: number): boolean;
 export declare const AI_ENDPOINT: string;
 export declare const AI_MAX_CHARS: number;
 export declare const AI_FIELD_KEYS: string[];
