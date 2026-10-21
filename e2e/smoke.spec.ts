@@ -168,3 +168,34 @@ test("랩: AI 대행을 쓰면 설정 서랍의 남은 횟수가 서버가 준 �
   await page.getByRole("button", { name: "설정" }).click();
   await expect(page.getByText("오늘 7번 남음", { exact: false })).toBeVisible();
 });
+
+// 위 테스트의 반대 순서 — AI 대행 응답이 로그인 직후의 /api/me보다 **먼저** 오는 경우. CI가 느리면 실제로
+// 이 순서가 되어, 갱신이 버려지거나 뒤늦은 /api/me의 옛 값(10번)이 덮어썼다. /api/me를 붙잡아 순서를 고정한다.
+test("랩: /api/me가 AI 대행보다 늦게 와도 남은 횟수는 더 새 값(AI 대행 응답)을 따른다", async ({ page }) => {
+  let releaseMe: () => void = () => {};
+  const meHeld = new Promise<void>((r) => {
+    releaseMe = r;
+  });
+  await page.route("**/api/me", async (route) => {
+    await meHeld;
+    await route.continue();
+  });
+  await page.route("**/api/extract", async (route) => {
+    await route.fulfill({
+      json: { ok: true, fields: { ROASTERY: "MOCK ROASTERY", ORIGIN: "KENYA" }, remaining: 7 },
+    });
+    releaseMe();
+  });
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByPlaceholder("원두 [링크] 또는 [정보/노트] 붙여넣기").fill("MOCK ROASTERY Kenya AA washed");
+  await page.getByRole("button", { name: "채우기" }).click();
+  await expect(page.getByPlaceholder("ETHIOPIA", { exact: true })).toHaveValue("KENYA");
+
+  await page.getByRole("button", { name: "설정" }).click();
+  await expect(page.getByText("오늘 7번 남음", { exact: false })).toBeVisible();
+});

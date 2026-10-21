@@ -27,6 +27,10 @@ export default function App() {
   // /api/me의 상태 하나 — 로그아웃하면 loading으로 돌아가 다음 로그인이 이전 세션의 실패를 물려받지 않는다
   const [meStatus, setMeStatus] = useState<"loading" | "ok" | "error">("loading");
   const [meAttempt, setMeAttempt] = useState(0); // 실패 뒤 다시 묻는 계기
+  // 오늘 남은 AI 대행 횟수 — /api/me와 /api/extract 두 곳에서 오고, 도착 순서가 보장되지 않는다(#103).
+  // 그래서 값에 "언제 물어본 값인가"(at)를 붙여 더 새 쪽만 남긴다. me 안에 두면 me가 아직 없을 때 온 갱신이
+  // 버려지고, 뒤늦게 도착한 /api/me의 옛 값이 새 값을 덮는다 — CI에서 실제로 그렇게 깨졌다.
+  const [aiRemaining, setAiRemaining] = useState<{ value: number; at: number } | null>(null);
   const [adminRoute, setAdminRoute] = useState(wantsAdmin);
   const signedIn = !!account?.usercode && !!account?.token;
   // 관리 화면은 주소가 #admin이고 서버가 관리자라고 답했을 때만이다. 비관리자에겐 #admin이 아무 뜻도 없다.
@@ -71,14 +75,21 @@ export default function App() {
     if (!signedIn || !account) {
       setMe(null);
       setMeStatus("loading");
+      setAiRemaining(null);
       return;
     }
     let alive = true;
     setMeStatus("loading");
+    const askedAt = performance.now(); // 이 응답은 "이 시각 이후의 서버 상태"다
     api<{ is_admin: boolean; ai_quota: AiQuota }>("/api/me", account.token).then((res) => {
       if (!alive) return;
       if (res.body?.ok) {
-        setMe({ is_admin: res.body.is_admin, ai_quota: res.body.ai_quota });
+        const { is_admin, ai_quota } = res.body;
+        setMe({ is_admin, ai_quota });
+        // 묻는 사이에 AI 대행 응답이 먼저 왔다면 그쪽이 더 새 값이다
+        setAiRemaining((prev) =>
+          prev && prev.at > askedAt ? prev : { value: ai_quota.remaining, at: askedAt },
+        );
         setMeStatus("ok");
       } else setMeStatus("error");
     });
@@ -118,10 +129,9 @@ export default function App() {
     setExpired(true);
   }, []);
 
-  // AI 대행을 쓸 때마다 서버가 남은 횟수를 준다 — 로그인 때 한 번 받은 /api/me 값에 덮어써 설정 서랍이
-  // 낡은 숫자("10번 남음")를 말하지 않게 한다(#103). 다음 상태는 앞 상태에서만 계산한다.
+  // AI 대행을 쓸 때마다 서버가 남은 횟수를 준다 — 지금 막 받은 값이라 언제나 가장 새 값이다(#103).
   const handleAiRemaining = useCallback((remaining: number) => {
-    setMe((prev) => (prev ? { ...prev, ai_quota: { ...prev.ai_quota, remaining } } : prev));
+    setAiRemaining({ value: remaining, at: performance.now() });
   }, []);
 
   const handleSignedIn = useCallback((next: Account) => {
@@ -172,7 +182,11 @@ export default function App() {
               </button>
             </div>
           )}
-          <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen} aiQuota={me?.ai_quota ?? null} />
+          <SettingsMenu
+            open={settingsOpen}
+            setOpen={setSettingsOpen}
+            aiQuota={me ? { ...me.ai_quota, remaining: aiRemaining?.value ?? me.ai_quota.remaining } : null}
+          />
         </div>
       </header>
       {signedIn && view === "admin" ? (
