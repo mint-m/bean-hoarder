@@ -91,6 +91,10 @@ export default function FlavorPicker({
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // 한글은 조합 중에 친 Enter가 "글자 확정"이지 "담기"가 아니다. 이걸 거르지 않으면 Chrome은 조합 중
+    // keydown과 확정 뒤 keydown을 둘 다 보내, "자스민"+Enter 한 번에 Jasmine이 담기고 남은 "민"이나
+    // 빈 검색어의 첫 후보(Floral)가 하나 더 담긴다. Safari는 isComposing 대신 keyCode 229로 알린다.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     const rows = results.length + (showNew ? 1 : 0);
     if (e.key === "Enter") {
       e.preventDefault(); // 폼 제출을 막는다 — 여기서 Enter는 "담기"다
