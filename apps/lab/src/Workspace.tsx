@@ -85,10 +85,13 @@ export default function Workspace({
   account,
   onSessionExpired,
   onOpenSettings,
+  onAiRemaining,
 }: {
   account: Account;
   onSessionExpired: () => void;
   onOpenSettings: () => void;
+  /** 서버가 알려 준 오늘 남은 AI 대행 횟수 — 설정 서랍의 "오늘 N번 남음"이 같은 숫자를 보게 App에 올린다(#103) */
+  onAiRemaining: (remaining: number) => void;
 }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   // 이벤트 핸들러에서 "지금의 폼"을 읽기 위한 최신값 참조 — 자동 채우기가 다음 상태를
@@ -705,6 +708,7 @@ export default function Workspace({
       },
     );
     if (body?.ok && body.fields) {
+      if (typeof body.remaining === "number") onAiRemaining(body.remaining);
       const ok = fillParsed(body.fields, "AI ", true);
       // 남은 횟수가 얼마 없으면 미리 알린다 — 갑자기 품질이 떨어진 것처럼 느끼지 않게
       if (ok && typeof body.remaining === "number" && body.remaining <= 3) {
@@ -716,7 +720,10 @@ export default function Workspace({
     // 소진 판정은 상태 코드로 한다: 서버가 429를 내는 경우는 이것뿐이고, 문구(AI_QUOTA_ERROR)는
     // 사용자에게 보이는 말이라 다듬는 순간 조건이 빗나가도 테스트는 전부 통과한다.
     // fallback 플래그로는 못 가른다 — 키 미설정(503)·호출 실패(502)도 같은 플래그를 준다.
-    if (status === 429) setAiQuotaLeft(0);
+    if (status === 429) {
+      setAiQuotaLeft(0);
+      onAiRemaining(0);
+    }
     // 키 미설정(503)·상위 호출 실패(502)는 우리 쪽 사정이다. 조용히 내려가면 사용자는 "AI가 원래
     // 이 정도"라고 오해하고, 우리는 기능이 죽은 줄도 모른다 — 서버 로그와 짝이 되는 화면 신호다.
     if (status === 502 || status === 503) setAiServiceDown(true);

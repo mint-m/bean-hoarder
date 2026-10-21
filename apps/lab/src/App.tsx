@@ -118,6 +118,12 @@ export default function App() {
     setExpired(true);
   }, []);
 
+  // AI 대행을 쓸 때마다 서버가 남은 횟수를 준다 — 로그인 때 한 번 받은 /api/me 값에 덮어써 설정 서랍이
+  // 낡은 숫자("10번 남음")를 말하지 않게 한다(#103). 다음 상태는 앞 상태에서만 계산한다.
+  const handleAiRemaining = useCallback((remaining: number) => {
+    setMe((prev) => (prev ? { ...prev, ai_quota: { ...prev.ai_quota, remaining } } : prev));
+  }, []);
+
   const handleSignedIn = useCallback((next: Account) => {
     setExpired(false);
     setAccount(next);
@@ -176,6 +182,7 @@ export default function App() {
           account={account}
           onSessionExpired={handleSessionExpired}
           onOpenSettings={() => setSettingsOpen(true)}
+          onAiRemaining={handleAiRemaining}
         />
       ) : (
         <AuthView onSignedIn={handleSignedIn} notice={expired ? EXPIRED_NOTICE : ""} />
