@@ -15,14 +15,38 @@ import {
   sha256hex,
 } from "../lib/crypto";
 import { json } from "../lib/http";
-import { clientIp, IP_BUCKET_LIMIT, isRateLimited, RATE_LIMIT_ERROR, recordFailure } from "../lib/ratelimit";
+import {
+  clientIp,
+  IP_BUCKET_LIMIT,
+  isRateLimited,
+  OPEN_SIGNUP_LIMIT,
+  RATE_LIMIT_ERROR,
+  recordFailure,
+  releaseAttempt,
+  reserveAttempt,
+} from "../lib/ratelimit";
 import { createSession, revokeSession } from "../lib/session";
+import { getSignupMode } from "../lib/settings";
+
+export const SIGNUP_CLOSED_ERROR = "지금은 가입을 받지 않습니다.";
 
 export async function signup(c: Context<AppEnv>): Promise<Response> {
   const body = signupBodySchema.parse(await c.req.json().catch(() => ({})));
   const db = createDb(c.env.DB);
   const signupBucket = `signup:${clientIp(c.req.raw)}`;
-  if (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE) {
+  // 가입 모드(관리자 설정, lib/settings.ts): closed면 문을 닫고, open이면 초대코드를 묻지 않는다.
+  // invite(기본)는 종전 그대로 — 아래 403과 메시지가 계약이다(app.test.ts).
+  const mode = await getSignupMode(db);
+  // 닫힌 문을 두드리는 것도 센다 — 가입을 닫는 방법이 INVITE_CODE를 비우는 것이던 때는 오답 한도를 그대로
+  // 탔으므로, 모드가 생겼다고 한도 없는 엔드포인트가 되면 회귀다(#102). 버킷은 초대코드 오답과 **따로** 둔다 —
+  // 같이 쓰면 닫혀 있는 동안 두드린 IP가 다시 열린 뒤에도 맞는 초대코드로 429를 받는다. 메시지는 그대로 403.
+  if (mode === "closed") {
+    if (!(await reserveAttempt(db, `signup-closed:${clientIp(c.req.raw)}`, IP_BUCKET_LIMIT))) {
+      return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
+    }
+    return json({ ok: false, error: SIGNUP_CLOSED_ERROR }, 403);
+  }
+  if (mode === "invite" && (!c.env.INVITE_CODE || body.invite !== c.env.INVITE_CODE)) {
     if (await isRateLimited(db, signupBucket, IP_BUCKET_LIMIT)) {
       return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
     }
@@ -31,6 +55,12 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
   }
   const pin = body.password;
   if (!PIN_RE.test(pin)) return json({ ok: false, error: "암호는 숫자 4자리여야 합니다." }, 400);
+  // 열린 모드에서는 가입을 센다 — 초대코드라는 문턱이 없는 대신 IP당 속도로 막는다(ratelimit.ts). 계정을 만들기
+  // **전에** 예약해야 병렬 요청이 한도를 넘지 못한다. 만들지 못하고 끝나면(아래 500) 예약을 돌려준다.
+  const openBucket = mode === "open" ? `signup-ok:${clientIp(c.req.raw)}` : null;
+  if (openBucket && !(await reserveAttempt(db, openBucket, OPEN_SIGNUP_LIMIT))) {
+    return json({ ok: false, error: RATE_LIMIT_ERROR }, 429);
+  }
 
   const recoveryKey = randomRecoveryKey();
   const recoveryHash = await sha256hex(normalizeRecoveryKey(recoveryKey));
@@ -59,6 +89,7 @@ export async function signup(c: Context<AppEnv>): Promise<Response> {
       /* usercode 충돌 시 재시도 */
     }
   }
+  if (openBucket) await releaseAttempt(db, openBucket);
   return json({ ok: false, error: "유저코드 발급 실패 (재시도 요망)" }, 500);
 }
 

@@ -146,3 +146,25 @@ test("랩: 세션이 만료되면 안내와 함께 로그인 화면으로 돌아
   // 죽은 토큰이 남아 있으면 다음 방문에도 같은 일이 반복된다
   expect(await page.evaluate(() => localStorage.getItem("bh_session"))).toBeNull();
 });
+
+// 설정 서랍의 "오늘 N번 남음"은 로그인 때 한 번 받은 값이었다 — AI 대행을 써도 줄지 않았다(#103).
+// e2e 서버엔 서비스 키가 없으므로 /api/extract 응답만 가로채 "서버가 7번 남았다고 답했다"를 만든다.
+test("랩: AI 대행을 쓰면 설정 서랍의 남은 횟수가 서버가 준 값으로 바뀐다", async ({ page }) => {
+  await page.route("**/api/extract", (route) =>
+    route.fulfill({
+      json: { ok: true, fields: { ROASTERY: "MOCK ROASTERY", ORIGIN: "KENYA" }, remaining: 7 },
+    }),
+  );
+  await page.goto("/lab/");
+  await page.getByPlaceholder("ABCD").fill("TEST");
+  await page.getByPlaceholder("0000").fill("0000");
+  await page.getByRole("button", { name: "이 브라우저에 로그인" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByPlaceholder("원두 [링크] 또는 [정보/노트] 붙여넣기").fill("MOCK ROASTERY Kenya AA washed");
+  await page.getByRole("button", { name: "채우기" }).click();
+  await expect(page.getByPlaceholder("ETHIOPIA", { exact: true })).toHaveValue("KENYA");
+
+  await page.getByRole("button", { name: "설정" }).click();
+  await expect(page.getByText("오늘 7번 남음", { exact: false })).toBeVisible();
+});

@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   count    INTEGER NOT NULL DEFAULT 0,
   reset_at TEXT NOT NULL
 );
+-- recordFailure의 만료 청소(DELETE WHERE reset_at <= now())가 테이블 전체를 훑지 않도록.
+-- 인덱스가 없으면 실패가 몰릴수록(브루트포스) 청소 한 번의 비용도 함께 커진다.
+CREATE INDEX IF NOT EXISTS idx_auth_attempts_reset_at ON auth_attempts(reset_at);
 
 -- R2 비용 백스톱 — 서비스 전역 월간 R2 쓰기(Class A) 카운터. 단일 행(id='global').
 -- 월이 바뀌면 write_count 리셋, 임계값 초과 시 로고 쓰기를 거부해 요금 폭탄을 물리적으로 막는다.
@@ -78,4 +81,12 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   bucket   TEXT PRIMARY KEY,
   count    INTEGER NOT NULL DEFAULT 0,
   reset_at TEXT NOT NULL
+);
+
+-- 서비스 설정 key/value — signup_mode(invite | open | closed) 등. 관리자 페이지(#88)가 읽고 쓴다.
+-- 행이 없으면 코드는 기본값으로 본다(signup_mode → invite).
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

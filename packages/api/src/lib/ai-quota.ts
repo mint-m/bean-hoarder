@@ -16,21 +16,12 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { schema } from "../db";
 
-/** 계정별 하루 한도 (서비스 키로 대신 호출해 주는 횟수). */
-export let DAILY_PER_ACCOUNT = 10;
-/** 서비스 전역 하루 한도. */
-export let DAILY_GLOBAL = 100;
-
-/** 테스트 전용 — 경계 케이스를 100번 호출하지 않고 검증하기 위한 조정 창구. */
-export function setAiQuotaForTest(perAccount: number, global: number): () => void {
-  const prev = [DAILY_PER_ACCOUNT, DAILY_GLOBAL] as const;
-  DAILY_PER_ACCOUNT = perAccount;
-  DAILY_GLOBAL = global;
-  return () => {
-    DAILY_PER_ACCOUNT = prev[0];
-    DAILY_GLOBAL = prev[1];
-  };
+/** 하루 한도 — 계정별(서비스 키로 대신 호출해 주는 횟수)과 서비스 전역. */
+export interface AiQuota {
+  readonly perAccount: number;
+  readonly global: number;
 }
+export const AI_QUOTA: AiQuota = { perAccount: 10, global: 100 };
 
 export const AI_QUOTA_ERROR =
   "오늘 쓸 수 있는 AI 인식을 다 썼습니다. 설정에서 본인 키를 넣으면 제한 없이 쓸 수 있어요.";
@@ -38,13 +29,21 @@ export const AI_QUOTA_ERROR =
 /**
  * 1회 사용을 예약한다 — "판정 = 기록"을 원자적 UPSERT로 묶어 동시 요청에서도 한도를 지킨다
  * (체크 후 기록 사이의 TOCTOU 레이스 없음. ratelimit.ts와 같은 방식).
- * 날짜가 바뀌면 카운터가 스스로 리셋된다.
+ * 날짜가 바뀌면 `reset_at`이 카운터를 리셋한다 — 버킷 키에 날짜를 넣지 않으므로 행은 계정 수만큼만
+ * 생기고 영원히 쌓이지 않는다(#71). 한도는 인자로 받는다 — 테스트가 경계를 낮춰 검증할 수 있게.
  *
  * @returns 허용되면 남은 횟수, 한도를 넘었으면 null
  */
-export async function reserveAiCall(db: Db, usercode: string): Promise<number | null> {
-  // 하루 경계는 D1의 시계(UTC)를 따른다 — datetime('now')와 같은 기준이어야 리셋이 어긋나지 않는다.
-  const nextReset = sql.raw("datetime('now', '+1 day', 'start of day')");
+export async function reserveAiCall(
+  db: Db,
+  usercode: string,
+  quota: AiQuota = AI_QUOTA,
+): Promise<number | null> {
+  // 하루 경계는 **한국 시간 자정**이다(#110) — 사용자가 "오늘"이라 읽는 날이 그날이다. UTC 자정이면 한국에서
+  // 오전 9시에 풀려 밤 11시에 다 쓴 사람이 자정이 지나도 "0번 남음"을 본다. 저장하는 값은 여전히 D1 시계(UTC)
+  // 문자열이다 — 위 비교(`reset_at <= datetime('now')`)와 같은 기준이어야 하므로, KST로 옮겨 날짜를 자른 뒤 다시 되돌린다.
+  // 서비스가 한국 전용이라는 가정이 여기 한 줄에 있다.
+  const nextReset = sql.raw("datetime('now', '+9 hours', '+1 day', 'start of day', '-9 hours')");
 
   async function bump(bucket: string): Promise<number> {
     // reset_at이 지났으면 1로 시작, 아니면 +1. RETURNING으로 확정된 값을 그대로 돌려받는다.
@@ -59,10 +58,10 @@ export async function reserveAiCall(db: Db, usercode: string): Promise<number | 
   }
 
   const acctCount = await bump(accountBucket(usercode));
-  if (acctCount > DAILY_PER_ACCOUNT) return null;
+  if (acctCount > quota.perAccount) return null;
 
   const globalCount = await bump(globalBucket());
-  if (globalCount > DAILY_GLOBAL) {
+  if (globalCount > quota.global) {
     // 전역 한도에 막힌 것은 이 사용자의 잘못이 아니다 — 방금 예약한 계정 몫을 돌려준다.
     // (releaseAiCall은 전역도 함께 내리지만 여기선 그게 맞다 — 이미 한도를 넘겨 올라간 값이라
     // 되돌려도 한도와 같아 다음 요청은 계속 막힌다.)
@@ -70,15 +69,13 @@ export async function reserveAiCall(db: Db, usercode: string): Promise<number | 
     return null;
   }
 
-  return DAILY_PER_ACCOUNT - acctCount;
+  return quota.perAccount - acctCount;
 }
 
-/** UTC 날짜 — D1의 date('now')와 같은 기준으로 버킷 키를 만든다 */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-const accountBucket = (usercode: string) => `acct:${usercode}:${today()}`;
-const globalBucket = () => `global:${today()}`;
+// 버킷 키는 날짜 없이 고정 — 하루 경계는 reset_at이 만든다(ratelimit.ts와 같은 장치). 예전에는 키에
+// 날짜를 넣어 매일 새 행이 생겼고, 그러면 reset_at 분기는 절대 실행되지 않으면서 행만 쌓였다.
+const accountBucket = (usercode: string) => `acct:${usercode}`;
+const globalBucket = () => "global";
 
 /** 호출이 실패했을 때 예약을 되돌린다 — 우리 잘못으로 사용자 몫을 깎지 않는다. */
 export async function releaseAiCall(db: Db, usercode: string): Promise<void> {
@@ -88,8 +85,8 @@ export async function releaseAiCall(db: Db, usercode: string): Promise<void> {
   `);
 }
 
-/** 남은 횟수 조회 (표시용) — 없으면 한도 전체가 남은 것. */
-export async function remainingAiCalls(db: Db, usercode: string): Promise<number> {
+/** 남은 횟수 조회 — `/api/me`가 랩에 내려 "오늘 N번 남음"을 보여 준다(#72). 없으면 한도 전체가 남은 것. */
+export async function remainingAiCalls(db: Db, usercode: string, quota: AiQuota = AI_QUOTA): Promise<number> {
   const row = await db
     .select({ count: schema.aiUsage.count })
     .from(schema.aiUsage)
@@ -100,5 +97,5 @@ export async function remainingAiCalls(db: Db, usercode: string): Promise<number
       ),
     )
     .get();
-  return Math.max(DAILY_PER_ACCOUNT - (row?.count ?? 0), 0);
+  return Math.max(quota.perAccount - (row?.count ?? 0), 0);
 }

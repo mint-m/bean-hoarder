@@ -134,6 +134,8 @@
     text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
   }
   .landing-links a:hover { text-decoration-color: var(--ink); }
+  .landing-session { margin: 10px 0 0; font-size: 12px; color: var(--sub); }
+  .landing-session code { font-family: var(--mono); font-weight: 700; color: var(--ink); letter-spacing: .06em; }
 
   /* ---- 카메라 QR 스캔 ---- */
   /* 보조 동선이므로 accent를 쓰지 않는다 — 주 동선(조회 버튼)과 경쟁하지 않게 중립 보더로 */
@@ -191,8 +193,10 @@
       <button class="primary" type="submit">조회</button>
     </form>
     <div class="landing-links">
-      <a href="/demo">데모 둘러보기</a> &nbsp;·&nbsp; <a href="/deck">내 원두 덱</a> &nbsp;·&nbsp; <a href="/lab">랩 (등록·QR 발급)</a>
+      <a href="/demo">데모 둘러보기</a> &nbsp;·&nbsp; <a href="/deck">내 원두 덱</a> &nbsp;·&nbsp; <a href="/lab">랩 (등록·QR 발급)</a><span id="landing-admin" class="hidden"> &nbsp;·&nbsp; <a href="/lab/#admin">관리</a></span>
     </div>
+    <!-- 이 브라우저에 세션이 있고 서버가 받아 줄 때만 보인다 — 채우는 것은 viewer.ts의 showSignedIn -->
+    <p id="landing-session" class="landing-session hidden"></p>
   </div>
 
   <div id="scanner" class="scanner hidden">
