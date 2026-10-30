@@ -58,7 +58,7 @@ npx wrangler pages dev dist --binding INVITE_CODE=test \
   라벨과 묶여 있다 — 절대 변경 금지. 커스텀 도메인·Workers 이전을 보류한 이유도 이것이다.
 - **API 계약 불변**: 기존 엔드포인트의 요청/응답 형태를 바꾸지 않는다 — 라이브 프론트가 그대로
   동작해야 한다. `packages/api/test/app.test.ts`가 **계약 문서**이므로 상태 코드나 메시지를
-  바꾸는 변경은 그 자체로 계약 파괴다. 필요하면 먼저 계획 문서에 기록한다.
+  바꾸는 변경은 그 자체로 계약 파괴다. 필요하면 먼저 GitHub Issue에 기록한다.
 - 루트 package.json에는 `"type"`을 선언하지 않는다 — 각 패키지가 자신의 package.json에
   type을 선언한다. (원래 근거였던 vendored CJS는 제거됐지만, 루트에 type을 올리려면
   전체 check + e2e로 검증한 뒤에만.)
