@@ -114,6 +114,7 @@ td code { white-space: nowrap; }
 
 <nav class="side" aria-label="목차">
 <div class="group"><a href="#readme">README.md</a><ul>
+<li class="d2"><a href="#readme-왜-이렇게-만들었나">왜 이렇게 만들었나</a></li>
 <li class="d2"><a href="#readme-사용-흐름">사용 흐름</a></li>
 <li class="d2"><a href="#readme-구조">구조</a></li>
 <li class="d2"><a href="#readme-운영">운영</a></li>
@@ -192,7 +193,15 @@ Cloudflare Pages + Functions + D1 하나로 동작하며 <strong>총 운영 비�
 <td><a href="#design">DESIGN.md</a> · <a href="#structure">STRUCTURE.md</a> · <a href="#claude">CLAUDE.md</a></td>
 </tr>
 </tbody></table>
-</div><h2 id="readme-사용-흐름"><a class="anchor" href="#readme-사용-흐름" aria-hidden="true">#</a>사용 흐름</h2>
+</div><h2 id="readme-왜-이렇게-만들었나"><a class="anchor" href="#readme-왜-이렇게-만들었나" aria-hidden="true">#</a>왜 이렇게 만들었나</h2>
+<p>AI 에이전트와 함께 만든 프로젝트다. 코드를 한 줄씩 읽는 대신, 문제가 생기면 걸러지는 장치와 낡지 않는 문서를 먼저 두었다.</p>
+<ul>
+<li><strong>검증 게이트</strong> — lint·typecheck·Vitest·Playwright e2e를 통과해야 배포된다(아래 &quot;운영&quot;). 사람이 보는 건 결과물과 AI의 보고, 테스트 결과다.</li>
+<li><strong>한 곳에서만 갱신(SSOT)</strong> — 저장소 구조는 코드에서 생성(<a href="#structure">STRUCTURE.md</a>), 버전은 태그 하나, 디자인 값은 <code>theme.css</code> 하나. 문서 파일을 늘리지 않는다는 원칙은 <a href="#claude">CLAUDE.md</a> &quot;문서 관리 원칙&quot;에 있다. 여러 에이전트·모델이 번갈아 일해도 같은 곳을 보고 같은 곳을 고친다.</li>
+<li><strong>정석을 덜어내기</strong> — AI가 내놓는 구조는 정석대로라 이 규모에는 과한 경우가 있다. v1 잔재를 걷어내 디렉터리를 평탄화했고, 조회·덱·랩이 한 빌드에서 나오게 바꿨다(아래 &quot;주요 변경&quot;).</li>
+<li><strong>명세가 먼저</strong> — 요구와 기준을 문서로 정리해 지시한다. 화면의 색과 규칙은 <a href="#design">DESIGN.md</a>에 있다.</li>
+</ul>
+<h2 id="readme-사용-흐름"><a class="anchor" href="#readme-사용-흐름" aria-hidden="true">#</a>사용 흐름</h2>
 <ol>
 <li><strong>가입</strong> — 운영자에게 받은 초대코드 + 내가 정한 숫자 4자리 암호 → 유저코드(4자리) 자동 발급 + <strong>복구키</strong>(오프라인 백업용, 1회만 표시) 발급. 브라우저에 저장되며, 유저코드+암호만 기억하면 어느 기기에서든 로그인. 복구키는 유저코드·암호를 모두 잊었을 때 재설정하는 유일한 수단.</li>
 <li><strong>입력</strong> — 상품 페이지 <strong>링크를 붙여넣으면 AI가 초안을 채운다</strong>. 그다음은 <strong>순서대로 확인만</strong> 하면 된다 — 로스터리·산지 → 가공·품종 → 날짜 → 플레이버·이름 → 용량·로스팅 포인트 → 상세(선택) 순으로 한 번에 한 단계씩 열리고, <strong>각 단계는 건너뛸 수 있다</strong>. 칸마다 추천 칩(산지·가공·품종·날짜·용량·로스팅 포인트 등)이 붙어 대부분 타이핑 없이 채워지고, AI가 채운 칸에는 &quot;확인&quot; 표시가 남아 무엇을 검토해야 하는지 드러난다. 링크가 막히는 사이트는 같은 칸에 페이지 내용을 그대로 붙여넣으면 된다 — 링크든 본문이든 한 칸에서 받는다. 같은 상품 페이지로 이미 등록한 원두가 있으면 가져오기 전에 알려 준다. 등록 버튼을 누르면 서버가 KEY(<code>{유저코드}{연도}-{순번}</code>)를 채번한다. 언제든 &quot;처음부터&quot;(입력 화면)나 &quot;새 원두 등록&quot;(QR 화면)으로 다시 시작할 수 있다.<ul>
