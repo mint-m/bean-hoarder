@@ -79,7 +79,7 @@ app.post("/fetch", authRequired, fetchExternal);
 app.post("/extract", authRequired, extractWithAi);
 
 app.get("/me", authRequired, getMe);
-// 관리자 — 목록(ADMIN_USERCODES secret)에 없으면 404. 존재 자체를 알리지 않는다(lib/admin.ts).
+// 관리자 — 목록(ADMIN_USERCODES secret)에 없으면 404. 로그인한 비관리자에게는 존재를 알리지 않는다(lib/admin.ts).
 // 잠금 해제(ADMIN_KEY → 1시간 토큰)를 거쳐야 나머지가 열린다 — 얕은 계정 인증 위의 두 번째 열쇠.
 app.post("/admin/unlock", authRequired, adminRequired, unlockAdmin);
 app.get("/admin/stats", authRequired, adminRequired, adminUnlocked, getStats);

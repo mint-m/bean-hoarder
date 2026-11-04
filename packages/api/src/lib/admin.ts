@@ -49,8 +49,9 @@ export function isAdmin(env: Env, usercode: string): boolean {
 }
 
 /**
- * 관리자 전용 — authRequired 뒤에 건다. 관리자가 아니면 **404**(403이 아니라): 관리 엔드포인트의 존재
- * 자체를 일반 사용자에게 알리지 않는다. 응답은 app.notFound와 같은 형태다.
+ * 관리자 전용 — authRequired 뒤에 건다. 관리자가 아니면 **404**(403이 아니라): 로그인한 비관리자에게
+ * 관리 엔드포인트의 존재를 알리지 않는다. 응답은 app.notFound와 같은 형태다. (로그인하지 않은 요청은
+ * authRequired가 먼저 401을 내므로 경로의 존재 자체까지 숨기지는 못한다 — 숨김에 기대는 보안이 아니다.)
  */
 export const adminRequired = createMiddleware<AppEnv>(async (c, next) => {
   if (!isAdmin(c.env, c.get("user").usercode)) return json({ ok: false, error: "not found" }, 404);

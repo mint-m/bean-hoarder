@@ -6,6 +6,7 @@ import {
   canonicalizeNotes,
   canonicalNote,
   FLAVOR_NOTES,
+  isKnownNote,
   parseNotes,
   searchNotes,
   serializeNotes,
@@ -104,4 +105,20 @@ test("콤마 목록 전체를 되돌리고 중복을 지운다", () => {
     "Pineapple, Jasmine, 알수없는향",
   );
   assert.equal(canonicalizeNotes(""), "");
+});
+
+// 관리자 페이지의 승격 후보 집계가 "어휘 밖"만 고르는 기준 — 표기가 달라도 같은 노트로 본다.
+test("isKnownNote — 영문·한글·별칭·대소문자·공백 변형은 어휘 안이다", () => {
+  assert.equal(isKnownNote("Jasmine"), true);
+  assert.equal(isKnownNote("자스민"), true);
+  assert.equal(isKnownNote("재스민"), true); // 별칭
+  assert.equal(isKnownNote("jasmine"), true);
+  assert.equal(isKnownNote("  Dark   Chocolate "), true);
+});
+
+test("isKnownNote — 어휘 밖 값과 빈 값은 아니다", () => {
+  assert.equal(isKnownNote("Honey Peachy Zzz"), false);
+  assert.equal(isKnownNote("민트초코"), false);
+  assert.equal(isKnownNote(""), false);
+  assert.equal(isKnownNote("   "), false);
 });
